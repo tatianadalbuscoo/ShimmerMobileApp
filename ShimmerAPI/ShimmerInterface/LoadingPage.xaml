@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ShimmerInterface.LoadingPage">
+
+    <VerticalStackLayout Spacing="20" Padding="30" HorizontalOptions="Center" VerticalOptions="Center">
+        <ActivityIndicator x:Name="MyActivityIndicator" IsRunning="True" IsVisible="True" />
+        <Label Text="Connecting to device..." HorizontalOptions="Center" FontSize="18" />
+    </VerticalStackLayout>
+
+</ContentPage>
