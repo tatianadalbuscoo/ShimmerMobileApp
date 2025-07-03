@@ -1,10 +1,15 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="ShimmerInterface.Views.DataPage">
+             x:Class="ShimmerInterface.Views.DataPage"
+             BackgroundColor="{StaticResource PageBackground}">
+
     <ScrollView>
-        <VerticalStackLayout Padding="20">
-            <Label Text="Dati dal sensore" FontSize="24" HorizontalOptions="Center" />
-            <Label Text="{Binding SensorText}" FontSize="14" />
+        <VerticalStackLayout Padding="20" Spacing="12">
+            <Label Text="Sensor data"
+                   Style="{StaticResource TitleLabel}" />
+            <Label Text="{Binding SensorText}"
+                   FontSize="14"
+                   TextColor="{StaticResource TextPrimary}" />
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>

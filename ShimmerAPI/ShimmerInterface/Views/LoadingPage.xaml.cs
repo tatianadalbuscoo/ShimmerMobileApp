@@ -28,7 +28,7 @@ public partial class LoadingPage : ContentPage
         }
         else
         {
-            await DisplayAlert("Errore", "Connessione fallita", "OK");
+            await DisplayAlert("Error", "Connession failed", "OK");
             await Navigation.PopAsync();
         }
     }

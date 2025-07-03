@@ -1,23 +1,37 @@
-﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+﻿
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="ShimmerInterface.Views.MainPage"
              x:Name="MainPageRoot"
-             xmlns:viewmodels="clr-namespace:ShimmerInterface.ViewModels">
+             xmlns:viewmodels="clr-namespace:ShimmerInterface.ViewModels"
+             BackgroundColor="{StaticResource PageBackground}"
+             Title="">
 
-    <VerticalStackLayout Padding="20" Spacing="10">
-        <Label Text="Shimmer Interface" FontSize="24" />
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="18" HorizontalOptions="Center" WidthRequest="380">
 
-        <Switch x:Name="AccelSwitch" IsToggled="{Binding EnableAccelerometer}" />
-        <Label Text="Accelerometer" />
+            <Label Text="Shimmer Interface"
+                   Style="{StaticResource TitleLabel}" />
 
-        <Switch IsToggled="{Binding EnableGSR}" />
-        <Label Text="GSR" />
+            <Frame Style="{StaticResource RoundedFrame}">
+                <VerticalStackLayout Spacing="14">
 
-        <Switch IsToggled="{Binding EnablePPG}" />
-        <Label Text="PPG" />
+                    <Label Text="Accelerometer" Style="{StaticResource SectionLabel}" />
+                    <Switch x:Name="AccelSwitch" IsToggled="{Binding EnableAccelerometer}" />
 
-        <Button Text="Start"
-                Command="{Binding ConnectCommand}"
-                CommandParameter="{Binding Navigation, Source={x:Reference Name=MainPageRoot}}" />
-    </VerticalStackLayout>
+                    <Label Text="GSR" Style="{StaticResource SectionLabel}" />
+                    <Switch IsToggled="{Binding EnableGSR}" />
+
+                    <Label Text="PPG" Style="{StaticResource SectionLabel}" />
+                    <Switch IsToggled="{Binding EnablePPG}" />
+
+                </VerticalStackLayout>
+            </Frame>
+
+            <Button Text="Start"
+                    Style="{StaticResource PrimaryButton}"
+                    Command="{Binding ConnectCommand}"
+                    CommandParameter="{Binding Navigation, Source={x:Reference Name=MainPageRoot}}" />
+        </VerticalStackLayout>
+    </ScrollView>
 </ContentPage>
