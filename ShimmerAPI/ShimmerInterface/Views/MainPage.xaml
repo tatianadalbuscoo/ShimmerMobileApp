@@ -1,0 +1,23 @@
+﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ShimmerInterface.Views.MainPage"
+             x:Name="MainPageRoot"
+             xmlns:viewmodels="clr-namespace:ShimmerInterface.ViewModels">
+
+    <VerticalStackLayout Padding="20" Spacing="10">
+        <Label Text="Shimmer Interface" FontSize="24" />
+
+        <Switch x:Name="AccelSwitch" IsToggled="{Binding EnableAccelerometer}" />
+        <Label Text="Accelerometer" />
+
+        <Switch IsToggled="{Binding EnableGSR}" />
+        <Label Text="GSR" />
+
+        <Switch IsToggled="{Binding EnablePPG}" />
+        <Label Text="PPG" />
+
+        <Button Text="Start"
+                Command="{Binding ConnectCommand}"
+                CommandParameter="{Binding Navigation, Source={x:Reference Name=MainPageRoot}}" />
+    </VerticalStackLayout>
+</ContentPage>

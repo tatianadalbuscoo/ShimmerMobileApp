@@ -1,4 +1,6 @@
-﻿namespace ShimmerInterface
+﻿using ShimmerInterface.Views;
+
+namespace ShimmerInterface
 {
     public partial class App : Application
     {
