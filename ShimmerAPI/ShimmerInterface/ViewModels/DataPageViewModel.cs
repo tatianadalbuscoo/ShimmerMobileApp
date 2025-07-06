@@ -75,10 +75,12 @@ public partial class DataPageViewModel : ObservableObject
         if (AvailableParameters.Count > 0)
         {
             SelectedParameter = AvailableParameters[0];
+            UpdateYAxisSettings(SelectedParameter); // ⬅️ aggiunto
         }
 
         StartTimer();
     }
+
 
     private void InitializeAvailableParameters()
     {
@@ -330,7 +332,20 @@ public partial class DataPageViewModel : ObservableObject
         }
 
         var currentDataPoints = dataPointsCollections[SelectedParameter];
-        if (currentDataPoints.Count == 0) return;
+
+        // Nessun dato? -> Mostra messaggio
+        if (currentDataPoints.Count == 0)
+        {
+            DrawNoDataMessage(canvas, info);
+            return;
+        }
+
+        // Tutti zeri o -1? (dati inutilizzabili)
+        if (currentDataPoints.All(v => v == 0 || v == -1))
+        {
+            DrawNoDataMessage(canvas, info);
+            return;
+        }
 
         // Definisce i margini e l'area del grafico
         var margin = 40f;
@@ -537,4 +552,57 @@ public partial class DataPageViewModel : ObservableObject
         var titleWidth = titlePaint.MeasureText(ChartTitle);
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
+
+    private void DrawNoDataMessage(SKCanvas canvas, SKImageInfo info)
+    {
+        var margin = 40f;
+        var bottomMargin = 65f;
+        var leftMargin = 65f;
+        var graphWidth = info.Width - leftMargin - margin;
+        var graphHeight = info.Height - margin - bottomMargin;
+
+        using var borderPaint = new SKPaint
+        {
+            Color = SKColors.LightGray,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 2
+        };
+        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
+
+        using var backgroundPaint = new SKPaint
+        {
+            Color = SKColors.LightGray.WithAlpha(100),
+            Style = SKPaintStyle.Fill
+        };
+        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, backgroundPaint);
+
+        using var messagePaint = new SKPaint
+        {
+            Color = SKColors.OrangeRed,
+            TextSize = 24,
+            IsAntialias = true,
+            FakeBoldText = true
+        };
+
+        var message = "No valid data available";
+        var messageWidth = messagePaint.MeasureText(message);
+        var centerX = leftMargin + graphWidth / 2;
+        var centerY = margin + graphHeight / 2;
+
+        canvas.DrawText(message, centerX - messageWidth / 2, centerY, messagePaint);
+
+        // Titolo
+        using var titlePaint = new SKPaint
+        {
+            Color = SKColors.Black,
+            TextSize = 20,
+            IsAntialias = true,
+            FakeBoldText = true
+        };
+        var titleWidth = titlePaint.MeasureText(ChartTitle);
+        canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
+    }
+
+
+
 }
