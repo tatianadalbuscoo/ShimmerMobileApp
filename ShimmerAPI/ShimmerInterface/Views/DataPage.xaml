@@ -44,7 +44,7 @@
                        FontSize="16" 
                        FontAttributes="Bold" />
                 <Entry Grid.Row="1" Grid.Column="1"
-                       Text="{Binding YAxisMin}"
+                       Text="{Binding YAxisMinText}"
                        Keyboard="Numeric"
                        FontSize="16"
                        BackgroundColor="White" />
@@ -56,7 +56,7 @@
                        FontSize="16" 
                        FontAttributes="Bold" />
                 <Entry Grid.Row="2" Grid.Column="1"
-                       Text="{Binding YAxisMax}"
+                       Text="{Binding YAxisMaxText}"
                        Keyboard="Numeric"
                        FontSize="16"
                        BackgroundColor="White" />
@@ -68,7 +68,7 @@
                        FontSize="16" 
                        FontAttributes="Bold" />
                 <Entry Grid.Row="3" Grid.Column="1"
-                       Text="{Binding TimeWindowSeconds}"
+                       Text="{Binding TimeWindowSecondsText}"
                        Keyboard="Numeric"
                        FontSize="16"
                        BackgroundColor="White" />
@@ -80,11 +80,18 @@
                        FontSize="16" 
                        FontAttributes="Bold" />
                 <Entry Grid.Row="4" Grid.Column="1"
-                       Text="{Binding XAxisLabelInterval}"
+                       Text="{Binding XAxisLabelIntervalText}"
+                       IsEnabled="{Binding IsXAxisLabelIntervalEnabled}"
                        Keyboard="Numeric"
                        FontSize="16"
                        BackgroundColor="White" />
             </Grid>
+
+            <!-- Messaggio di validazione -->
+            <Label Text="{Binding ValidationMessage}"
+                   TextColor="Red"
+                   FontSize="14"
+                   IsVisible="{Binding ValidationMessage, Converter={StaticResource StringToBoolConverter}}" />
 
             <!-- Separatore -->
             <BoxView HeightRequest="1"
@@ -134,7 +141,8 @@
                            TextColor="{StaticResource TextSecondary}" />
                     <Label Text="{Binding XAxisLabelInterval, StringFormat='X Labels every: {0}s'}"
                            FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
+                           TextColor="{StaticResource TextSecondary}"
+                           IsVisible="{Binding IsXAxisLabelIntervalEnabled}" />
                 </StackLayout>
             </Frame>
 
