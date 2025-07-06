@@ -5,28 +5,139 @@
              BackgroundColor="{StaticResource PageBackground}">
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="12">
+
             <!-- Sezione dati del sensore -->
             <Label Text="Sensor data"
                    Style="{StaticResource TitleLabel}" />
             <Label Text="{Binding SensorText}"
                    FontSize="14"
                    TextColor="{StaticResource TextPrimary}" />
+
             <!-- Separatore -->
             <BoxView HeightRequest="1"
                      BackgroundColor="{StaticResource Gray200}"
                      Margin="0,10" />
+
+            <!-- Controlli per la selezione del parametro -->
+            <Label Text="Chart Configuration"
+                   Style="{StaticResource TitleLabel}" />
+
+            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto" 
+                  ColumnSpacing="10" RowSpacing="10">
+
+                <!-- Selezione parametro -->
+                <Label Grid.Row="0" Grid.Column="0" 
+                       Text="Parameter:" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Picker Grid.Row="0" Grid.Column="1"
+                        ItemsSource="{Binding AvailableParameters}"
+                        SelectedItem="{Binding SelectedParameter}"
+                        FontSize="16"
+                        BackgroundColor="White" />
+
+                <!-- Scala Y minima -->
+                <Label Grid.Row="1" Grid.Column="0" 
+                       Text="Y Min:" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Entry Grid.Row="1" Grid.Column="1"
+                       Text="{Binding YAxisMin}"
+                       Keyboard="Numeric"
+                       FontSize="16"
+                       BackgroundColor="White" />
+
+                <!-- Scala Y massima -->
+                <Label Grid.Row="2" Grid.Column="0" 
+                       Text="Y Max:" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Entry Grid.Row="2" Grid.Column="1"
+                       Text="{Binding YAxisMax}"
+                       Keyboard="Numeric"
+                       FontSize="16"
+                       BackgroundColor="White" />
+
+                <!-- Finestra temporale -->
+                <Label Grid.Row="3" Grid.Column="0" 
+                       Text="Time Window (s):" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Entry Grid.Row="3" Grid.Column="1"
+                       Text="{Binding TimeWindowSeconds}"
+                       Keyboard="Numeric"
+                       FontSize="16"
+                       BackgroundColor="White" />
+
+                <!-- Intervallo etichette X -->
+                <Label Grid.Row="4" Grid.Column="0" 
+                       Text="X Labels every (s):" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Entry Grid.Row="4" Grid.Column="1"
+                       Text="{Binding XAxisLabelInterval}"
+                       Keyboard="Numeric"
+                       FontSize="16"
+                       BackgroundColor="White" />
+            </Grid>
+
+            <!-- Separatore -->
+            <BoxView HeightRequest="1"
+                     BackgroundColor="{StaticResource Gray200}"
+                     Margin="0,10" />
+
             <!-- Sezione grafico -->
             <Label Text="Real-time Chart"
                    Style="{StaticResource TitleLabel}" />
+
             <Border BackgroundColor="White"
                     Stroke="{StaticResource Gray200}"
                     StrokeThickness="1"
                     Padding="5"
-                    HeightRequest="250">
+                    HeightRequest="300">
                 <skia:SKCanvasView x:Name="canvasView"
-                                   HeightRequest="240"
+                                   HeightRequest="290"
                                    PaintSurface="OnCanvasViewPaintSurface" />
             </Border>
+
+            <!-- Informazioni parametro corrente -->
+            <Frame BackgroundColor="{StaticResource Gray100}" 
+                   Padding="15" 
+                   Margin="0,10">
+                <StackLayout>
+                    <Label Text="{Binding SelectedParameter, StringFormat='Current Parameter: {0}'}"
+                           FontSize="16"
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Primary}" />
+                    <Label Text="{Binding YAxisLabel, StringFormat='Measuring: {0}'}"
+                           FontSize="14"
+                           TextColor="{StaticResource TextSecondary}" />
+                    <Label Text="{Binding YAxisUnit, StringFormat='Unit: {0}'}"
+                           FontSize="14"
+                           TextColor="{StaticResource TextSecondary}" />
+                    <Label FontSize="14"
+                           TextColor="{StaticResource TextSecondary}">
+                        <Label.Text>
+                            <MultiBinding StringFormat="Y Range: {0:F1} - {1:F1}">
+                                <Binding Path="YAxisMin" />
+                                <Binding Path="YAxisMax" />
+                            </MultiBinding>
+                        </Label.Text>
+                    </Label>
+                    <Label Text="{Binding TimeWindowSeconds, StringFormat='Time Window: {0}s'}"
+                           FontSize="14"
+                           TextColor="{StaticResource TextSecondary}" />
+                    <Label Text="{Binding XAxisLabelInterval, StringFormat='X Labels every: {0}s'}"
+                           FontSize="14"
+                           TextColor="{StaticResource TextSecondary}" />
+                </StackLayout>
+            </Frame>
+
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>
