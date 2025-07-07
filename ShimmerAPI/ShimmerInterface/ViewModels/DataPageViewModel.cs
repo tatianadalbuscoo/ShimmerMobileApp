@@ -17,9 +17,9 @@ public partial class DataPageViewModel : ObservableObject
     private int secondsElapsed = 0;
 
     // Stato dei sensori
-    private readonly bool enableAccelerometer;
-    private readonly bool enableGSR;
-    private readonly bool enablePPG;
+    private bool enableAccelerometer;
+    private bool enableGSR;
+    private bool enablePPG;
 
     // Valori di backup per il ripristino in caso di input non validi
     private double _lastValidYAxisMin = 0;
@@ -119,12 +119,12 @@ public partial class DataPageViewModel : ObservableObject
 
     public event EventHandler? ChartUpdateRequested;
 
-    public DataPageViewModel(XR2Learn_ShimmerGSR shimmerDevice, bool enableAccelerometer = true, bool enableGSR = true, bool enablePPG = true)
+    public DataPageViewModel(XR2Learn_ShimmerGSR shimmerDevice, SensorConfiguration config)
     {
         shimmer = shimmerDevice;
-        this.enableAccelerometer = enableAccelerometer;
-        this.enableGSR = enableGSR;
-        this.enablePPG = enablePPG;
+        enableAccelerometer = config.EnableAccelerometer;
+        enableGSR = config.EnableGSR;
+        enablePPG = config.EnablePPG;
 
         InitializeAvailableParameters();
 
@@ -158,6 +158,8 @@ public partial class DataPageViewModel : ObservableObject
         UpdateTextProperties();
 
         StartTimer();
+
+        DebugSensorStatus();
     }
 
     private void UpdateTextProperties()
@@ -435,6 +437,7 @@ public partial class DataPageViewModel : ObservableObject
             AvailableParameters.Add("HeartRate");
         }
 
+        // ⚠️ IMPORTANTE: Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
         // Forza un parametro valido se quello selezionato non lo è più
         if (!AvailableParameters.Contains(SelectedParameter))
         {
@@ -450,7 +453,7 @@ public partial class DataPageViewModel : ObservableObject
             "AcceleratorX" or "AcceleratorY" or "AcceleratorZ" => enableAccelerometer,
             "GalvanicSkinResponse" => enableGSR,
             "PhotoPlethysmoGram" => enablePPG,
-            "HeartRate" => enablePPG, // HeartRate dipende da PPG
+            "HeartRate" => enablePPG, // HeartRate dipende da PPG - QUESTO È CORRETTO
             _ => false
         };
     }
@@ -632,14 +635,21 @@ public partial class DataPageViewModel : ObservableObject
     public void OnCanvasViewPaintSurface(SKCanvas canvas, SKImageInfo info)
     {
         canvas.Clear(SKColors.White);
+        System.Diagnostics.Debug.WriteLine($"enablePPG: {enablePPG}");
 
-        // Controlla subito se il sensore è disabilitato e mostra subito il messaggio
-        if (!AvailableParameters.Contains(SelectedParameter) || !IsSensorEnabled(SelectedParameter))
-        {
+        // ⚠️ PRIMA CONTROLLO: Verifica se il sensore è disabilitato
+        if (!IsSensorEnabled(SelectedParameter))
+        { 
             DrawDisabledSensorMessage(canvas, info);
             return;
         }
 
+        // ⚠️ SECONDO CONTROLLO: Verifica se il parametro è disponibile
+        if (!AvailableParameters.Contains(SelectedParameter))
+        {
+            DrawDisabledSensorMessage(canvas, info);
+            return;
+        }
 
         var currentDataPoints = dataPointsCollections[SelectedParameter];
         var currentTimeStamps = timeStampsCollections[SelectedParameter];
@@ -648,10 +658,11 @@ public partial class DataPageViewModel : ObservableObject
         {
             if (SelectedParameter == "HeartRate")
             {
+                // ⚠️ TERZO CONTROLLO: Per HeartRate, controlla nuovamente se PPG è abilitato
                 if (enablePPG)
                     DrawCalibratingMessage(canvas, info);
                 else
-                    DrawDisabledSensorMessage(canvas, info); 
+                    DrawDisabledSensorMessage(canvas, info);
             }
             else
             {
@@ -660,9 +671,7 @@ public partial class DataPageViewModel : ObservableObject
             return;
         }
 
-
-
-
+        // Resto del codice rimane invariato...
         if (currentDataPoints.All(v => v == 0 || v == -1))
         {
             DrawNoDataMessage(canvas, info);
@@ -1047,4 +1056,77 @@ public partial class DataPageViewModel : ObservableObject
         var titleWidth = titlePaint.MeasureText(ChartTitle);
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
+
+    private void DebugSensorStatus()
+    {
+        System.Diagnostics.Debug.WriteLine($"=== SENSOR STATUS DEBUG ===");
+        System.Diagnostics.Debug.WriteLine($"enablePPG: {enableAccelerometer}");
+        System.Diagnostics.Debug.WriteLine($"SelectedParameter: {SelectedParameter}");
+        System.Diagnostics.Debug.WriteLine($"IsSensorEnabled(HeartRate): {IsSensorEnabled("HeartRate")}");
+        System.Diagnostics.Debug.WriteLine($"AvailableParameters contains HeartRate: {AvailableParameters.Contains("HeartRate")}");
+        System.Diagnostics.Debug.WriteLine($"AvailableParameters: {string.Join(", ", AvailableParameters)}");
+        System.Diagnostics.Debug.WriteLine($"============================");
+    }
+
+    public void UpdateSensorConfiguration(bool enableAccelerometer, bool enableGSR, bool enablePPG)
+    {
+        // Salva il parametro attualmente selezionato
+        string currentParameter = SelectedParameter;
+
+        // Aggiorna i flag dei sensori (aggiungi questi campi come non-readonly)
+        this.enableAccelerometer = enableAccelerometer;
+        this.enableGSR = enableGSR;
+        this.enablePPG = enablePPG;
+
+        // Rigenera la lista dei parametri disponibili
+        InitializeAvailableParameters();
+
+        // Se il parametro precedente non è più disponibile, seleziona il primo disponibile
+        if (!AvailableParameters.Contains(currentParameter))
+        {
+            SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
+        }
+
+        // Aggiorna le collezioni di dati
+        UpdateDataCollections();
+
+        // Debug aggiornato
+        DebugSensorStatus();
+    }
+
+    // Metodo per aggiornare le collezioni di dati dopo cambio configurazione
+    private void UpdateDataCollections()
+    {
+        // Rimuovi le collezioni per parametri non più disponibili
+        var parametersToRemove = dataPointsCollections.Keys.Where(p => !AvailableParameters.Contains(p)).ToList();
+        foreach (var parameter in parametersToRemove)
+        {
+            dataPointsCollections.Remove(parameter);
+            timeStampsCollections.Remove(parameter);
+        }
+
+        // Aggiungi collezioni per nuovi parametri
+        foreach (var parameter in AvailableParameters)
+        {
+            if (!dataPointsCollections.ContainsKey(parameter))
+            {
+                dataPointsCollections[parameter] = new List<float>();
+                timeStampsCollections[parameter] = new List<int>();
+            }
+        }
+    }
+   
+
+    // Metodo per ottenere la configurazione corrente
+    public SensorConfiguration GetCurrentSensorConfiguration()
+    {
+        return new SensorConfiguration
+        {
+            EnableAccelerometer = enableAccelerometer,
+            EnableGSR = enableGSR,
+            EnablePPG = enablePPG
+        };
+    }
+
 }
+

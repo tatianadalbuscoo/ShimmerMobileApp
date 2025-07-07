@@ -7,15 +7,15 @@ namespace ShimmerInterface.Views;
 
 public partial class DataPage : ContentPage
 {
-    private DataPageViewModel viewModel;
+    private readonly DataPageViewModel viewModel;
 
-    public DataPage(XR2Learn_ShimmerGSR shimmer)
+    public DataPage(XR2Learn_ShimmerGSR shimmer, SensorConfiguration sensorConfig)
     {
         InitializeComponent();
-        viewModel = new DataPageViewModel(shimmer);
+
+        viewModel = new DataPageViewModel(shimmer, sensorConfig);
         BindingContext = viewModel;
 
-        // Sottoscrive l'evento per aggiornare il grafico
         viewModel.ChartUpdateRequested += OnChartUpdateRequested;
     }
 
@@ -26,7 +26,6 @@ public partial class DataPage : ContentPage
 
     private void OnChartUpdateRequested(object? sender, EventArgs e)
     {
-        // Forza il ridisegno del canvas sul thread UI
         MainThread.BeginInvokeOnMainThread(() =>
         {
             canvasView.InvalidateSurface();
@@ -35,11 +34,7 @@ public partial class DataPage : ContentPage
 
     protected override void OnDisappearing()
     {
-        // Pulisce gli eventi quando la pagina viene chiusa
-        if (viewModel != null)
-        {
-            viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
-        }
+        viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
         base.OnDisappearing();
     }
 }
