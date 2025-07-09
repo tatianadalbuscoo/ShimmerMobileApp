@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using XR2Learn_ShimmerAPI;
+using ShimmerInterface.Models;
 
 namespace ShimmerInterface.ViewModels;
 

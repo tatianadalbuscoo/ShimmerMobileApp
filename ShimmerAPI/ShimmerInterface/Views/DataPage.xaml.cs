@@ -2,8 +2,11 @@ using ShimmerInterface.ViewModels;
 using XR2Learn_ShimmerAPI;
 using SkiaSharp.Views.Maui.Controls;
 using SkiaSharp.Views.Maui;
+using ShimmerInterface.Models;
+
 
 namespace ShimmerInterface.Views;
+
 
 public partial class DataPage : ContentPage
 {

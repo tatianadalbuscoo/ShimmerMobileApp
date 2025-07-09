@@ -10,6 +10,8 @@ namespace ShimmerInterface
 
             // Set MainPage inside a NavigationPage to allow page navigation
             MainPage = new NavigationPage(new MainPage());
+
+
         }
     }
 }

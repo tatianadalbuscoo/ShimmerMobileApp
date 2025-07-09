@@ -1,49 +1,49 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using ShimmerInterface.Models;
 using ShimmerInterface.Views;
+using XR2Learn_ShimmerAPI;
 
 namespace ShimmerInterface.ViewModels;
 
 public partial class MainPageViewModel : ObservableObject
 {
-    [ObservableProperty]
-    private bool enableAccelerometer = true;
-
-    [ObservableProperty]
-    private bool enableGSR = true;
-
-    [ObservableProperty]
-    private bool enablePPG = true;
+    public ObservableCollection<SensorConfiguration> AvailableDevices { get; } = new();
 
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
     public MainPageViewModel()
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
+        LoadDevices();
+    }
+
+    private void LoadDevices()
+    {
+        AvailableDevices.Clear();
+        var ports = XR2Learn_SerialPortsManager.GetAvailableSerialPortsNames();
+
+        foreach (var port in ports)
+        {
+            AvailableDevices.Add(new SensorConfiguration
+            {
+                PortName = port,
+                IsSelected = false
+            });
+        }
     }
 
     private async Task Connect(INavigation nav)
     {
-        // Naviga a LoadingPage con i sensori selezionati
-        await nav.PushAsync(new LoadingPage(EnableAccelerometer, EnableGSR, EnablePPG));
-    }
+        var selectedDevice = AvailableDevices.FirstOrDefault(d => d.IsSelected);
 
-    // Metodo per ottenere la configurazione dei sensori
-    public SensorConfiguration GetSensorConfiguration()
-    {
-        return new SensorConfiguration
+        if (selectedDevice == null)
         {
-            EnableAccelerometer = EnableAccelerometer,
-            EnableGSR = EnableGSR,
-            EnablePPG = EnablePPG
-        };
-    }
-}
+            await App.Current.MainPage.DisplayAlert("Errore", "Seleziona un dispositivo Shimmer", "OK");
+            return;
+        }
 
-// Classe helper per trasferire la configurazione dei sensori
-public class SensorConfiguration
-{
-    public bool EnableAccelerometer { get; set; }
-    public bool EnableGSR { get; set; }
-    public bool EnablePPG { get; set; }
+        await nav.PushAsync(new LoadingPage(selectedDevice));
+    }
 }

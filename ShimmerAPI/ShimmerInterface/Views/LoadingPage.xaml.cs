@@ -1,44 +1,35 @@
-﻿using ShimmerInterface.Views;
-using ShimmerInterface.ViewModels;
+﻿using ShimmerInterface.Models;
 using XR2Learn_ShimmerAPI;
-
 namespace ShimmerInterface.Views;
-
 public partial class LoadingPage : ContentPage
 {
-    private readonly LoadingPageViewModel viewModel;
     private readonly SensorConfiguration config;
-
-    public LoadingPage(bool enableAccelerometer, bool enableGSR, bool enablePPG)
+    public LoadingPage(SensorConfiguration selected)
     {
         InitializeComponent();
-
-        config = new SensorConfiguration
-        {
-            EnableAccelerometer = enableAccelerometer,
-            EnableGSR = enableGSR,
-            EnablePPG = enablePPG
-        };
-
-        viewModel = new LoadingPageViewModel(enableAccelerometer, enableGSR, enablePPG);
-        BindingContext = viewModel;
+        config = selected;
     }
-
     protected override async void OnAppearing()
     {
         base.OnAppearing();
-
-        await Task.Delay(500); // mostra loading
-
-        var shimmer = await viewModel.ConnectAsync();
-        if (shimmer != null)
+        await Task.Delay(500);
+        var shimmer = new XR2Learn_ShimmerGSR
         {
-            await Navigation.PushAsync(new DataPage(shimmer, config)); // 👈 passa anche la configurazione
-            Navigation.RemovePage(this);
+            EnableAccelerator = config.EnableAccelerometer,
+            EnableGSR = config.EnableGSR,
+            EnablePPG = config.EnablePPG
+        };
+        shimmer.Configure("Shimmer", config.PortName);
+        shimmer.Connect();
+        if (shimmer.IsConnected())
+        {
+            shimmer.StartStreaming();
+            await DisplayAlert("OK", "Dispositivo connesso con successo", "OK");
+            await Navigation.PopAsync();
         }
         else
         {
-            await DisplayAlert("Error", "Connection failed", "OK");
+            await DisplayAlert("Errore", "Connessione fallita", "OK");
             await Navigation.PopAsync();
         }
     }

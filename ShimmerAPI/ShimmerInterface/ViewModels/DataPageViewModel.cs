@@ -5,6 +5,7 @@ using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
 using System.Collections.ObjectModel;
 using System.Globalization;
+using ShimmerInterface.Models;
 
 namespace ShimmerInterface.ViewModels;
 

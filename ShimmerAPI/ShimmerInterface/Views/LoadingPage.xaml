@@ -3,12 +3,9 @@
              x:Class="ShimmerInterface.Views.LoadingPage"
              BackgroundColor="{StaticResource PageBackground}">
 
-    <VerticalStackLayout Spacing="20"
-                         Padding="30"
-                         HorizontalOptions="Center"
-                         VerticalOptions="Center">
-        <ActivityIndicator x:Name="MyActivityIndicator" IsRunning="True" IsVisible="True" />
-        <Label Text="Connecting to device..."
+    <VerticalStackLayout Padding="30" Spacing="20" HorizontalOptions="Center" VerticalOptions="Center">
+        <ActivityIndicator IsRunning="True" IsVisible="True" />
+        <Label Text="Connessione in corso..."
                FontSize="18"
                TextColor="{StaticResource TextPrimary}"
                HorizontalOptions="Center" />
