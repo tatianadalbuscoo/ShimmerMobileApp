@@ -10,7 +10,6 @@ namespace ShimmerInterface.ViewModels;
 public partial class MainPageViewModel : ObservableObject
 {
     public ObservableCollection<SensorConfiguration> AvailableDevices { get; } = new();
-
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
     public MainPageViewModel()
@@ -21,26 +20,40 @@ public partial class MainPageViewModel : ObservableObject
 
     private void LoadDevices()
     {
-        AvailableDevices.Clear();
+        // Ensure collection is completely cleared
+        while (AvailableDevices.Count > 0)
+        {
+            AvailableDevices.RemoveAt(0);
+        }
+
         var ports = XR2Learn_SerialPortsManager.GetAvailableSerialPortsNames();
 
-        foreach (var port in ports)
+        // Filter out COM3 by default and remove duplicates
+        var filteredPorts = ports
+            .Where(port => !port.Equals("COM3", StringComparison.OrdinalIgnoreCase))
+            .Distinct()
+            .ToList();
+
+        foreach (var port in filteredPorts)
         {
-            AvailableDevices.Add(new SensorConfiguration
+            // Double-check that we're not adding duplicates
+            if (!AvailableDevices.Any(d => d.PortName == port))
             {
-                PortName = port,
-                IsSelected = false
-            });
+                AvailableDevices.Add(new SensorConfiguration
+                {
+                    PortName = port,
+                    IsSelected = false
+                });
+            }
         }
     }
 
     private async Task Connect(INavigation nav)
     {
         var selectedDevice = AvailableDevices.FirstOrDefault(d => d.IsSelected);
-
         if (selectedDevice == null)
         {
-            await App.Current.MainPage.DisplayAlert("Errore", "Seleziona un dispositivo Shimmer", "OK");
+            await App.Current.MainPage.DisplayAlert("Error", "Please select a Shimmer device", "OK");
             return;
         }
 
