@@ -15,6 +15,8 @@ public partial class DataPage : ContentPage
     public DataPage(XR2Learn_ShimmerGSR shimmer, SensorConfiguration sensorConfig)
     {
         InitializeComponent();
+        NavigationPage.SetHasBackButton(this, false);
+
 
         viewModel = new DataPageViewModel(shimmer, sensorConfig);
         BindingContext = viewModel;

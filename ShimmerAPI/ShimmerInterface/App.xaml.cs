@@ -1,17 +1,20 @@
 ﻿using ShimmerInterface.Views;
 
-namespace ShimmerInterface
+namespace ShimmerInterface;
+
+public partial class App : Application
 {
-    public partial class App : Application
+    public App()
     {
-        public App()
-        {
-            InitializeComponent();
+        InitializeComponent();
 
-            // Set MainPage inside a NavigationPage to allow page navigation
-            MainPage = new NavigationPage(new MainPage());
+        // Create NavigationPage with back button hidden
+        var navigationPage = new NavigationPage(new MainPage());
+
+        navigationPage.BarBackgroundColor = Color.FromArgb("#F0E5D8"); // Champagne
+        navigationPage.BarTextColor = Color.FromArgb("#6D4C41"); // Marrone intenso
 
 
-        }
+        MainPage = navigationPage;
     }
 }

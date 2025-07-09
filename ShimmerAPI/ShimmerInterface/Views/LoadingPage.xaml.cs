@@ -7,7 +7,9 @@ public partial class LoadingPage : ContentPage
     public LoadingPage(SensorConfiguration selected)
     {
         InitializeComponent();
+        NavigationPage.SetHasBackButton(this, false);
         config = selected;
+
     }
     protected override async void OnAppearing()
     {
