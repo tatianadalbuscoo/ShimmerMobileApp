@@ -86,10 +86,30 @@ namespace ShimmerAPI
         {
             if (GetState() != SHIMMER_STATE_NONE)
             {
-                return SerialPort.ReadByte();
+                try
+                {
+                    return SerialPort.ReadByte();
+                }
+                catch (OperationCanceledException ex)
+                {
+                    Console.WriteLine("[Shimmer] ReadByte canceled: " + ex.Message);
+                    return -1;
+                }
+                catch (TimeoutException ex)
+                {
+                    Console.WriteLine("[Shimmer] ReadByte timeout: " + ex.Message);
+                    return -1;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("[Shimmer] ReadByte error: " + ex.Message);
+                    return -1;
+                }
             }
+
             throw new InvalidOperationException();
         }
+
 
         protected override void OpenConnection()
         {

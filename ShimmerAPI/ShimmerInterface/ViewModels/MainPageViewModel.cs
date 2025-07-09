@@ -10,6 +10,7 @@ namespace ShimmerInterface.ViewModels;
 public partial class MainPageViewModel : ObservableObject
 {
     public ObservableCollection<SensorConfiguration> AvailableDevices { get; } = new();
+
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
     public MainPageViewModel()
@@ -20,43 +21,37 @@ public partial class MainPageViewModel : ObservableObject
 
     private void LoadDevices()
     {
-        // Ensure collection is completely cleared
-        while (AvailableDevices.Count > 0)
-        {
-            AvailableDevices.RemoveAt(0);
-        }
+        AvailableDevices.Clear();
 
-        var ports = XR2Learn_SerialPortsManager.GetAvailableSerialPortsNames();
-
-        // Filter out COM3 by default and remove duplicates
-        var filteredPorts = ports
-            .Where(port => !port.Equals("COM3", StringComparison.OrdinalIgnoreCase))
+        var ports = XR2Learn_SerialPortsManager
+            .GetAvailableSerialPortsNames()
             .Distinct()
             .ToList();
 
-        foreach (var port in filteredPorts)
+        foreach (var port in ports)
         {
-            // Double-check that we're not adding duplicates
-            if (!AvailableDevices.Any(d => d.PortName == port))
+            AvailableDevices.Add(new SensorConfiguration
             {
-                AvailableDevices.Add(new SensorConfiguration
-                {
-                    PortName = port,
-                    IsSelected = false
-                });
-            }
+                PortName = port,
+                IsSelected = false
+            });
         }
     }
 
     private async Task Connect(INavigation nav)
     {
-        var selectedDevice = AvailableDevices.FirstOrDefault(d => d.IsSelected);
-        if (selectedDevice == null)
+        var selectedDevices = AvailableDevices.Where(d => d.IsSelected).ToList();
+
+        if (!selectedDevices.Any())
         {
-            await App.Current.MainPage.DisplayAlert("Error", "Please select a Shimmer device", "OK");
+            await App.Current.MainPage.DisplayAlert("Error", "Please select at least one Shimmer device", "OK");
             return;
         }
 
-        await nav.PushAsync(new LoadingPage(selectedDevice));
+        foreach (var device in selectedDevices)
+        {
+            await nav.PushAsync(new LoadingPage(device));
+            // Aspetta che l'utente torni alla MainPage per passare al successivo
+        }
     }
 }
