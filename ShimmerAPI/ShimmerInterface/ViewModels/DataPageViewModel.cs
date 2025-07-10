@@ -1,4 +1,7 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿// ViewModel for the DataPage. It manages real-time data acquisition from a Shimmer device,
+// input validation, and UI chart updates using SkiaSharp.
+
+using CommunityToolkit.Mvvm.ComponentModel;
 using XR2Learn_ShimmerAPI;
 using SkiaSharp;
 using SkiaSharp.Views.Maui;
@@ -11,13 +14,20 @@ namespace ShimmerInterface.ViewModels;
 
 public partial class DataPageViewModel : ObservableObject
 {
+    // Device reference from the Shimmer API
     private readonly XR2Learn_ShimmerGSR shimmer;
+
+    // Timer that triggers data updates every second
     private readonly System.Timers.Timer timer = new(1000);
+
+    // Dizionario che memorizza i dati delle serie temporali per ciascun parametro (X/Y/Z, GSR, PPG...)
     private readonly Dictionary<string, List<float>> dataPointsCollections = new();
     private readonly Dictionary<string, List<int>> timeStampsCollections = new();
+
+    // Elapsed seconds since data collection started
     private int secondsElapsed = 0;
 
-    // Stato dei sensori
+    // Sensor enable flags (set from SensorConfiguration passed in constructor)
     private bool enableAccelerometer;
     private bool enableGSR;
     private bool enablePPG;
@@ -34,6 +44,8 @@ public partial class DataPageViewModel : ObservableObject
     private string _timeWindowSecondsText = "20";
     private string _xAxisLabelIntervalText = "5";
 
+    // Testo mostrato sopra il grafico che riassume i valori dei sensori in tempo reale.
+    // Viene aggiornato ogni secondo con i nuovi dati letti dal dispositivo Shimmer.
     [ObservableProperty]
     private string sensorText = "Waiting for data...";
 
@@ -66,6 +78,7 @@ public partial class DataPageViewModel : ObservableObject
 
     [ObservableProperty]
     private bool isXAxisLabelIntervalEnabled = true;
+
 
     // Text properties for input fields
     public string YAxisMinText
@@ -129,11 +142,8 @@ public partial class DataPageViewModel : ObservableObject
 
         InitializeAvailableParameters();
 
-        // IMPORTANTE: cambia prima il parametro se non è valido
         if (!AvailableParameters.Contains(SelectedParameter))
-        {
             SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
-        }
 
         foreach (var parameter in AvailableParameters)
         {
@@ -141,28 +151,23 @@ public partial class DataPageViewModel : ObservableObject
             timeStampsCollections[parameter] = new List<int>();
         }
 
-        // ✅ Imposta le proprietà di visualizzazione
         if (!string.IsNullOrEmpty(SelectedParameter))
         {
             UpdateYAxisSettings(SelectedParameter);
             IsXAxisLabelIntervalEnabled = SelectedParameter != "HeartRate";
         }
 
-
-        // Inizializza i valori di backup e testi
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
         _lastValidTimeWindowSeconds = TimeWindowSeconds;
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
 
-        // Sincronizza i testi con i valori iniziali
         UpdateTextProperties();
-
-        StartTimer();
 
         DebugSensorStatus();
     }
 
+    // Aggiorna i testi dei campi di input in base ai valori numerici correnti.
     private void UpdateTextProperties()
     {
         _yAxisMinText = YAxisMin.ToString(CultureInfo.InvariantCulture);
@@ -179,6 +184,7 @@ public partial class DataPageViewModel : ObservableObject
 
     // Modifica i metodi di validazione per gestire campi vuoti con valori di default
 
+    // Valida e aggiorna il valore minimo dell'asse Y.
     private void ValidateAndUpdateYAxisMin(string value)
     {
         // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
@@ -230,6 +236,7 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+    // Valida e aggiorna il valore massimo dell'asse Y.
     private void ValidateAndUpdateYAxisMax(string value)
 {
     // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
@@ -273,6 +280,7 @@ public partial class DataPageViewModel : ObservableObject
     }
 }
 
+    // Valida e aggiorna la finestra temporale in secondi.
     private void ValidateAndUpdateTimeWindow(string value)
     {
         // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
@@ -329,6 +337,7 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+    // Valida e aggiorna l’intervallo tra le etichette sull’asse X.
     private void ValidateAndUpdateXAxisInterval(string value)
     {
         // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
@@ -367,6 +376,7 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     // Metodi helper per ottenere i valori di default
+    // Restituisce il valore minimo di default per l’asse Y in base al parametro selezionato.
     private double GetDefaultYAxisMin(string parameter)
     {
         return parameter switch
@@ -379,6 +389,7 @@ public partial class DataPageViewModel : ObservableObject
         };
     }
 
+    // Restituisce il valore massimo di default per l’asse Y in base al parametro selezionato.
     private double GetDefaultYAxisMax(string parameter)
     {
         return parameter switch
@@ -391,34 +402,38 @@ public partial class DataPageViewModel : ObservableObject
         };
     }
 
-
+    // Ripristina il testo del campo YMin all’ultimo valore valido.
     private void ResetYAxisMinText()
     {
         _yAxisMinText = _lastValidYAxisMin.ToString(CultureInfo.InvariantCulture);
         OnPropertyChanged(nameof(YAxisMinText));
     }
 
+    // Ripristina il testo del campo YMax all’ultimo valore valido.
     private void ResetYAxisMaxText()
     {
         _yAxisMaxText = _lastValidYAxisMax.ToString(CultureInfo.InvariantCulture);
         OnPropertyChanged(nameof(YAxisMaxText));
     }
 
+    // Ripristina il testo della finestra temporale all’ultimo valore valido.
     private void ResetTimeWindowText()
     {
         _timeWindowSecondsText = _lastValidTimeWindowSeconds.ToString();
         OnPropertyChanged(nameof(TimeWindowSecondsText));
     }
 
+    // Ripristina il testo dell’intervallo X all’ultimo valore valido.
     private void ResetXAxisIntervalText()
     {
         _xAxisLabelIntervalText = _lastValidXAxisLabelInterval.ToString();
         OnPropertyChanged(nameof(XAxisLabelIntervalText));
     }
 
+    // Popola la lista dei parametri disponibili in base ai sensori attivi.
     private void InitializeAvailableParameters()
     {
-        AvailableParameters.Clear(); // 👈 importante se ricarichi il ViewModel
+        AvailableParameters.Clear();
 
         if (enableAccelerometer)
         {
@@ -438,7 +453,7 @@ public partial class DataPageViewModel : ObservableObject
             AvailableParameters.Add("HeartRate");
         }
 
-        // ⚠️ IMPORTANTE: Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
+        // Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
         // Forza un parametro valido se quello selezionato non lo è più
         if (!AvailableParameters.Contains(SelectedParameter))
         {
@@ -446,7 +461,7 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
-
+    // Restituisce true se il sensore associato al parametro è abilitato.
     private bool IsSensorEnabled(string parameter)
     {
         return parameter switch
@@ -454,32 +469,12 @@ public partial class DataPageViewModel : ObservableObject
             "AcceleratorX" or "AcceleratorY" or "AcceleratorZ" => enableAccelerometer,
             "GalvanicSkinResponse" => enableGSR,
             "PhotoPlethysmoGram" => enablePPG,
-            "HeartRate" => enablePPG, // HeartRate dipende da PPG - QUESTO È CORRETTO
+            "HeartRate" => enablePPG, // HeartRate dipende da PPG
             _ => false
         };
     }
 
-
-    /* private void StartTimer()
-     {
-         timer.Elapsed += (s, e) =>
-         {
-             var data = shimmer.LatestData;
-             if (data == null) return;
-
-             secondsElapsed++;
-
-             SensorText = $"[{data.TimeStamp.Data}] {data.AcceleratorX.Data} [{data.AcceleratorX.Unit}] | " +
-                          $"{data.AcceleratorY.Data} [{data.AcceleratorY.Unit}] | {data.AcceleratorZ.Data} [{data.AcceleratorZ.Unit}]\n" +
-                          $"{data.GalvanicSkinResponse.Data} [{data.GalvanicSkinResponse.Unit}] | " +
-                          $"{data.PhotoPlethysmoGram.Data} [{data.PhotoPlethysmoGram.Unit}] | {data.HeartRate} [BPM]";
-
-             UpdateAllDataCollections(data);
-             UpdateChart();
-         };
-         timer.Start();
-     }*/
-
+    // Avvia il timer che legge e aggiorna i dati a intervalli regolari.
     public void StartTimer()
     {
         timer.Elapsed -= OnTimerElapsed; // prevenzione doppia iscrizione
@@ -487,6 +482,7 @@ public partial class DataPageViewModel : ObservableObject
         timer.Start();
     }
 
+    // Metodo chiamato ogni volta che scatta il timer: aggiorna i dati e il grafico.
     private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         var data = shimmer.LatestData;
@@ -503,7 +499,7 @@ public partial class DataPageViewModel : ObservableObject
         UpdateChart();
     }
 
-
+    // Inserisce i nuovi dati raccolti nelle collezioni dei parametri abilitati.
     private void UpdateAllDataCollections(dynamic data)
     {
         // Estrai i valori per ogni parametro
@@ -548,11 +544,13 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+    // Genera un evento per aggiornare il grafico.
     private void UpdateChart()
     {
         ChartUpdateRequested?.Invoke(this, EventArgs.Empty);
     }
 
+    // Gestisce il cambio di parametro selezionato e aggiorna le impostazioni asse Y.
     partial void OnSelectedParameterChanged(string value)
     {
         UpdateYAxisSettings(value);
@@ -573,6 +571,7 @@ public partial class DataPageViewModel : ObservableObject
         UpdateChart();
     }
 
+    // Imposta etichette e limiti asse Y in base al parametro selezionato.
     private void UpdateYAxisSettings(string parameter)
     {
         switch (parameter)
@@ -622,6 +621,7 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+    // Aggiorna manualmente i limiti degli assi e la finestra temporale.
     public void UpdateAxisScales(double minY, double maxY, int timeWindow)
     {
         // Controllo specifico per Heart Rate
@@ -657,19 +657,20 @@ public partial class DataPageViewModel : ObservableObject
         UpdateTextProperties();
     }
 
+    // Disegna il grafico dei dati sul canvas SkiaSharp.
     public void OnCanvasViewPaintSurface(SKCanvas canvas, SKImageInfo info)
     {
         canvas.Clear(SKColors.White);
         System.Diagnostics.Debug.WriteLine($"enablePPG: {enablePPG}");
 
-        // ⚠️ PRIMA CONTROLLO: Verifica se il sensore è disabilitato
+        // PRIMO CONTROLLO: Verifica se il sensore è disabilitato
         if (!IsSensorEnabled(SelectedParameter))
         { 
             DrawDisabledSensorMessage(canvas, info);
             return;
         }
 
-        // ⚠️ SECONDO CONTROLLO: Verifica se il parametro è disponibile
+        // SECONDO CONTROLLO: Verifica se il parametro è disponibile
         if (!AvailableParameters.Contains(SelectedParameter))
         {
             DrawDisabledSensorMessage(canvas, info);
@@ -683,7 +684,7 @@ public partial class DataPageViewModel : ObservableObject
         {
             if (SelectedParameter == "HeartRate")
             {
-                // ⚠️ TERZO CONTROLLO: Per HeartRate, controlla nuovamente se PPG è abilitato
+                // TERZO CONTROLLO: Per HeartRate, controlla nuovamente se PPG è abilitato
                 if (enablePPG)
                     DrawCalibratingMessage(canvas, info);
                 else
@@ -696,7 +697,6 @@ public partial class DataPageViewModel : ObservableObject
             return;
         }
 
-        // Resto del codice rimane invariato...
         if (currentDataPoints.All(v => v == 0 || v == -1))
         {
             DrawNoDataMessage(canvas, info);
@@ -828,17 +828,21 @@ public partial class DataPageViewModel : ObservableObject
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
-    // Metodi di validazione numerica migliorati
+    // Metodi di validazione numerica 
+
+    //// Verifica se un numero double è valido (non infinito, non NaN, ecc.).
     private static bool IsValidNumber(double value)
     {
         return !double.IsNaN(value) && !double.IsInfinity(value) && value != double.MinValue && value != double.MaxValue;
     }
 
+    // Verifica se un intero è positivo e valido.
     private static bool IsValidPositiveInteger(int value)
     {
         return value > 0 && value < int.MaxValue;
     }
 
+    // Cerca di convertire una stringa in un numero double valido.
     public static bool TryParseDouble(string input, out double result)
     {
         result = 0;
@@ -884,7 +888,7 @@ public partial class DataPageViewModel : ObservableObject
                double.TryParse(cleanInput, NumberStyles.Float, CultureInfo.CurrentCulture, out result);
     }
 
-
+    // Cerca di convertire una stringa in un numero intero valido.
     public static bool TryParseInt(string input, out int result)
     {
         result = 0;
@@ -905,6 +909,7 @@ public partial class DataPageViewModel : ObservableObject
         return int.TryParse(cleanInput, out result);
     }
 
+    // Disegna un messaggio che segnala che il sensore è disattivato.
     private void DrawDisabledSensorMessage(SKCanvas canvas, SKImageInfo info)
     {
         var margin = 40f;
@@ -973,6 +978,7 @@ public partial class DataPageViewModel : ObservableObject
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
+    // Disegna un messaggio quando non ci sono dati validi da mostrare.
     private void DrawNoDataMessage(SKCanvas canvas, SKImageInfo info)
     {
         var margin = 40f;
@@ -1022,6 +1028,7 @@ public partial class DataPageViewModel : ObservableObject
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
+    // Disegna un messaggio che indica che il sensore è in fase di calibrazione.
     private void DrawCalibratingMessage(SKCanvas canvas, SKImageInfo info)
     {
         var margin = 40f;
@@ -1082,6 +1089,7 @@ public partial class DataPageViewModel : ObservableObject
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
+    // Stampa su console lo stato dei sensori e dei parametri disponibili (debug).
     private void DebugSensorStatus()
     {
         System.Diagnostics.Debug.WriteLine($"=== SENSOR STATUS DEBUG ===");
@@ -1093,6 +1101,7 @@ public partial class DataPageViewModel : ObservableObject
         System.Diagnostics.Debug.WriteLine($"============================");
     }
 
+    // Aggiorna la configurazione dei sensori attivi e rigenera la lista dei parametri.
     public void UpdateSensorConfiguration(bool enableAccelerometer, bool enableGSR, bool enablePPG)
     {
         // Salva il parametro attualmente selezionato
@@ -1120,6 +1129,7 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     // Metodo per aggiornare le collezioni di dati dopo cambio configurazione
+    // Aggiorna le collezioni di dati per riflettere i sensori attivi.
     private void UpdateDataCollections()
     {
         // Rimuovi le collezioni per parametri non più disponibili
@@ -1140,9 +1150,9 @@ public partial class DataPageViewModel : ObservableObject
             }
         }
     }
-   
 
     // Metodo per ottenere la configurazione corrente
+    // Restituisce un oggetto che rappresenta la configurazione attuale dei sensori.
     public SensorConfiguration GetCurrentSensorConfiguration()
     {
         return new SensorConfiguration
@@ -1153,7 +1163,7 @@ public partial class DataPageViewModel : ObservableObject
         };
     }
 
-
+    // Ferma il timer che aggiorna i dati.
     public void StopTimer()
     {
         timer.Stop();

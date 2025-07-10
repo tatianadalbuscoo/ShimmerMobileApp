@@ -1,4 +1,8 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿// This class represents a Shimmer device with two COM ports,
+// a display name, selection state, and sensor configuration flags (Accelerometer, GSR, PPG).
+// It is used in the device selection UI and supports data binding through CommunityToolkit.Mvvm.
+
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ShimmerInterface.Models;
 

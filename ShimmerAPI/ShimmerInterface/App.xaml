@@ -1,13 +1,24 @@
 ﻿<?xml version = "1.0" encoding = "UTF-8" ?>
+<!-- Definisce l'applicazione MAUI e le sue risorse globali condivise -->    
 <Application xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:ShimmerInterface"
              x:Class="ShimmerInterface.App">
+    
+    <!-- Definizione delle risorse globali dell'app (colori, stili, temi...) -->
     <Application.Resources>
         <ResourceDictionary>
+
+            <!-- Importa e unisce i dizionari di risorse separati -->
             <ResourceDictionary.MergedDictionaries>
+
+                <!-- Colori personalizzati usati nell'app -->
                 <ResourceDictionary Source="Resources/Styles/Colors.xaml" />
+
+                <!-- Stili generali per controlli (pulsanti, etichette, ecc.) -->
                 <ResourceDictionary Source="Resources/Styles/Styles.xaml" />
+
+                <!-- Stili base condivisi tra piattaforme -->
                 <ResourceDictionary Source="Resources/Styles/BaseStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>

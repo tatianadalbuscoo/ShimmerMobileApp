@@ -25,6 +25,9 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         }
     }
 
+    // Costruttore della pagina di caricamento.
+    // Riceve il dispositivo selezionato e un oggetto TaskCompletionSource per restituire il risultato della connessione.
+    // Imposta il messaggio di connessione e il BindingContext per il data binding.
     public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerGSR> completion)
     {
         InitializeComponent();
@@ -34,6 +37,10 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         BindingContext = this;
     }
 
+    // Metodo chiamato automaticamente quando la pagina diventa visibile.
+    // Tenta di connettersi al dispositivo Shimmer su una delle due porte (Port1 o Port2).
+    // Se la connessione ha successo, avvia lo streaming e restituisce il dispositivo connesso.
+    // In ogni caso, mostra un messaggio di successo o errore all'utente.
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -82,6 +89,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         _completion.SetResult(connectedShimmer);
     }
 
+    // Evento di notifica delle modifiche alle proprietà, richiesto per aggiornare l'interfaccia utente durante il binding.
     public new event PropertyChangedEventHandler PropertyChanged;
     protected new void OnPropertyChanged([CallerMemberName] string propertyName = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

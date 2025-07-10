@@ -1,4 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
+    
+<!--
+    Definizione della struttura di navigazione dell'app tramite Shell di MAUI.
+    In questo caso viene disabilitato il menu a scomparsa (Flyout) e viene definita una sola pagina iniziale: MainPage.
+    Shell permette una gestione centralizzata e semplificata della navigazione tra pagine.
+-->
+
 <Shell
     x:Class="ShimmerInterface.AppShell"
     xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
