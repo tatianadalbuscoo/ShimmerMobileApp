@@ -80,12 +80,17 @@ public partial class MainPageViewModel : ObservableObject
 
         foreach (var shimmer in connectedShimmers)
         {
+            // Trova il device associato allo shimmer
+            var device = AvailableDevices.FirstOrDefault(d =>
+                d.EnableAccelerometer == shimmer.EnableAccelerator &&
+                d.EnableGSR == shimmer.EnableGSR &&
+                d.EnablePPG == shimmer.EnablePPG);
+
             var sensorConfig = new SensorConfiguration
             {
-                // Configura con i valori del dispositivo
-                EnableAccelerometer = true,
-                EnableGSR = true,
-                EnablePPG = true
+                EnableAccelerometer = device?.EnableAccelerometer ?? true,
+                EnableGSR = device?.EnableGSR ?? true,
+                EnablePPG = device?.EnablePPG ?? true
             };
 
             var dataPage = new DataPage(shimmer, sensorConfig);
@@ -96,4 +101,5 @@ public partial class MainPageViewModel : ObservableObject
 
         Application.Current.MainPage = tabbedPage;
     }
+
 }
