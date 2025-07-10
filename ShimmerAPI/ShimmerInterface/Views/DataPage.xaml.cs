@@ -1,4 +1,4 @@
-using ShimmerInterface.ViewModels;
+﻿using ShimmerInterface.ViewModels;
 using XR2Learn_ShimmerAPI;
 using SkiaSharp.Views.Maui.Controls;
 using SkiaSharp.Views.Maui;
@@ -37,9 +37,20 @@ public partial class DataPage : ContentPage
         });
     }
 
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+        viewModel.StartTimer(); // ✅ Lo abiliti ogni volta che la pagina torna attiva
+        viewModel.ChartUpdateRequested += OnChartUpdateRequested;
+    }
+
     protected override void OnDisappearing()
     {
+        viewModel.StopTimer(); // <-- chiamato correttamente
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
         base.OnDisappearing();
     }
+
+
 }

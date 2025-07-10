@@ -460,25 +460,49 @@ public partial class DataPageViewModel : ObservableObject
     }
 
 
-    private void StartTimer()
+    /* private void StartTimer()
+     {
+         timer.Elapsed += (s, e) =>
+         {
+             var data = shimmer.LatestData;
+             if (data == null) return;
+
+             secondsElapsed++;
+
+             SensorText = $"[{data.TimeStamp.Data}] {data.AcceleratorX.Data} [{data.AcceleratorX.Unit}] | " +
+                          $"{data.AcceleratorY.Data} [{data.AcceleratorY.Unit}] | {data.AcceleratorZ.Data} [{data.AcceleratorZ.Unit}]\n" +
+                          $"{data.GalvanicSkinResponse.Data} [{data.GalvanicSkinResponse.Unit}] | " +
+                          $"{data.PhotoPlethysmoGram.Data} [{data.PhotoPlethysmoGram.Unit}] | {data.HeartRate} [BPM]";
+
+             UpdateAllDataCollections(data);
+             UpdateChart();
+         };
+         timer.Start();
+     }*/
+
+    public void StartTimer()
     {
-        timer.Elapsed += (s, e) =>
-        {
-            var data = shimmer.LatestData;
-            if (data == null) return;
-
-            secondsElapsed++;
-
-            SensorText = $"[{data.TimeStamp.Data}] {data.AcceleratorX.Data} [{data.AcceleratorX.Unit}] | " +
-                         $"{data.AcceleratorY.Data} [{data.AcceleratorY.Unit}] | {data.AcceleratorZ.Data} [{data.AcceleratorZ.Unit}]\n" +
-                         $"{data.GalvanicSkinResponse.Data} [{data.GalvanicSkinResponse.Unit}] | " +
-                         $"{data.PhotoPlethysmoGram.Data} [{data.PhotoPlethysmoGram.Unit}] | {data.HeartRate} [BPM]";
-
-            UpdateAllDataCollections(data);
-            UpdateChart();
-        };
+        timer.Elapsed -= OnTimerElapsed; // prevenzione doppia iscrizione
+        timer.Elapsed += OnTimerElapsed;
         timer.Start();
     }
+
+    private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        var data = shimmer.LatestData;
+        if (data == null) return;
+
+        secondsElapsed++;
+
+        SensorText = $"[{data.TimeStamp.Data}] {data.AcceleratorX.Data} [{data.AcceleratorX.Unit}] | " +
+                     $"{data.AcceleratorY.Data} [{data.AcceleratorY.Unit}] | {data.AcceleratorZ.Data} [{data.AcceleratorZ.Unit}]\n" +
+                     $"{data.GalvanicSkinResponse.Data} [{data.GalvanicSkinResponse.Unit}] | " +
+                     $"{data.PhotoPlethysmoGram.Data} [{data.PhotoPlethysmoGram.Unit}] | {data.HeartRate} [BPM]";
+
+        UpdateAllDataCollections(data);
+        UpdateChart();
+    }
+
 
     private void UpdateAllDataCollections(dynamic data)
     {
@@ -1128,6 +1152,13 @@ public partial class DataPageViewModel : ObservableObject
             EnablePPG = enablePPG
         };
     }
+
+
+    public void StopTimer()
+    {
+        timer.Stop();
+    }
+
 
 }
 
