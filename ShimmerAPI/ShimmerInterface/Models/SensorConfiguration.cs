@@ -20,4 +20,3 @@ public partial class SensorConfiguration : ObservableObject
 
     public string DisplayName => $"Shimmer on {PortName}";
 }
-

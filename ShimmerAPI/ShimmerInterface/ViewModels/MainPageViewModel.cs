@@ -9,8 +9,7 @@ namespace ShimmerInterface.ViewModels;
 
 public partial class MainPageViewModel : ObservableObject
 {
-    public ObservableCollection<SensorConfiguration> AvailableDevices { get; } = new();
-
+    public ObservableCollection<ShimmerDevice> AvailableDevices { get; } = new();
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
     public MainPageViewModel()
@@ -25,14 +24,16 @@ public partial class MainPageViewModel : ObservableObject
 
         var ports = XR2Learn_SerialPortsManager
             .GetAvailableSerialPortsNames()
-            .Distinct()
+            .OrderBy(p => p)
             .ToList();
 
-        foreach (var port in ports)
+        for (int i = 0; i < ports.Count - 1; i += 2)
         {
-            AvailableDevices.Add(new SensorConfiguration
+            AvailableDevices.Add(new ShimmerDevice
             {
-                PortName = port,
+                DisplayName = $"Shimmer Device {i / 2 + 1}",
+                Port1 = ports[i],
+                Port2 = ports[i + 1],
                 IsSelected = false
             });
         }
@@ -50,8 +51,18 @@ public partial class MainPageViewModel : ObservableObject
 
         foreach (var device in selectedDevices)
         {
-            await nav.PushAsync(new LoadingPage(device));
-            // Aspetta che l'utente torni alla MainPage per passare al successivo
+            var loadingPage = new LoadingPage(device);
+            await nav.PushAsync(loadingPage);
+
+            // Aspetta che la connessione finisca
+            if (loadingPage.BindingContext is not null)
+            {
+                await loadingPage.ConnectionTask;
+            }
+
+            // oppure piccolo delay per sicurezza tra le connessioni
+            await Task.Delay(200);
         }
     }
+
 }

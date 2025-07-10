@@ -1,6 +1,4 @@
-﻿using ShimmerInterface.ViewModels;
-
-namespace ShimmerInterface.Views;
+﻿namespace ShimmerInterface.Views;
 
 public partial class MainPage : ContentPage
 {

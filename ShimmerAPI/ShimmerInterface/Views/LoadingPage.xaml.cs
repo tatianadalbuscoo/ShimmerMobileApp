@@ -7,9 +7,13 @@ namespace ShimmerInterface.Views;
 
 public partial class LoadingPage : ContentPage, INotifyPropertyChanged
 {
-    private readonly SensorConfiguration config;
+    private readonly ShimmerDevice device;
     private bool connectionInProgress;
     private string connectingMessage;
+
+    private readonly TaskCompletionSource<bool> _connectionCompletion = new();
+
+    public Task<bool> ConnectionTask => _connectionCompletion.Task;
 
     public string ConnectingMessage
     {
@@ -24,13 +28,12 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         }
     }
 
-    public LoadingPage(SensorConfiguration selected)
+    public LoadingPage(ShimmerDevice device)
     {
         InitializeComponent();
         NavigationPage.SetHasBackButton(this, false);
-
-        config = selected;
-        ConnectingMessage = $"Connecting to {config.PortName}...";
+        this.device = device;
+        ConnectingMessage = $"Connecting to {device.Port1} / {device.Port2}...";
         BindingContext = this;
     }
 
@@ -38,50 +41,52 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
     {
         base.OnAppearing();
         await Task.Delay(500);
+
         if (connectionInProgress) return;
         connectionInProgress = true;
 
         bool connected = false;
+        string? usedPort = null;
 
-        await Task.Factory.StartNew(() =>
+        foreach (var port in new[] { device.Port1, device.Port2 })
         {
             try
             {
                 var shimmer = new XR2Learn_ShimmerGSR
                 {
-                    EnableAccelerator = config.EnableAccelerometer,
-                    EnableGSR = config.EnableGSR,
-                    EnablePPG = config.EnablePPG
+                    EnableAccelerator = device.EnableAccelerometer,
+                    EnableGSR = device.EnableGSR,
+                    EnablePPG = device.EnablePPG
                 };
 
-                shimmer.Configure("Shimmer", config.PortName);
+                shimmer.Configure("Shimmer", port);
                 shimmer.Connect();
 
                 if (shimmer.IsConnected())
                 {
                     shimmer.StartStreaming();
                     connected = true;
+                    usedPort = port;
+                    break;
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[SHIMMER ERROR] " + ex.Message);
+                Console.WriteLine($"[SHIMMER ERROR] on {port}: {ex.Message}");
             }
-        }, TaskCreationOptions.LongRunning);
+        }
 
         await DisplayAlert(
             connected ? "Success" : "Connection Failed",
-            connected ? $"Device on {config.PortName} connected successfully"
-                      : $"Could not connect to {config.PortName}.",
-            "OK"
-        );
+            connected ? $"{device.DisplayName} connected on {usedPort}"
+                      : $"Could not connect to {device.DisplayName}.",
+            "OK");
 
-        connectionInProgress = false;
+        _connectionCompletion.SetResult(connected);
         await Navigation.PopAsync();
     }
 
     public new event PropertyChangedEventHandler PropertyChanged;
-
     protected new void OnPropertyChanged([CallerMemberName] string propertyName = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 }

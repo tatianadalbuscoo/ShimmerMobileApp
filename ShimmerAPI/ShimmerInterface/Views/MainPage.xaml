@@ -5,23 +5,29 @@
              x:Class="ShimmerInterface.Views.MainPage"
              x:Name="MainPageRoot"
              BackgroundColor="{StaticResource PageBackground}">
+
     <ContentPage.BindingContext>
         <viewmodels:MainPageViewModel />
     </ContentPage.BindingContext>
+
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="18" HorizontalOptions="Center" WidthRequest="380">
-            <Label Text="Select Shimmer Device"
-                   Style="{StaticResource TitleLabel}" />
+            <Label Text="Select Shimmer Device" Style="{StaticResource TitleLabel}" />
+
             <CollectionView ItemsSource="{Binding AvailableDevices}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
                         <Frame Padding="10" Margin="5" BorderColor="Gray" BackgroundColor="White">
                             <VerticalStackLayout Spacing="8">
                                 <Label Text="{Binding DisplayName}" FontAttributes="Bold" />
+                                <Label Text="{Binding Port1, StringFormat='Port 1: {0}'}" FontSize="12" />
+                                <Label Text="{Binding Port2, StringFormat='Port 2: {0}'}" FontSize="12" />
+
                                 <HorizontalStackLayout>
                                     <CheckBox IsChecked="{Binding IsSelected}" />
                                     <Label Text="Select" VerticalOptions="Center" FontSize="12" />
                                 </HorizontalStackLayout>
+
                                 <Label Text="Accelerometer" />
                                 <Switch IsToggled="{Binding EnableAccelerometer}" />
                                 <Label Text="GSR" />
@@ -33,6 +39,7 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+
             <Button Text="Connect"
                     Style="{StaticResource PrimaryButton}"
                     Command="{Binding ConnectCommand}"
