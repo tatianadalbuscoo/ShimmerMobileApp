@@ -12,6 +12,9 @@ public partial class MainPageViewModel : ObservableObject
     public ObservableCollection<ShimmerDevice> AvailableDevices { get; } = new();
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
+    // Lista per tenere traccia degli Shimmer connessi
+    private List<XR2Learn_ShimmerGSR> connectedShimmers = new();
+
     public MainPageViewModel()
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
@@ -21,7 +24,6 @@ public partial class MainPageViewModel : ObservableObject
     private void LoadDevices()
     {
         AvailableDevices.Clear();
-
         var ports = XR2Learn_SerialPortsManager
             .GetAvailableSerialPortsNames()
             .OrderBy(p => p)
@@ -42,27 +44,56 @@ public partial class MainPageViewModel : ObservableObject
     private async Task Connect(INavigation nav)
     {
         var selectedDevices = AvailableDevices.Where(d => d.IsSelected).ToList();
-
         if (!selectedDevices.Any())
         {
             await App.Current.MainPage.DisplayAlert("Error", "Please select at least one Shimmer device", "OK");
             return;
         }
 
+        connectedShimmers.Clear();
+
         foreach (var device in selectedDevices)
         {
-            var tcs = new TaskCompletionSource<bool>();
+            var tcs = new TaskCompletionSource<XR2Learn_ShimmerGSR>();
             var loadingPage = new LoadingPage(device, tcs);
 
-            // Mostra la pagina come modale sopra tutto (no PushAsync = no flash)
             await Application.Current.MainPage.Navigation.PushModalAsync(loadingPage);
-
-            // Aspetta la conclusione della connessione
-            await tcs.Task;
-
-            // Chiudi la pagina modale
+            var shimmer = await tcs.Task;
             await Application.Current.MainPage.Navigation.PopModalAsync();
+
+            if (shimmer != null)
+            {
+                connectedShimmers.Add(shimmer);
+            }
+        }
+
+        // Dopo aver connesso tutti i dispositivi, crea la TabbedPage
+        if (connectedShimmers.Any())
+        {
+            CreateTabbedPage();
         }
     }
 
+    private void CreateTabbedPage()
+    {
+        var tabbedPage = new TabbedPage();
+
+        foreach (var shimmer in connectedShimmers)
+        {
+            var sensorConfig = new SensorConfiguration
+            {
+                // Configura con i valori del dispositivo
+                EnableAccelerometer = true,
+                EnableGSR = true,
+                EnablePPG = true
+            };
+
+            var dataPage = new DataPage(shimmer, sensorConfig);
+            dataPage.Title = $"Shimmer {connectedShimmers.IndexOf(shimmer) + 1}";
+
+            tabbedPage.Children.Add(dataPage);
+        }
+
+        Application.Current.MainPage = tabbedPage;
+    }
 }

@@ -10,8 +10,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
     private readonly ShimmerDevice device;
     private bool connectionInProgress;
     private string connectingMessage;
-
-    private readonly TaskCompletionSource<bool> _completion;
+    private readonly TaskCompletionSource<XR2Learn_ShimmerGSR> _completion;
 
     public string ConnectingMessage
     {
@@ -26,7 +25,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         }
     }
 
-    public LoadingPage(ShimmerDevice device, TaskCompletionSource<bool> completion)
+    public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerGSR> completion)
     {
         InitializeComponent();
         this.device = device;
@@ -43,7 +42,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         if (connectionInProgress) return;
         connectionInProgress = true;
 
-        bool connected = false;
+        XR2Learn_ShimmerGSR? connectedShimmer = null;
         string? usedPort = null;
 
         foreach (var port in new[] { device.Port1, device.Port2 })
@@ -63,7 +62,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
                 if (shimmer.IsConnected())
                 {
                     shimmer.StartStreaming();
-                    connected = true;
+                    connectedShimmer = shimmer;
                     usedPort = port;
                     break;
                 }
@@ -75,12 +74,12 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         }
 
         await DisplayAlert(
-            connected ? "Success" : "Connection Failed",
-            connected ? $"{device.DisplayName} connected on {usedPort}"
+            connectedShimmer != null ? "Success" : "Connection Failed",
+            connectedShimmer != null ? $"{device.DisplayName} connected on {usedPort}"
                       : $"Could not connect to {device.DisplayName}.",
             "OK");
 
-        _completion.SetResult(connected);
+        _completion.SetResult(connectedShimmer);
     }
 
     public new event PropertyChangedEventHandler PropertyChanged;
