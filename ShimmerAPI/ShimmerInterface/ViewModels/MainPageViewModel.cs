@@ -51,17 +51,17 @@ public partial class MainPageViewModel : ObservableObject
 
         foreach (var device in selectedDevices)
         {
-            var loadingPage = new LoadingPage(device);
-            await nav.PushAsync(loadingPage);
+            var tcs = new TaskCompletionSource<bool>();
+            var loadingPage = new LoadingPage(device, tcs);
 
-            // Aspetta che la connessione finisca
-            if (loadingPage.BindingContext is not null)
-            {
-                await loadingPage.ConnectionTask;
-            }
+            // Mostra la pagina come modale sopra tutto (no PushAsync = no flash)
+            await Application.Current.MainPage.Navigation.PushModalAsync(loadingPage);
 
-            // oppure piccolo delay per sicurezza tra le connessioni
-            await Task.Delay(200);
+            // Aspetta la conclusione della connessione
+            await tcs.Task;
+
+            // Chiudi la pagina modale
+            await Application.Current.MainPage.Navigation.PopModalAsync();
         }
     }
 

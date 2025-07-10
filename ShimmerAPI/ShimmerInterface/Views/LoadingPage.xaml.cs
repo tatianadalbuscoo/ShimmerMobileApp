@@ -11,9 +11,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
     private bool connectionInProgress;
     private string connectingMessage;
 
-    private readonly TaskCompletionSource<bool> _connectionCompletion = new();
-
-    public Task<bool> ConnectionTask => _connectionCompletion.Task;
+    private readonly TaskCompletionSource<bool> _completion;
 
     public string ConnectingMessage
     {
@@ -28,11 +26,11 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         }
     }
 
-    public LoadingPage(ShimmerDevice device)
+    public LoadingPage(ShimmerDevice device, TaskCompletionSource<bool> completion)
     {
         InitializeComponent();
-        NavigationPage.SetHasBackButton(this, false);
         this.device = device;
+        _completion = completion;
         ConnectingMessage = $"Connecting to {device.Port1} / {device.Port2}...";
         BindingContext = this;
     }
@@ -82,8 +80,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
                       : $"Could not connect to {device.DisplayName}.",
             "OK");
 
-        _connectionCompletion.SetResult(connected);
-        await Navigation.PopAsync();
+        _completion.SetResult(connected);
     }
 
     public new event PropertyChangedEventHandler PropertyChanged;
