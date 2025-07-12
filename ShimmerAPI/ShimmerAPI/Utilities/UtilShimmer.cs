@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Defines default RGB color values used for visualizing Shimmer sensor data in UI or plots.
+
+using System;
 using System.Collections.Generic;
 using System.Text;
 

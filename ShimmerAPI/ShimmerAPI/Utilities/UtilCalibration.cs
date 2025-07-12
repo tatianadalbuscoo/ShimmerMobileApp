@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Utility class for calibrating inertial sensor data (e.g., accelerometer, gyroscope)
+// using alignment, sensitivity, and offset matrices based on a well-known calibration model.
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;

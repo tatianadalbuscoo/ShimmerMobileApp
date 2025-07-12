@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Utility class for converting byte arrays to integers with support for 
+// endianness and signed values. Useful for parsing raw sensor data.
+
+using System;
 using System.Collections.Generic;
 using System.Text;
 

@@ -1,4 +1,6 @@
-﻿/*Rev 0.2
+﻿// Abstract class for handling serial (COM) communication with a Shimmer device. Now marked as obsolete.
+
+/*Rev 0.2
  * 
  * Copyright (c) 2014, Shimmer Research, Ltd.
  * All rights reserved

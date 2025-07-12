@@ -1,4 +1,7 @@
-﻿/*
+﻿// This class estimates 3D orientation using accelerometer, gyroscope, and magnetometer data.
+// It implements Madgwick's gradient descent algorithm and returns the orientation as a quaternion.
+
+/*
  * Madgwick, Sebastian OH, Andrew JL Harrison, and Ravi Vaidyanathan. "Estimation of imu and marg orientation using a gradient descent algorithm." Rehabilitation Robotics (ICORR), 2011 IEEE International Conference on. IEEE, 2011.
  *
  * 3D orientation code taken from https://code.google.com/p/labview-quaternion-ahrs/ which is licensed under GNU_Lesser_GPL

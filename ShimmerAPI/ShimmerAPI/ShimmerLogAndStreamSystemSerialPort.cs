@@ -1,4 +1,6 @@
-﻿using System;
+﻿// Handles Shimmer device streaming and logging over a serial (COM) connection.
+
+using System;
 using System.IO.Ports;
 
 namespace ShimmerAPI
