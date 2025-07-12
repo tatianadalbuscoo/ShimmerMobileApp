@@ -42,10 +42,10 @@
                                 <!-- Opzioni per abilitare/disabilitare i sensori -->
                                 <Label Text="Accelerometer" />
                                 <Switch IsToggled="{Binding EnableAccelerometer}" />
-                                <Label Text="GSR" />
-                                <Switch IsToggled="{Binding EnableGSR}" />
-                                <Label Text="PPG" />
-                                <Switch IsToggled="{Binding EnablePPG}" />
+                                <Label Text="Gyroscope" />
+                                <Switch IsToggled="{Binding EnableGyroscope}" />
+                                <Label Text="Magnetometer" />
+                                <Switch IsToggled="{Binding EnableMagnetometer}" />
                             </VerticalStackLayout>
                         </Frame>
                     </DataTemplate>

@@ -3,6 +3,7 @@
 
 using CommunityToolkit.Mvvm.ComponentModel;
 using XR2Learn_ShimmerAPI;
+using XR2Learn_ShimmerAPI.IMU;
 using SkiaSharp;
 using SkiaSharp.Views.Maui;
 using SkiaSharp.Views.Maui.Controls;
@@ -15,7 +16,7 @@ namespace ShimmerInterface.ViewModels;
 public partial class DataPageViewModel : ObservableObject
 {
     // Device reference from the Shimmer API
-    private readonly XR2Learn_ShimmerGSR shimmer;
+    private readonly XR2Learn_ShimmerIMU shimmer;
 
     // Timer that triggers data updates every second
     private readonly System.Timers.Timer timer = new(1000);
@@ -29,8 +30,8 @@ public partial class DataPageViewModel : ObservableObject
 
     // Sensor enable flags (set from SensorConfiguration passed in constructor)
     private bool enableAccelerometer;
-    private bool enableGSR;
-    private bool enablePPG;
+    private bool enableGyroscope;
+    private bool enableMagnetometer;
 
     // Valori di backup per il ripristino in caso di input non validi
     private double _lastValidYAxisMin = 0;
@@ -50,7 +51,7 @@ public partial class DataPageViewModel : ObservableObject
     private string sensorText = "Waiting for data...";
 
     [ObservableProperty]
-    private string selectedParameter = "AcceleratorX";
+    private string selectedParameter = "AccelerometerX";
 
     [ObservableProperty]
     private double yAxisMin = 0;
@@ -133,12 +134,12 @@ public partial class DataPageViewModel : ObservableObject
 
     public event EventHandler? ChartUpdateRequested;
 
-    public DataPageViewModel(XR2Learn_ShimmerGSR shimmerDevice, SensorConfiguration config)
+    public DataPageViewModel(XR2Learn_ShimmerIMU shimmerDevice, SensorConfiguration config)
     {
         shimmer = shimmerDevice;
         enableAccelerometer = config.EnableAccelerometer;
-        enableGSR = config.EnableGSR;
-        enablePPG = config.EnablePPG;
+        enableGyroscope = config.EnableGyroscope;
+        enableMagnetometer = config.EnableMagnetometer;
 
         InitializeAvailableParameters();
 
@@ -164,7 +165,6 @@ public partial class DataPageViewModel : ObservableObject
 
         UpdateTextProperties();
 
-        DebugSensorStatus();
     }
 
     // Aggiorna i testi dei campi di input in base ai valori numerici correnti.
@@ -209,13 +209,6 @@ public partial class DataPageViewModel : ObservableObject
 
         if (TryParseDouble(value, out double result))
         {
-            // Controllo specifico per Heart Rate - minimo 50
-            if (SelectedParameter == "HeartRate" && result < 50)
-            {
-                ValidationMessage = "Heart Rate Y Min cannot be less than 50 BPM.";
-                ResetYAxisMinText();
-                return;
-            }
 
             if (result >= YAxisMax)
             {
@@ -381,10 +374,9 @@ public partial class DataPageViewModel : ObservableObject
     {
         return parameter switch
         {
-            "AcceleratorX" or "AcceleratorY" or "AcceleratorZ" => -2,
-            "GalvanicSkinResponse" => 0,
-            "PhotoPlethysmoGram" => 0,
-            "HeartRate" => 50,
+            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => -5,
+            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => -250,
+            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => -2,
             _ => 0
         };
     }
@@ -394,13 +386,13 @@ public partial class DataPageViewModel : ObservableObject
     {
         return parameter switch
         {
-            "AcceleratorX" or "AcceleratorY" or "AcceleratorZ" => 2,
-            "GalvanicSkinResponse" => 100,
-            "PhotoPlethysmoGram" => 3300,
-            "HeartRate" => 150,
+            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => 5,
+            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => 250,
+            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => 2,
             _ => 1
         };
     }
+
 
     // Ripristina il testo del campo YMin all’ultimo valore valido.
     private void ResetYAxisMinText()
@@ -437,20 +429,23 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableAccelerometer)
         {
-            AvailableParameters.Add("AcceleratorX");
-            AvailableParameters.Add("AcceleratorY");
-            AvailableParameters.Add("AcceleratorZ");
+            AvailableParameters.Add("AccelerometerX");
+            AvailableParameters.Add("AccelerometerY");
+            AvailableParameters.Add("AccelerometerZ");
         }
 
-        if (enableGSR)
+        if (enableGyroscope)
         {
-            AvailableParameters.Add("GalvanicSkinResponse");
+            AvailableParameters.Add("GyroscopeX");
+            AvailableParameters.Add("GyroscopeY");
+            AvailableParameters.Add("GyroscopeZ");
         }
 
-        if (enablePPG)
+        if (enableMagnetometer)
         {
-            AvailableParameters.Add("PhotoPlethysmoGram");
-            AvailableParameters.Add("HeartRate");
+            AvailableParameters.Add("MagnetometerX");
+            AvailableParameters.Add("MagnetometerY");
+            AvailableParameters.Add("MagnetometerZ");
         }
 
         // Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
@@ -466,10 +461,9 @@ public partial class DataPageViewModel : ObservableObject
     {
         return parameter switch
         {
-            "AcceleratorX" or "AcceleratorY" or "AcceleratorZ" => enableAccelerometer,
-            "GalvanicSkinResponse" => enableGSR,
-            "PhotoPlethysmoGram" => enablePPG,
-            "HeartRate" => enablePPG, // HeartRate dipende da PPG
+            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => enableAccelerometer,
+            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
+            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
             _ => false
         };
     }
@@ -490,10 +484,12 @@ public partial class DataPageViewModel : ObservableObject
 
         secondsElapsed++;
 
-        SensorText = $"[{data.TimeStamp.Data}] {data.AcceleratorX.Data} [{data.AcceleratorX.Unit}] | " +
-                     $"{data.AcceleratorY.Data} [{data.AcceleratorY.Unit}] | {data.AcceleratorZ.Data} [{data.AcceleratorZ.Unit}]\n" +
-                     $"{data.GalvanicSkinResponse.Data} [{data.GalvanicSkinResponse.Unit}] | " +
-                     $"{data.PhotoPlethysmoGram.Data} [{data.PhotoPlethysmoGram.Unit}] | {data.HeartRate} [BPM]";
+        SensorText = $"[{data.TimeStamp.Data}] {data.AccelerometerX.Data} [{data.AccelerometerX.Unit}] | " +
+                     $"{data.AccelerometerY.Data} [{data.AccelerometerY.Unit}] | {data.AccelerometerZ.Data} [{data.AccelerometerZ.Unit}]\n" +
+                     $"{data.GyroscopeX.Data} [{data.GyroscopeX.Unit}] | " +
+                     $"{data.GyroscopeY.Data} [{data.GyroscopeY.Unit}] | {data.GyroscopeZ.Data} [{data.GyroscopeZ.Unit}]\n" +
+                     $"{data.MagnetometerX.Data} [{data.MagnetometerX.Unit}] | " +
+                     $"{data.MagnetometerY.Data} [{data.MagnetometerY.Unit}] | {data.MagnetometerZ.Data} [{data.MagnetometerZ.Unit}]\n";
 
         UpdateAllDataCollections(data);
         UpdateChart();
@@ -507,23 +503,22 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableAccelerometer)
         {
-            values["AcceleratorX"] = (float)data.AcceleratorX.Data;
-            values["AcceleratorY"] = (float)data.AcceleratorY.Data;
-            values["AcceleratorZ"] = (float)data.AcceleratorZ.Data;
+            values["AccelerometerX"] = (float)data.AccelerometerX.Data;
+            values["AccelerometerY"] = (float)data.AccelerometerY.Data;
+            values["AccelerometerZ"] = (float)data.AccelerometerZ.Data;
         }
-        if (enableGSR)
+        if (enableGyroscope)
         {
-            values["GalvanicSkinResponse"] = (float)data.GalvanicSkinResponse.Data;
+            values["GyroscopeX"] = (float)data.GyroscopeX.Data;
+            values["GyroscopeY"] = (float)data.GyroscopeY.Data;
+            values["GyroscopeZ"] = (float)data.GyroscopeZ.Data;
         }
-        if (enablePPG)
+        if (enableMagnetometer)
         {
-            values["PhotoPlethysmoGram"] = (float)data.PhotoPlethysmoGram.Data;
+            values["MagnetometerX"] = (float)data.MagnetometerX.Data;
+            values["MagnetometerY"] = (float)data.MagnetometerY.Data;
+            values["MagnetometerZ"] = (float)data.MagnetometerZ.Data;
 
-            // Aggiungi HeartRate solo se è valido
-            if (data.HeartRate > 0 && data.HeartRate < 250)
-            {
-                values["HeartRate"] = (float)data.HeartRate;
-            }
         }
 
         // Aggiorna ogni collezione SOLO se c'è un valore valido
@@ -576,60 +571,76 @@ public partial class DataPageViewModel : ObservableObject
     {
         switch (parameter)
         {
-            case "AcceleratorX":
+            case "AccelerometerX":
                 YAxisLabel = "Acceleration X";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Acceleration X";
-                YAxisMin = -2;
-                YAxisMax = 2;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
-            case "AcceleratorY":
+            case "AccelerometerY":
                 YAxisLabel = "Acceleration Y";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Acceleration Y";
-                YAxisMin = -2;
-                YAxisMax = 2;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
-            case "AcceleratorZ":
+            case "AccelerometerZ":
                 YAxisLabel = "Acceleration Z";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Acceleration Z";
+                YAxisMin = -5;
+                YAxisMax = 5;
+                break;
+            case "GyroscopeX":
+                YAxisLabel = "Angular Velocity X";
+                YAxisUnit = "°/s";
+                ChartTitle = "Real-time Gyroscope X";
+                YAxisMin = -250;
+                YAxisMax = 250;
+                break;
+            case "GyroscopeY":
+                YAxisLabel = "Angular Velocity Y";
+                YAxisUnit = "°/s";
+                ChartTitle = "Real-time Gyroscope Y";
+                YAxisMin = -250;
+                YAxisMax = 250;
+                break;
+            case "GyroscopeZ":
+                YAxisLabel = "Angular Velocity Z";
+                YAxisUnit = "°/s";
+                ChartTitle = "Real-time Gyroscope Z";
+                YAxisMin = -250;
+                YAxisMax = 250;
+                break;
+            case "MagnetometerX":
+                YAxisLabel = "Magnetic Field X";
+                YAxisUnit = "µT";
+                ChartTitle = "Real-time Magnetometer X";
                 YAxisMin = -2;
                 YAxisMax = 2;
                 break;
-            case "GalvanicSkinResponse":
-                YAxisLabel = "Galvanic Skin Response";
-                YAxisUnit = "kΩ";
-                ChartTitle = "Real-time GSR";
-                YAxisMin = 0;
-                YAxisMax = 100;
+            case "MagnetometerY":
+                YAxisLabel = "Magnetic Field Y";
+                YAxisUnit = "µT";
+                ChartTitle = "Real-time Magnetometer Y";
+                YAxisMin = -2;
+                YAxisMax = 2;
                 break;
-            case "PhotoPlethysmoGram":
-                YAxisLabel = "PhotoPlethysmoGram";
-                YAxisUnit = "mV";
-                ChartTitle = "Real-time PPG";
-                YAxisMin = 0;
-                YAxisMax = 3300;
-                break;
-            case "HeartRate":
-                YAxisLabel = "Heart Rate";
-                YAxisUnit = "BPM";
-                ChartTitle = "Real-time Heart Rate";
-                YAxisMin = 50; // Minimo fissato a 50 per Heart Rate
-                YAxisMax = 150;
+            case "MagnetometerZ":
+                YAxisLabel = "Magnetic Field Z";
+                YAxisUnit = "µT";
+                ChartTitle = "Real-time Magnetometer Z";
+                YAxisMin = -2;
+                YAxisMax = 2;
                 break;
         }
     }
 
+
     // Aggiorna manualmente i limiti degli assi e la finestra temporale.
     public void UpdateAxisScales(double minY, double maxY, int timeWindow)
     {
-        // Controllo specifico per Heart Rate
-        if (SelectedParameter == "HeartRate" && minY < 50)
-        {
-            ValidationMessage = "Heart Rate Y Min cannot be less than 50 BPM.";
-            return;
-        }
 
         if (minY >= maxY)
         {
@@ -661,7 +672,6 @@ public partial class DataPageViewModel : ObservableObject
     public void OnCanvasViewPaintSurface(SKCanvas canvas, SKImageInfo info)
     {
         canvas.Clear(SKColors.White);
-        System.Diagnostics.Debug.WriteLine($"enablePPG: {enablePPG}");
 
         // PRIMO CONTROLLO: Verifica se il sensore è disabilitato
         if (!IsSensorEnabled(SelectedParameter))
@@ -682,18 +692,7 @@ public partial class DataPageViewModel : ObservableObject
 
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
         {
-            if (SelectedParameter == "HeartRate")
-            {
-                // TERZO CONTROLLO: Per HeartRate, controlla nuovamente se PPG è abilitato
-                if (enablePPG)
-                    DrawCalibratingMessage(canvas, info);
-                else
-                    DrawDisabledSensorMessage(canvas, info);
-            }
-            else
-            {
-                DrawNoDataMessage(canvas, info);
-            }
+            DrawNoDataMessage(canvas, info);
             return;
         }
 
@@ -943,9 +942,9 @@ public partial class DataPageViewModel : ObservableObject
 
         string sensorName = SelectedParameter switch
         {
-            "AcceleratorX" or "AcceleratorY" or "AcceleratorZ" => "Accelerometer",
-            "GalvanicSkinResponse" => "GSR",
-            "PhotoPlethysmoGram" or "HeartRate" => "PPG",
+            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => "Accelerometer",
+            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
+            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
             _ => "Sensor"
         };
 
@@ -1089,28 +1088,16 @@ public partial class DataPageViewModel : ObservableObject
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
-    // Stampa su console lo stato dei sensori e dei parametri disponibili (debug).
-    private void DebugSensorStatus()
-    {
-        System.Diagnostics.Debug.WriteLine($"=== SENSOR STATUS DEBUG ===");
-        System.Diagnostics.Debug.WriteLine($"enablePPG: {enableAccelerometer}");
-        System.Diagnostics.Debug.WriteLine($"SelectedParameter: {SelectedParameter}");
-        System.Diagnostics.Debug.WriteLine($"IsSensorEnabled(HeartRate): {IsSensorEnabled("HeartRate")}");
-        System.Diagnostics.Debug.WriteLine($"AvailableParameters contains HeartRate: {AvailableParameters.Contains("HeartRate")}");
-        System.Diagnostics.Debug.WriteLine($"AvailableParameters: {string.Join(", ", AvailableParameters)}");
-        System.Diagnostics.Debug.WriteLine($"============================");
-    }
-
     // Aggiorna la configurazione dei sensori attivi e rigenera la lista dei parametri.
-    public void UpdateSensorConfiguration(bool enableAccelerometer, bool enableGSR, bool enablePPG)
+    public void UpdateSensorConfiguration(bool enableAccelerometer, bool enableGyroscope, bool enableMagnetometer)
     {
         // Salva il parametro attualmente selezionato
         string currentParameter = SelectedParameter;
 
         // Aggiorna i flag dei sensori (aggiungi questi campi come non-readonly)
         this.enableAccelerometer = enableAccelerometer;
-        this.enableGSR = enableGSR;
-        this.enablePPG = enablePPG;
+        this.enableGyroscope = enableGyroscope;
+        this.enableMagnetometer = enableMagnetometer;
 
         // Rigenera la lista dei parametri disponibili
         InitializeAvailableParameters();
@@ -1124,8 +1111,6 @@ public partial class DataPageViewModel : ObservableObject
         // Aggiorna le collezioni di dati
         UpdateDataCollections();
 
-        // Debug aggiornato
-        DebugSensorStatus();
     }
 
     // Metodo per aggiornare le collezioni di dati dopo cambio configurazione
@@ -1158,8 +1143,8 @@ public partial class DataPageViewModel : ObservableObject
         return new SensorConfiguration
         {
             EnableAccelerometer = enableAccelerometer,
-            EnableGSR = enableGSR,
-            EnablePPG = enablePPG
+            EnableGyroscope = enableGyroscope,
+            EnableMagnetometer = enableMagnetometer
         };
     }
 

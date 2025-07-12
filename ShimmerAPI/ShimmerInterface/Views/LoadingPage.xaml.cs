@@ -2,6 +2,7 @@
 using System.Runtime.CompilerServices;
 using ShimmerInterface.Models;
 using XR2Learn_ShimmerAPI;
+using XR2Learn_ShimmerAPI.IMU;
 
 namespace ShimmerInterface.Views;
 
@@ -10,7 +11,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
     private readonly ShimmerDevice device;
     private bool connectionInProgress;
     private string connectingMessage;
-    private readonly TaskCompletionSource<XR2Learn_ShimmerGSR> _completion;
+    private readonly TaskCompletionSource<XR2Learn_ShimmerIMU> _completion;
 
     public string ConnectingMessage
     {
@@ -28,7 +29,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
     // Costruttore della pagina di caricamento.
     // Riceve il dispositivo selezionato e un oggetto TaskCompletionSource per restituire il risultato della connessione.
     // Imposta il messaggio di connessione e il BindingContext per il data binding.
-    public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerGSR> completion)
+    public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU> completion)
     {
         InitializeComponent();
         this.device = device;
@@ -49,18 +50,18 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         if (connectionInProgress) return;
         connectionInProgress = true;
 
-        XR2Learn_ShimmerGSR? connectedShimmer = null;
+        XR2Learn_ShimmerIMU? connectedShimmer = null;
         string? usedPort = null;
 
         foreach (var port in new[] { device.Port1, device.Port2 })
         {
             try
             {
-                var shimmer = new XR2Learn_ShimmerGSR
+                var shimmer = new XR2Learn_ShimmerIMU
                 {
-                    EnableAccelerator = device.EnableAccelerometer,
-                    EnableGSR = device.EnableGSR,
-                    EnablePPG = device.EnablePPG
+                    EnableAccelerometer = device.EnableAccelerometer,
+                    EnableGyroscope = device.EnableGyroscope,
+                    EnableMagnetometer = device.EnableMagnetometer
                 };
 
                 shimmer.Configure("Shimmer", port);

@@ -1,5 +1,6 @@
 ﻿using ShimmerInterface.ViewModels;
 using XR2Learn_ShimmerAPI;
+using XR2Learn_ShimmerAPI.IMU;
 using SkiaSharp.Views.Maui.Controls;
 using SkiaSharp.Views.Maui;
 using ShimmerInterface.Models;
@@ -13,7 +14,7 @@ public partial class DataPage : ContentPage
 
     // Costruttore della pagina. Inizializza il ViewModel con il dispositivo Shimmer e la configurazione selezionata,
     // imposta il BindingContext e si registra per aggiornare il grafico quando necessario.
-    public DataPage(XR2Learn_ShimmerGSR shimmer, SensorConfiguration sensorConfig)
+    public DataPage(XR2Learn_ShimmerIMU shimmer, SensorConfiguration sensorConfig)
     {
         InitializeComponent();
         NavigationPage.SetHasBackButton(this, false);

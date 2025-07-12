@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ShimmerInterface.Models;
 using ShimmerInterface.Views;
+using XR2Learn_ShimmerAPI.IMU;
 using XR2Learn_ShimmerAPI;
 
 namespace ShimmerInterface.ViewModels;
@@ -13,7 +14,7 @@ public partial class MainPageViewModel : ObservableObject
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
     // Lista per tenere traccia degli Shimmer connessi
-    private List<XR2Learn_ShimmerGSR> connectedShimmers = new();
+    private List<XR2Learn_ShimmerIMU> connectedShimmers = new();
 
     // Costruttore: inizializza il comando di connessione e carica i dispositivi disponibili
     public MainPageViewModel()
@@ -58,7 +59,7 @@ public partial class MainPageViewModel : ObservableObject
 
         foreach (var device in selectedDevices)
         {
-            var tcs = new TaskCompletionSource<XR2Learn_ShimmerGSR>();
+            var tcs = new TaskCompletionSource<XR2Learn_ShimmerIMU>();
             var loadingPage = new LoadingPage(device, tcs);
 
             await Application.Current.MainPage.Navigation.PushModalAsync(loadingPage);
@@ -94,15 +95,15 @@ public partial class MainPageViewModel : ObservableObject
         {
             // Trova il device associato allo shimmer
             var device = AvailableDevices.FirstOrDefault(d =>
-                d.EnableAccelerometer == shimmer.EnableAccelerator &&
-                d.EnableGSR == shimmer.EnableGSR &&
-                d.EnablePPG == shimmer.EnablePPG);
+                d.EnableAccelerometer == shimmer.EnableAccelerometer &&
+                d.EnableGyroscope == shimmer.EnableGyroscope &&
+                d.EnableMagnetometer == shimmer.EnableMagnetometer);
 
             var sensorConfig = new SensorConfiguration
             {
                 EnableAccelerometer = device?.EnableAccelerometer ?? true,
-                EnableGSR = device?.EnableGSR ?? true,
-                EnablePPG = device?.EnablePPG ?? true
+                EnableGyroscope = device?.EnableGyroscope ?? true,
+                EnableMagnetometer = device?.EnableMagnetometer ?? true
             };
 
             var dataPage = new DataPage(shimmer, sensorConfig);

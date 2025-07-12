@@ -14,6 +14,6 @@ public partial class ShimmerDevice : ObservableObject
 
     [ObservableProperty] private bool isSelected;
     [ObservableProperty] private bool enableAccelerometer = true;
-    [ObservableProperty] private bool enableGSR = true;
-    [ObservableProperty] private bool enablePPG = true;
+    [ObservableProperty] private bool enableGyroscope = true;
+    [ObservableProperty] private bool enableMagnetometer = true;
 }
