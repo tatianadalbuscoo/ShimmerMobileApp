@@ -80,9 +80,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI.csproj" />
-		<ProjectReference Include="..\ShimmerAPI\ShimmerAPI.csproj" />
+		<ProjectReference Include="..\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI.csproj" />
 	</ItemGroup>
+
 
 	<ItemGroup>
 		<MauiXaml Update="Resources\Styles\BaseStyles.xaml">
