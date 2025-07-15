@@ -555,8 +555,8 @@ public partial class DataPageViewModel : ObservableObject
 
     public void StartTimer()
     {
-        double rateHz = shimmer.SamplingRate;
-        int intervalMs = (int)(1000.0 / rateHz);
+        // Timer fisso a 1 secondo per l'aggiornamento della visualizzazione
+        int intervalMs = 1000;
 
         timer?.Stop();
         timer?.Dispose();
@@ -577,20 +577,83 @@ public partial class DataPageViewModel : ObservableObject
     // Metodo chiamato ogni volta che scatta il timer: aggiorna i dati e il grafico.
     private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        var data = shimmer.LatestData;
-        if (data == null) return;
+        // Raccogli tutti i campioni disponibili nell'ultimo secondo
+        var samples = CollectSamplesForLastSecond();
+
+        if (samples.Count == 0) return;
 
         secondsElapsed++;
 
-        SensorText = $"[{data.TimeStamp.Data}] {data.AccelerometerX.Data} [{data.AccelerometerX.Unit}] | " +
-                     $"{data.AccelerometerY.Data} [{data.AccelerometerY.Unit}] | {data.AccelerometerZ.Data} [{data.AccelerometerZ.Unit}]\n" +
-                     $"{data.GyroscopeX.Data} [{data.GyroscopeX.Unit}] | " +
-                     $"{data.GyroscopeY.Data} [{data.GyroscopeY.Unit}] | {data.GyroscopeZ.Data} [{data.GyroscopeZ.Unit}]\n" +
-                     $"{data.MagnetometerX.Data} [{data.MagnetometerX.Unit}] | " +
-                     $"{data.MagnetometerY.Data} [{data.MagnetometerY.Unit}] | {data.MagnetometerZ.Data} [{data.MagnetometerZ.Unit}]\n";
+        // Usa l'ultimo campione per il display del testo
+        var lastSample = samples.Last();
+        SensorText = $"[{lastSample.TimeStamp.Data}] {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
+                     $"{lastSample.AccelerometerY.Data} [{lastSample.AccelerometerY.Unit}] | {lastSample.AccelerometerZ.Data} [{lastSample.AccelerometerZ.Unit}]\n" +
+                     $"{lastSample.GyroscopeX.Data} [{lastSample.GyroscopeX.Unit}] | " +
+                     $"{lastSample.GyroscopeY.Data} [{lastSample.GyroscopeY.Unit}] | {lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
+                     $"{lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
+                     $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | {lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]\n";
 
-        UpdateAllDataCollections(data);
+        // Processa tutti i campioni per calcolare un valore rappresentativo (es. media)
+        var averagedData = CalculateAveragedData(samples);
+
+        UpdateAllDataCollections(averagedData);
         UpdateChart();
+    }
+
+    // Aggiungi questo nuovo metodo per raccogliere i campioni:
+    private List<dynamic> CollectSamplesForLastSecond()
+    {
+        var samples = new List<dynamic>();
+        var samplesPerSecond = (int)Math.Round(shimmer.SamplingRate);
+
+        // Raccogli i campioni per l'ultimo secondo
+        for (int i = 0; i < samplesPerSecond; i++)
+        {
+            var data = shimmer.LatestData;
+            if (data != null)
+            {
+                samples.Add(data);
+            }
+
+            // Piccola pausa per rispettare il sampling rate
+            System.Threading.Thread.Sleep((int)(1000.0 / shimmer.SamplingRate));
+        }
+
+        return samples;
+    }
+
+    // Aggiungi questo metodo per calcolare i valori mediati:
+    private dynamic CalculateAveragedData(List<dynamic> samples)
+    {
+        if (samples.Count == 0) return null;
+
+        // Calcola le medie per ogni parametro
+        var avgAccelX = samples.Average(s => (double)s.AccelerometerX.Data);
+        var avgAccelY = samples.Average(s => (double)s.AccelerometerY.Data);
+        var avgAccelZ = samples.Average(s => (double)s.AccelerometerZ.Data);
+
+        var avgGyroX = samples.Average(s => (double)s.GyroscopeX.Data);
+        var avgGyroY = samples.Average(s => (double)s.GyroscopeY.Data);
+        var avgGyroZ = samples.Average(s => (double)s.GyroscopeZ.Data);
+
+        var avgMagX = samples.Average(s => (double)s.MagnetometerX.Data);
+        var avgMagY = samples.Average(s => (double)s.MagnetometerY.Data);
+        var avgMagZ = samples.Average(s => (double)s.MagnetometerZ.Data);
+
+        // Restituisci un oggetto con i valori mediati
+        return new
+        {
+            TimeStamp = samples.Last().TimeStamp,
+            AccelerometerX = new { Data = avgAccelX, Unit = samples.First().AccelerometerX.Unit },
+            AccelerometerY = new { Data = avgAccelY, Unit = samples.First().AccelerometerY.Unit },
+            AccelerometerZ = new { Data = avgAccelZ, Unit = samples.First().AccelerometerZ.Unit },
+            GyroscopeX = new { Data = avgGyroX, Unit = samples.First().GyroscopeX.Unit },
+            GyroscopeY = new { Data = avgGyroY, Unit = samples.First().GyroscopeY.Unit },
+            GyroscopeZ = new { Data = avgGyroZ, Unit = samples.First().GyroscopeZ.Unit },
+            MagnetometerX = new { Data = avgMagX, Unit = samples.First().MagnetometerX.Unit },
+            MagnetometerY = new { Data = avgMagY, Unit = samples.First().MagnetometerY.Unit },
+            MagnetometerZ = new { Data = avgMagZ, Unit = samples.First().MagnetometerZ.Unit }
+        };
     }
 
     // Inserisce i nuovi dati raccolti nelle collezioni dei parametri abilitati.
