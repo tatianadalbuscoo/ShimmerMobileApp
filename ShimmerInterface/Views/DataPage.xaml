@@ -22,7 +22,7 @@
             <Label Text="Chart Configuration"
                    Style="{StaticResource TitleLabel}" />
 
-            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto" 
+            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto" 
                   ColumnSpacing="10" RowSpacing="10">
 
                 <!-- Selezione parametro -->
@@ -85,6 +85,17 @@
                        Keyboard="Numeric"
                        FontSize="16"
                        BackgroundColor="White" />
+                <!-- Sample Rate -->
+                <Label Grid.Row="5" Grid.Column="0" 
+                       Text="Sampling Rate (Hz):" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Entry Grid.Row="5" Grid.Column="1"
+                       Text="{Binding SamplingRateText}"
+                       Keyboard="Numeric"
+                       FontSize="16"
+                       BackgroundColor="White" />
             </Grid>
 
             <!-- Messaggio di validazione -->
@@ -118,32 +129,37 @@
                    Margin="0,10">
                 <StackLayout>
                     <Label Text="{Binding SelectedParameter, StringFormat='Current Parameter: {0}'}"
-                           FontSize="16"
-                           FontAttributes="Bold"
-                           TextColor="{StaticResource Primary}" />
-                    <Label Text="{Binding YAxisLabel, StringFormat='Measuring: {0}'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
-                    <Label Text="{Binding YAxisUnit, StringFormat='Unit: {0}'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
-                    <Label FontSize="14"
-                           TextColor="{StaticResource TextSecondary}">
-                        <Label.Text>
-                            <MultiBinding StringFormat="Y Range: {0:F1} - {1:F1}">
-                                <Binding Path="YAxisMin" />
-                                <Binding Path="YAxisMax" />
-                            </MultiBinding>
-                        </Label.Text>
-                    </Label>
-                    <Label Text="{Binding TimeWindowSeconds, StringFormat='Time Window: {0}s'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
-                    <Label Text="{Binding XAxisLabelInterval, StringFormat='X Labels every: {0}s'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}"
-                           IsVisible="{Binding IsXAxisLabelIntervalEnabled}" />
+                       FontSize="16"
+                       FontAttributes="Bold"
+                       TextColor="{StaticResource Primary}" />
+                                <Label Text="{Binding YAxisLabel, StringFormat='Measuring: {0}'}"
+                       FontSize="14"
+                       TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding YAxisUnit, StringFormat='Unit: {0}'}"
+                       FontSize="14"
+                       TextColor="{StaticResource TextSecondary}" />
+                                <Label FontSize="14"
+                       TextColor="{StaticResource TextSecondary}">
+                                    <Label.Text>
+                                        <MultiBinding StringFormat="Y Range: {0:F1} - {1:F1}">
+                                            <Binding Path="YAxisMin" />
+                                            <Binding Path="YAxisMax" />
+                                        </MultiBinding>
+                                    </Label.Text>
+                                </Label>
+                                <Label Text="{Binding TimeWindowSeconds, StringFormat='Time Window: {0}s'}"
+                       FontSize="14"
+                       TextColor="{StaticResource TextSecondary}" />
+                                <Label Text="{Binding XAxisLabelInterval, StringFormat='X Labels every: {0}s'}"
+                       FontSize="14"
+                       TextColor="{StaticResource TextSecondary}"
+                       IsVisible="{Binding IsXAxisLabelIntervalEnabled}" />
+
+                                <Label Text="{Binding SamplingRateDisplay, StringFormat='Sample Rate: {0:F1} Hz'}"
+                       FontSize="14"
+                       TextColor="{StaticResource TextSecondary}" />
                 </StackLayout>
+
             </Frame>
 
         </VerticalStackLayout>

@@ -11,7 +11,11 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using ShimmerInterface.Models;
 
+
+
 namespace ShimmerInterface.ViewModels;
+
+
 
 public partial class DataPageViewModel : ObservableObject
 {
@@ -19,7 +23,8 @@ public partial class DataPageViewModel : ObservableObject
     private readonly XR2Learn_ShimmerIMU shimmer;
 
     // Timer that triggers data updates every second
-    private readonly System.Timers.Timer timer = new(1000);
+    private System.Timers.Timer? timer;
+
 
     // Dizionario che memorizza i dati delle serie temporali per ciascun parametro (X/Y/Z, GSR, PPG...)
     private readonly Dictionary<string, List<float>> dataPointsCollections = new();
@@ -38,6 +43,8 @@ public partial class DataPageViewModel : ObservableObject
     private double _lastValidYAxisMax = 1;
     private int _lastValidTimeWindowSeconds = 20;
     private int _lastValidXAxisLabelInterval = 5;
+    private double _lastValidSamplingRate = 51.2;
+
 
     // Backing fields for input validation
     private string _yAxisMinText = "0";
@@ -79,6 +86,24 @@ public partial class DataPageViewModel : ObservableObject
 
     [ObservableProperty]
     private bool isXAxisLabelIntervalEnabled = true;
+
+    [ObservableProperty]
+    private double samplingRateDisplay;
+
+
+    private string _samplingRateText = "51.2";
+    public string SamplingRateText
+    {
+        get => _samplingRateText;
+        set
+        {
+            if (SetProperty(ref _samplingRateText, value))
+            {
+                ValidateAndUpdateSamplingRate(value);
+            }
+        }
+    }
+
 
 
     // Text properties for input fields
@@ -141,6 +166,9 @@ public partial class DataPageViewModel : ObservableObject
         enableGyroscope = config.EnableGyroscope;
         enableMagnetometer = config.EnableMagnetometer;
 
+        samplingRateDisplay = shimmer.SamplingRate;
+
+
         InitializeAvailableParameters();
 
         if (!AvailableParameters.Contains(SelectedParameter))
@@ -160,6 +188,9 @@ public partial class DataPageViewModel : ObservableObject
 
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
+        _samplingRateText = shimmer.SamplingRate.ToString(CultureInfo.InvariantCulture);
+        _lastValidSamplingRate = shimmer.SamplingRate;
+        OnPropertyChanged(nameof(SamplingRateText));
         _lastValidTimeWindowSeconds = TimeWindowSeconds;
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
 
@@ -272,6 +303,58 @@ public partial class DataPageViewModel : ObservableObject
         ResetYAxisMaxText();
     }
 }
+
+    private void ValidateAndUpdateSamplingRate(string value)
+    {
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            const double defaultRate = 51.2;
+            shimmer.SamplingRate = defaultRate;
+            SamplingRateDisplay = defaultRate;
+            _lastValidSamplingRate = defaultRate;
+            ValidationMessage = "";
+            RestartTimer();
+            return;
+        }
+
+        if (value.Trim() == "-" || value.Trim() == "+")
+        {
+            ValidationMessage = "";
+            return;
+        }
+
+        if (TryParseDouble(value, out double result))
+        {
+            if (result <= 0)
+            {
+                ValidationMessage = "Sampling rate must be greater than 0 Hz.";
+                ResetSamplingRateText();
+                return;
+            }
+
+            shimmer.SamplingRate = result;
+            SamplingRateDisplay = result;
+            _lastValidSamplingRate = result;
+            ValidationMessage = "";
+            RestartTimer();
+        }
+        else
+        {
+            ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
+            ResetSamplingRateText();
+        }
+    }
+
+
+    private void ResetSamplingRateText()
+    {
+        _samplingRateText = _lastValidSamplingRate.ToString(CultureInfo.InvariantCulture);
+        OnPropertyChanged(nameof(SamplingRateText));
+    }
+
+
+
 
     // Valida e aggiorna la finestra temporale in secondi.
     private void ValidateAndUpdateTimeWindow(string value)
@@ -469,12 +552,27 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     // Avvia il timer che legge e aggiorna i dati a intervalli regolari.
+
     public void StartTimer()
     {
-        timer.Elapsed -= OnTimerElapsed; // prevenzione doppia iscrizione
+        double rateHz = shimmer.SamplingRate;
+        int intervalMs = (int)(1000.0 / rateHz);
+
+        timer?.Stop();
+        timer?.Dispose();
+
+        timer = new System.Timers.Timer(intervalMs);
         timer.Elapsed += OnTimerElapsed;
         timer.Start();
     }
+
+    private void RestartTimer()
+    {
+        StopTimer();
+        StartTimer();
+    }
+
+
 
     // Metodo chiamato ogni volta che scatta il timer: aggiorna i dati e il grafico.
     private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
@@ -1151,7 +1249,12 @@ public partial class DataPageViewModel : ObservableObject
     // Ferma il timer che aggiorna i dati.
     public void StopTimer()
     {
-        timer.Stop();
+        if (timer != null)
+        {
+            timer.Stop();
+            timer.Dispose();
+            timer = null;
+        }
     }
 
 
