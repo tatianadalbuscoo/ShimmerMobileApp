@@ -46,6 +46,7 @@ public partial class DataPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+        viewModel.ResetStartTime();
         viewModel.StartTimer(); // Lo abiliti ogni volta che la pagina torna attiva
         viewModel.ChartUpdateRequested += OnChartUpdateRequested;
     }

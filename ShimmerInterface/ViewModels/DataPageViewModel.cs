@@ -15,6 +15,11 @@ using ShimmerInterface.Models;
 
 namespace ShimmerInterface.ViewModels;
 
+public enum TimeDisplayMode
+{
+    Seconds,
+    Clock
+}
 
 
 public partial class DataPageViewModel : ObservableObject
@@ -32,6 +37,8 @@ public partial class DataPageViewModel : ObservableObject
 
     // Elapsed seconds since data collection started
     private int secondsElapsed = 0;
+
+    private DateTime startTime = DateTime.Now;
 
     // Sensor enable flags (set from SensorConfiguration passed in constructor)
     private bool enableAccelerometer;
@@ -89,6 +96,12 @@ public partial class DataPageViewModel : ObservableObject
 
     [ObservableProperty]
     private double samplingRateDisplay;
+
+    [ObservableProperty]
+    private TimeDisplayMode timeDisplayMode = TimeDisplayMode.Seconds;
+
+    [ObservableProperty]
+    private bool showGrid = true;
 
 
     private string _samplingRateText = "51.2";
@@ -194,9 +207,12 @@ public partial class DataPageViewModel : ObservableObject
         _lastValidTimeWindowSeconds = TimeWindowSeconds;
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
 
+        startTime = DateTime.Now;
+
         UpdateTextProperties();
 
     }
+
 
     // Aggiorna i testi dei campi di input in base ai valori numerici correnti.
     private void UpdateTextProperties()
@@ -583,6 +599,8 @@ public partial class DataPageViewModel : ObservableObject
         if (samples.Count == 0) return;
 
         secondsElapsed++;
+        var currentTime = DateTime.Now; // Aggiungi questa riga
+
 
         // Usa l'ultimo campione per il display del testo
         var lastSample = samples.Last();
@@ -599,6 +617,59 @@ public partial class DataPageViewModel : ObservableObject
         UpdateAllDataCollections(averagedData);
         UpdateChart();
     }
+
+    private void DrawOscilloscopeGrid(SKCanvas canvas, float leftMargin, float topMargin, float graphWidth, float graphHeight)
+    {
+        if (!ShowGrid) return;
+
+        float right = leftMargin + graphWidth;
+        float bottom = topMargin + graphHeight;
+
+        int horizontalDivisions = 4;
+        int verticalDivisions = TimeWindowSeconds; // Una divisione ogni secondo
+
+        using var majorGridPaint = new SKPaint
+        {
+            Color = SKColors.LightSlateGray,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1,
+            PathEffect = SKPathEffect.CreateDash(new float[] { 4, 4 }, 0)
+        };
+
+        using var minorGridPaint = new SKPaint
+        {
+            Color = SKColors.LightGray,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 0.5f,
+            PathEffect = SKPathEffect.CreateDash(new float[] { 2, 2 }, 0)
+        };
+
+        using var labelPaint = new SKPaint
+        {
+            Color = SKColors.Gray,
+            TextSize = 12,
+            IsAntialias = true
+        };
+
+        // Griglia orizzontale (asse Y)
+        for (int i = 0; i <= horizontalDivisions; i++)
+        {
+            float y = bottom - (i * graphHeight / horizontalDivisions);
+            canvas.DrawLine(leftMargin, y, right, y, majorGridPaint);
+
+           
+        }
+
+        // Griglia verticale (asse X) 
+        for (int i = 0; i <= verticalDivisions; i++)
+        {
+            float x = leftMargin + (i * graphWidth / verticalDivisions);
+            canvas.DrawLine(x, topMargin, x, bottom, majorGridPaint);
+
+            
+        }
+    }
+
 
     // Aggiungi questo nuovo metodo per raccogliere i campioni:
     private List<dynamic> CollectSamplesForLastSecond()
@@ -620,6 +691,15 @@ public partial class DataPageViewModel : ObservableObject
         }
 
         return samples;
+    }
+
+    private string FormatTimeLabel(int timeValue)
+    {
+        return TimeDisplayMode switch
+        {
+            TimeDisplayMode.Clock => startTime.AddSeconds(timeValue).ToString("HH:mm:ss"),
+            _ => timeValue.ToString() + "s"
+        };
     }
 
     // Aggiungi questo metodo per calcolare i valori mediati:
@@ -836,7 +916,7 @@ public partial class DataPageViewModel : ObservableObject
 
         // PRIMO CONTROLLO: Verifica se il sensore è disabilitato
         if (!IsSensorEnabled(SelectedParameter))
-        { 
+        {
             DrawDisabledSensorMessage(canvas, info);
             return;
         }
@@ -851,13 +931,8 @@ public partial class DataPageViewModel : ObservableObject
         var currentDataPoints = dataPointsCollections[SelectedParameter];
         var currentTimeStamps = timeStampsCollections[SelectedParameter];
 
+        // Nessun dato o tutti -1/0
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
-        {
-            DrawNoDataMessage(canvas, info);
-            return;
-        }
-
-        if (currentDataPoints.All(v => v == 0 || v == -1))
         {
             DrawNoDataMessage(canvas, info);
             return;
@@ -877,10 +952,17 @@ public partial class DataPageViewModel : ObservableObject
         };
         canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
 
+        // *** CORREZIONE: Chiamare DrawOscilloscopeGrid ***
+        DrawOscilloscopeGrid(canvas, leftMargin, margin, graphWidth, graphHeight);
+
         var yRange = YAxisMax - YAxisMin;
         var bottomY = margin + graphHeight;
         var topY = margin;
 
+        // *** RIMUOVERE: Eliminare il codice duplicato della griglia ***
+        // VECCHIO CODICE DA RIMUOVERE:
+        /*
+        // Griglia orizzontale
         using var gridLinePaint = new SKPaint
         {
             Color = SKColors.LightGray,
@@ -895,7 +977,9 @@ public partial class DataPageViewModel : ObservableObject
             var y = bottomY - (float)((value - YAxisMin) / yRange * graphHeight);
             canvas.DrawLine(leftMargin, y, leftMargin + graphWidth, y, gridLinePaint);
         }
+        */
 
+        // Linea del segnale
         using var linePaint = new SKPaint
         {
             Color = SKColors.Blue,
@@ -910,8 +994,7 @@ public partial class DataPageViewModel : ObservableObject
             var x = leftMargin + (i * graphWidth / Math.Max(currentDataPoints.Count - 1, 1));
             var normalizedValue = (currentDataPoints[i] - YAxisMin) / yRange;
             var y = bottomY - (float)(normalizedValue * graphHeight);
-
-            y = Math.Max(topY, Math.Min(bottomY, y));
+            y = Math.Clamp(y, topY, bottomY);
 
             if (i == 0)
                 path.MoveTo(x, y);
@@ -928,26 +1011,22 @@ public partial class DataPageViewModel : ObservableObject
             IsAntialias = true
         };
 
-        // Usa i timestamp effettivi, ma solo se l'intervallo è abilitato
-        for (int i = 0; i < currentDataPoints.Count; i++)
+        // Etichette X sincronizzate con la griglia e filtrate ogni XAxisLabelInterval secondi
+        int numDivisions = TimeWindowSeconds;
+        int labelInterval = IsXAxisLabelIntervalEnabled ? XAxisLabelInterval : 1;
+
+        for (int i = 0; i <= numDivisions; i++)
         {
-            var timeValue = currentTimeStamps[i];
+            int timeValue = secondsElapsed - TimeWindowSeconds + i;
+            if (timeValue < 0 || (timeValue % labelInterval != 0)) continue;
 
-            // Per Heart Rate, mostra sempre tutte le etichette (intervallo disabilitato)
-            // Per altri sensori, usa l'intervallo impostato
-            bool shouldShowLabel = !IsXAxisLabelIntervalEnabled ||
-                                  timeValue % XAxisLabelInterval == 0 ||
-                                  i == 0 ||
-                                  i == currentDataPoints.Count - 1;
+            float x = leftMargin + (i * graphWidth / numDivisions);
 
-            if (shouldShowLabel)
-            {
-                var x = leftMargin + (i * graphWidth / Math.Max(currentDataPoints.Count - 1, 1));
-                var displayTime = timeValue.ToString() + "s";
-                var textWidth = textPaint.MeasureText(displayTime);
-                canvas.DrawText(displayTime, x - textWidth / 2, margin + graphHeight + 20, textPaint);
-            }
+            string label = FormatTimeLabel(timeValue);
+            var textWidth = textPaint.MeasureText(label);
+            canvas.DrawText(label, x - textWidth / 2, bottomY + 20, textPaint);
         }
+
 
         // Etichette Y
         for (int i = 0; i <= 4; i++)
@@ -958,6 +1037,7 @@ public partial class DataPageViewModel : ObservableObject
             canvas.DrawText(label, leftMargin - 45, y + 6, textPaint);
         }
 
+        // Etichette assi
         using var axisLabelPaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -966,17 +1046,25 @@ public partial class DataPageViewModel : ObservableObject
             FakeBoldText = true
         };
 
-        var xAxisLabel = "Time[seconds]";
-        var xAxisLabelWidth = axisLabelPaint.MeasureText(xAxisLabel);
-        canvas.DrawText(xAxisLabel, (info.Width - xAxisLabelWidth) / 2, info.Height - 5, axisLabelPaint);
+        string xAxisLabel = "Time [s]";
 
-        var yAxisLabelText = $"{YAxisLabel}[{YAxisUnit}]";
+
+
+
+        var labelX = (info.Width - axisLabelPaint.MeasureText(xAxisLabel)) / 2;
+        var labelY = info.Height - 8; // più in alto di "5" per evitare taglio in basso
+
+        canvas.DrawText(xAxisLabel, labelX, labelY, axisLabelPaint);
+
+
+        var yAxisLabelText = $"{YAxisLabel} [{YAxisUnit}]";
         canvas.Save();
         canvas.Translate(15, (info.Height + axisLabelPaint.MeasureText(yAxisLabelText)) / 2);
         canvas.RotateDegrees(-90);
         canvas.DrawText(yAxisLabelText, 0, 0, axisLabelPaint);
         canvas.Restore();
 
+        // Titolo
         using var titlePaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -984,8 +1072,16 @@ public partial class DataPageViewModel : ObservableObject
             IsAntialias = true,
             FakeBoldText = true
         };
+
         var titleWidth = titlePaint.MeasureText(ChartTitle);
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
+    }
+
+
+    public void ToggleGrid()
+    {
+        ShowGrid = !ShowGrid;
+        UpdateChart();
     }
 
     // Metodi di validazione numerica 
@@ -1319,6 +1415,12 @@ public partial class DataPageViewModel : ObservableObject
             timer = null;
         }
     }
+
+    public void ResetStartTime()
+    {
+        startTime = DateTime.Now;
+    }
+
 
 
 }
