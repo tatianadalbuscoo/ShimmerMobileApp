@@ -48,6 +48,9 @@
                                 <Switch IsToggled="{Binding EnableGyroscope}" />
                                 <Label Text="Magnetometer" />
                                 <Switch IsToggled="{Binding EnableMagnetometer}" />
+                                <Label Text="Battery Voltage" />
+                                <Switch IsToggled="{Binding EnableBattery}" />
+
                             </VerticalStackLayout>
                         </Frame>
                     </DataTemplate>

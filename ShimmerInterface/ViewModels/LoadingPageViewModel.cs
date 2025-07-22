@@ -13,13 +13,16 @@ public partial class LoadingPageViewModel : ObservableObject
     public bool EnableWideRangeAccelerometer { get; }
     public bool EnableGyroscope { get; }
     public bool EnableMagnetometer { get; }
+    public bool EnableBattery { get; }
 
     // Costruttore: salva le impostazioni dei sensori da abilitare
-    public LoadingPageViewModel(bool accel, bool gsr, bool ppg)
+    public LoadingPageViewModel(bool accelerometer, bool wideRangeAccelerometer, bool gyroscope, bool magnetometer, bool battery)
     {
-        EnableAccelerometer = accel;
-        EnableGyroscope = gsr;
-        EnableMagnetometer = ppg;
+        EnableAccelerometer = accelerometer;
+        EnableWideRangeAccelerometer = wideRangeAccelerometer;
+        EnableGyroscope = gyroscope;
+        EnableMagnetometer = magnetometer;
+        EnableBattery = battery;
     }
 
     // Metodo asincrono che prova a connettersi a un dispositivo Shimmer.
@@ -36,7 +39,8 @@ public partial class LoadingPageViewModel : ObservableObject
             EnableLowNoiseAccelerometer = EnableAccelerometer,
             EnableWideRangeAccelerometer = EnableWideRangeAccelerometer,
             EnableGyroscope = EnableGyroscope,
-            EnableMagnetometer = EnableMagnetometer
+            EnableMagnetometer = EnableMagnetometer,
+            EnableBattery = EnableBattery,
         };
 
         shimmer.Configure("Shimmer3", ports[0]);

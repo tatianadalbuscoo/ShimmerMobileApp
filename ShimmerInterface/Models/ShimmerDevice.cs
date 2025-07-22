@@ -28,6 +28,9 @@ namespace ShimmerInterface.Models
         [ObservableProperty]
         private bool enableMagnetometer = true;
 
+        [ObservableProperty]
+        private bool enableBattery = true;
+
         // Nuove proprietà per il nome Shimmer e l'indirizzo Bluetooth
         [ObservableProperty]
         private string shimmerName;

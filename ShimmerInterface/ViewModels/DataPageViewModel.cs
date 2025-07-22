@@ -45,6 +45,7 @@ public partial class DataPageViewModel : ObservableObject
     private bool enableWideRangeAccelerometer;
     private bool enableGyroscope;
     private bool enableMagnetometer;
+    private bool enableBattery;
 
     // Valori di backup per il ripristino in caso di input non validi
     private double _lastValidYAxisMin = 0;
@@ -180,6 +181,7 @@ public partial class DataPageViewModel : ObservableObject
         enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
         enableGyroscope = config.EnableGyroscope;
         enableMagnetometer = config.EnableMagnetometer;
+        enableBattery = config.EnableBattery;
 
         samplingRateDisplay = shimmer.SamplingRate;
 
@@ -280,47 +282,47 @@ public partial class DataPageViewModel : ObservableObject
 
     // Valida e aggiorna il valore massimo dell'asse Y.
     private void ValidateAndUpdateYAxisMax(string value)
-{
-    // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
-    if (string.IsNullOrWhiteSpace(value))
     {
-        var defaultMax = GetDefaultYAxisMax(SelectedParameter);
-        ValidationMessage = "";
-        YAxisMax = defaultMax;
-        _lastValidYAxisMax = defaultMax;
-        UpdateChart();
-        return;
-    }
-
-    // Permetti input parziali come "-" o "+"
-    if (value.Trim() == "-" || value.Trim() == "+")
-    {
-        ValidationMessage = "";
-        // Non aggiornare YAxisMax, mantieni il valore precedente
-        // Non chiamare UpdateChart() per evitare refresh continui
-        return;
-    }
-
-    if (TryParseDouble(value, out double result))
-    {
-        if (result <= YAxisMin)
+        // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
+        if (string.IsNullOrWhiteSpace(value))
         {
-            ValidationMessage = "Y Max cannot be less than or equal to Y Min.";
-            ResetYAxisMaxText();
+            var defaultMax = GetDefaultYAxisMax(SelectedParameter);
+            ValidationMessage = "";
+            YAxisMax = defaultMax;
+            _lastValidYAxisMax = defaultMax;
+            UpdateChart();
             return;
         }
 
-        ValidationMessage = "";
-        YAxisMax = result;
-        _lastValidYAxisMax = result;
-        UpdateChart();
+        // Permetti input parziali come "-" o "+"
+        if (value.Trim() == "-" || value.Trim() == "+")
+        {
+            ValidationMessage = "";
+            // Non aggiornare YAxisMax, mantieni il valore precedente
+            // Non chiamare UpdateChart() per evitare refresh continui
+            return;
+        }
+
+        if (TryParseDouble(value, out double result))
+        {
+            if (result <= YAxisMin)
+            {
+                ValidationMessage = "Y Max cannot be less than or equal to Y Min.";
+                ResetYAxisMaxText();
+                return;
+            }
+
+            ValidationMessage = "";
+            YAxisMax = result;
+            _lastValidYAxisMax = result;
+            UpdateChart();
+        }
+        else
+        {
+            ValidationMessage = "Y Max must be a valid number (no letters or special characters allowed).";
+            ResetYAxisMaxText();
+        }
     }
-    else
-    {
-        ValidationMessage = "Y Max must be a valid number (no letters or special characters allowed).";
-        ResetYAxisMaxText();
-    }
-}
 
     private void ValidateAndUpdateSamplingRate(string value)
     {
@@ -377,7 +379,6 @@ public partial class DataPageViewModel : ObservableObject
     // Valida e aggiorna la finestra temporale in secondi.
     private void ValidateAndUpdateTimeWindow(string value)
     {
-        // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
         if (string.IsNullOrWhiteSpace(value))
         {
             const int defaultTimeWindow = 20;
@@ -385,12 +386,11 @@ public partial class DataPageViewModel : ObservableObject
             TimeWindowSeconds = defaultTimeWindow;
             _lastValidTimeWindowSeconds = defaultTimeWindow;
 
-            // Non aggiornare il testo - lascia il campo vuoto
-
             // Taglia tutte le collezioni alla nuova dimensione
+            var maxPoints = (int)(defaultTimeWindow * shimmer.SamplingRate);
             foreach (var parameter in AvailableParameters)
             {
-                while (dataPointsCollections[parameter].Count > defaultTimeWindow)
+                while (dataPointsCollections[parameter].Count > maxPoints)
                 {
                     dataPointsCollections[parameter].RemoveAt(0);
                     timeStampsCollections[parameter].RemoveAt(0);
@@ -413,10 +413,11 @@ public partial class DataPageViewModel : ObservableObject
             TimeWindowSeconds = result;
             _lastValidTimeWindowSeconds = result;
 
-            // Taglia tutte le collezioni alla nuova dimensione
+            // Taglia tutte le collezioni alla nuova dimensione basata sul sampling rate
+            var maxPoints = (int)(result * shimmer.SamplingRate);
             foreach (var parameter in AvailableParameters)
             {
-                while (dataPointsCollections[parameter].Count > result)
+                while (dataPointsCollections[parameter].Count > maxPoints)
                 {
                     dataPointsCollections[parameter].RemoveAt(0);
                     timeStampsCollections[parameter].RemoveAt(0);
@@ -476,11 +477,15 @@ public partial class DataPageViewModel : ObservableObject
         return parameter switch
         {
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => -5,
+            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => -20,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => -250,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => -2,
+            "Battery Voltage" => 3300,
+            "Battery Percent" => 0,
             _ => 0
         };
     }
+
 
     // Restituisce il valore massimo di default per l’asse Y in base al parametro selezionato.
     private double GetDefaultYAxisMax(string parameter)
@@ -488,11 +493,15 @@ public partial class DataPageViewModel : ObservableObject
         return parameter switch
         {
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => 5,
+            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => 20,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => 250,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => 2,
+            "Battery Voltage" => 4200,
+            "Battery Percent" => 100,
             _ => 1
         };
     }
+
 
 
     // Ripristina il testo del campo YMin all’ultimo valore valido.
@@ -557,6 +566,11 @@ public partial class DataPageViewModel : ObservableObject
             AvailableParameters.Add("MagnetometerZ");
         }
 
+        if(enableBattery)
+        {
+            AvailableParameters.Add("BatteryVoltage");
+        }
+
         // Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
         // Forza un parametro valido se quello selezionato non lo è più
         if (!AvailableParameters.Contains(SelectedParameter))
@@ -574,9 +588,11 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
+            "BatteryVoltage" => enableBattery,
             _ => false
         };
     }
+
 
     // Avvia il timer che legge e aggiorna i dati a intervalli regolari.
 
@@ -602,19 +618,27 @@ public partial class DataPageViewModel : ObservableObject
 
 
     // Metodo chiamato ogni volta che scatta il timer: aggiorna i dati e il grafico.
+    // 1. First, modify the OnTimerElapsed method to handle battery data safely
     private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         // Raccogli tutti i campioni disponibili nell'ultimo secondo
         var samples = CollectSamplesForLastSecond();
-
         if (samples.Count == 0) return;
 
         secondsElapsed++;
-        var currentTime = DateTime.Now; // Aggiungi questa riga
-
+        var currentTime = DateTime.Now;
 
         // Usa l'ultimo campione per il display del testo
         var lastSample = samples.Last();
+
+        // Battery info senza reflection
+        string batteryText = "";
+        if (enableBattery && lastSample.BatteryVoltage != null)
+        {
+            batteryText = $"\nBattery: {lastSample.BatteryVoltage.Data} [{lastSample.BatteryVoltage.Unit}]";
+        }
+
+        // Update sensor text display
         SensorText =
             $"[{lastSample.TimeStamp.Data}]\n" +
             $"Low-Noise Accelerometer: {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
@@ -628,15 +652,87 @@ public partial class DataPageViewModel : ObservableObject
             $"{lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
             $"Magnetometer: {lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
             $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | " +
-            $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]";
+            $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]" +
+            batteryText;
 
+        // Aggiungi tutti i campioni individuali alle collezioni dati
+        UpdateAllDataCollectionsWithAllSamples(samples);
 
-        // Processa tutti i campioni per calcolare un valore rappresentativo (es. media)
-        var averagedData = CalculateAveragedData(samples);
-
-        UpdateAllDataCollections(averagedData);
         UpdateChart();
     }
+
+
+    private void UpdateAllDataCollectionsWithAllSamples(List<dynamic> samples)
+    {
+        foreach (var sample in samples)
+        {
+            var values = new Dictionary<string, float>();
+
+            try
+            {
+                if (enableAccelerometer)
+                {
+                    values["Low-Noise AccelerometerX"] = (float)sample.AccelerometerX.Data;
+                    values["Low-Noise AccelerometerY"] = (float)sample.AccelerometerY.Data;
+                    values["Low-Noise AccelerometerZ"] = (float)sample.AccelerometerZ.Data;
+                }
+
+                if (enableWideRangeAccelerometer)
+                {
+                    values["Wide-Range AccelerometerX"] = (float)sample.WideRangeAccelerometerX.Data;
+                    values["Wide-Range AccelerometerY"] = (float)sample.WideRangeAccelerometerY.Data;
+                    values["Wide-Range AccelerometerZ"] = (float)sample.WideRangeAccelerometerZ.Data;
+                }
+
+                if (enableGyroscope)
+                {
+                    values["GyroscopeX"] = (float)sample.GyroscopeX.Data;
+                    values["GyroscopeY"] = (float)sample.GyroscopeY.Data;
+                    values["GyroscopeZ"] = (float)sample.GyroscopeZ.Data;
+                }
+
+                if (enableMagnetometer)
+                {
+                    values["MagnetometerX"] = (float)sample.MagnetometerX.Data;
+                    values["MagnetometerY"] = (float)sample.MagnetometerY.Data;
+                    values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
+                }
+
+                if (enableBattery && sample.BatteryVoltage != null)
+                {
+                    values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error processing sample: {ex.Message}");
+                continue;
+            }
+
+            // Calcola il timestamp per questo campione specifico
+            var sampleIndex = samples.IndexOf(sample);
+            var fractionalTime = secondsElapsed + (double)sampleIndex / samples.Count;
+
+            // Aggiorna ogni collezione SOLO se c'è un valore valido
+            foreach (var parameter in AvailableParameters)
+            {
+                if (values.ContainsKey(parameter))
+                {
+                    dataPointsCollections[parameter].Add(values[parameter]);
+                    timeStampsCollections[parameter].Add((int)Math.Round(fractionalTime * 1000));
+
+                    // Mantieni solo i punti degli ultimi TimeWindowSeconds
+                    var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
+                    while (dataPointsCollections[parameter].Count > maxPoints)
+                    {
+                        dataPointsCollections[parameter].RemoveAt(0);
+                        timeStampsCollections[parameter].RemoveAt(0);
+                    }
+                }
+            }
+        }
+    }
+
 
     private void DrawOscilloscopeGrid(SKCanvas canvas, float leftMargin, float topMargin, float graphWidth, float graphHeight)
     {
@@ -677,7 +773,7 @@ public partial class DataPageViewModel : ObservableObject
             float y = bottom - (i * graphHeight / horizontalDivisions);
             canvas.DrawLine(leftMargin, y, right, y, majorGridPaint);
 
-           
+
         }
 
         // Griglia verticale (asse X) 
@@ -686,7 +782,7 @@ public partial class DataPageViewModel : ObservableObject
             float x = leftMargin + (i * graphWidth / verticalDivisions);
             canvas.DrawLine(x, topMargin, x, bottom, majorGridPaint);
 
-            
+
         }
     }
 
@@ -723,11 +819,12 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     // Aggiungi questo metodo per calcolare i valori mediati:
+    // Replace the existing CalculateAveragedData method with this fixed version:
     private dynamic CalculateAveragedData(List<dynamic> samples)
     {
         if (samples.Count == 0) return null;
 
-        // Calcola le medie per ogni parametro
+        // Calculate averages for standard sensors
         var avgAccelX = samples.Average(s => (double)s.AccelerometerX.Data);
         var avgAccelY = samples.Average(s => (double)s.AccelerometerY.Data);
         var avgAccelZ = samples.Average(s => (double)s.AccelerometerZ.Data);
@@ -744,9 +841,18 @@ public partial class DataPageViewModel : ObservableObject
         var avgWideAccY = samples.Average(s => (double)s.WideRangeAccelerometerY.Data);
         var avgWideAccZ = samples.Average(s => (double)s.WideRangeAccelerometerZ.Data);
 
+        // 🪫 Battery average (senza reflection)
+        double avgBatteryVoltage = 0;
+        string batteryUnit = "mV";
 
-        // Restituisci un oggetto con i valori mediati
-        return new
+        if (enableBattery && samples.Count > 0)
+        {
+            avgBatteryVoltage = samples.Average(s => (double)s.BatteryVoltage.Data);
+            batteryUnit = samples.First().BatteryVoltage.Unit;
+        }
+
+        // 🧾 Create the result object
+        var result = new
         {
             TimeStamp = samples.Last().TimeStamp,
             AccelerometerX = new { Data = avgAccelX, Unit = samples.First().AccelerometerX.Unit },
@@ -760,41 +866,59 @@ public partial class DataPageViewModel : ObservableObject
             MagnetometerZ = new { Data = avgMagZ, Unit = samples.First().MagnetometerZ.Unit },
             WideRangeAccelerometerX = new { Data = avgWideAccX, Unit = samples.First().WideRangeAccelerometerX.Unit },
             WideRangeAccelerometerY = new { Data = avgWideAccY, Unit = samples.First().WideRangeAccelerometerY.Unit },
-            WideRangeAccelerometerZ = new { Data = avgWideAccZ, Unit = samples.First().WideRangeAccelerometerZ.Unit }
-
+            WideRangeAccelerometerZ = new { Data = avgWideAccZ, Unit = samples.First().WideRangeAccelerometerZ.Unit },
+            BatteryVoltage = new { Data = avgBatteryVoltage, Unit = batteryUnit }
         };
+
+        return result;
     }
+
+
 
     // Inserisce i nuovi dati raccolti nelle collezioni dei parametri abilitati.
     private void UpdateAllDataCollections(dynamic data)
     {
-        // Estrai i valori per ogni parametro
         var values = new Dictionary<string, float>();
 
-        if (enableAccelerometer)
+        try
         {
-            values["Low-Noise AccelerometerX"] = (float)data.AccelerometerX.Data;
-            values["Low-Noise AccelerometerY"] = (float)data.AccelerometerY.Data;
-            values["Low-Noise AccelerometerZ"] = (float)data.AccelerometerZ.Data;
-        }
-        if (enableWideRangeAccelerometer)
-        {
-            values["Wide-Range AccelerometerX"] = (float)data.WideRangeAccelerometerX.Data;
-            values["Wide-Range AccelerometerY"] = (float)data.WideRangeAccelerometerY.Data;
-            values["Wide-Range AccelerometerZ"] = (float)data.WideRangeAccelerometerZ.Data;
-        }
-        if (enableGyroscope)
-        {
-            values["GyroscopeX"] = (float)data.GyroscopeX.Data;
-            values["GyroscopeY"] = (float)data.GyroscopeY.Data;
-            values["GyroscopeZ"] = (float)data.GyroscopeZ.Data;
-        }
-        if (enableMagnetometer)
-        {
-            values["MagnetometerX"] = (float)data.MagnetometerX.Data;
-            values["MagnetometerY"] = (float)data.MagnetometerY.Data;
-            values["MagnetometerZ"] = (float)data.MagnetometerZ.Data;
+            if (enableAccelerometer)
+            {
+                values["Low-Noise AccelerometerX"] = (float)data.AccelerometerX.Data;
+                values["Low-Noise AccelerometerY"] = (float)data.AccelerometerY.Data;
+                values["Low-Noise AccelerometerZ"] = (float)data.AccelerometerZ.Data;
+            }
 
+            if (enableWideRangeAccelerometer)
+            {
+                values["Wide-Range AccelerometerX"] = (float)data.WideRangeAccelerometerX.Data;
+                values["Wide-Range AccelerometerY"] = (float)data.WideRangeAccelerometerY.Data;
+                values["Wide-Range AccelerometerZ"] = (float)data.WideRangeAccelerometerZ.Data;
+            }
+
+            if (enableGyroscope)
+            {
+                values["GyroscopeX"] = (float)data.GyroscopeX.Data;
+                values["GyroscopeY"] = (float)data.GyroscopeY.Data;
+                values["GyroscopeZ"] = (float)data.GyroscopeZ.Data;
+            }
+
+            if (enableMagnetometer)
+            {
+                values["MagnetometerX"] = (float)data.MagnetometerX.Data;
+                values["MagnetometerY"] = (float)data.MagnetometerY.Data;
+                values["MagnetometerZ"] = (float)data.MagnetometerZ.Data;
+            }
+
+            if (enableBattery && data.BatteryVoltage != null)
+            {
+                values["BatteryVoltage"] = (float)data.BatteryVoltage.Data;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error in UpdateAllDataCollections: {ex.Message}");
+            return;
         }
 
         // Aggiorna ogni collezione SOLO se c'è un valore valido
@@ -814,6 +938,7 @@ public partial class DataPageViewModel : ObservableObject
             }
         }
     }
+
 
     // Genera un evento per aggiornare il grafico.
     private void UpdateChart()
@@ -931,6 +1056,13 @@ public partial class DataPageViewModel : ObservableObject
                 YAxisMin = -2;
                 YAxisMax = 2;
                 break;
+            case "BatteryVoltage":
+                YAxisLabel = "Battery Voltage";
+                YAxisUnit = "mV";
+                ChartTitle = "Real-time Battery";
+                YAxisMin = 3000;
+                YAxisMax = 4200;
+                break;
         }
     }
 
@@ -1014,26 +1146,6 @@ public partial class DataPageViewModel : ObservableObject
         var yRange = YAxisMax - YAxisMin;
         var bottomY = margin + graphHeight;
         var topY = margin;
-
-        // *** RIMUOVERE: Eliminare il codice duplicato della griglia ***
-        // VECCHIO CODICE DA RIMUOVERE:
-        /*
-        // Griglia orizzontale
-        using var gridLinePaint = new SKPaint
-        {
-            Color = SKColors.LightGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1,
-            PathEffect = SKPathEffect.CreateDash(new float[] { 5, 5 }, 0)
-        };
-
-        for (int i = 0; i <= 4; i++)
-        {
-            var value = YAxisMin + (yRange * i / 4);
-            var y = bottomY - (float)((value - YAxisMin) / yRange * graphHeight);
-            canvas.DrawLine(leftMargin, y, leftMargin + graphWidth, y, gridLinePaint);
-        }
-        */
 
         // Linea del segnale
         using var linePaint = new SKPaint
@@ -1259,6 +1371,7 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
+            "Battery" => "Battery",
             _ => "Sensor"
         };
 
@@ -1414,6 +1527,7 @@ public partial class DataPageViewModel : ObservableObject
         this.enableWideRangeAccelerometer = enableWideRangeAccelerometer;
         this.enableGyroscope = enableGyroscope;
         this.enableMagnetometer = enableMagnetometer;
+        this.enableBattery = enableBattery;
 
         // Rigenera la lista dei parametri disponibili
         InitializeAvailableParameters();
@@ -1461,7 +1575,8 @@ public partial class DataPageViewModel : ObservableObject
             EnableAccelerometer = enableAccelerometer,
             EnableWideRangeAccelerometer = enableWideRangeAccelerometer,
             EnableGyroscope = enableGyroscope,
-            EnableMagnetometer = enableMagnetometer
+            EnableMagnetometer = enableMagnetometer,
+            EnableBattery = enableBattery
         };
     }
 
@@ -1481,7 +1596,8 @@ public partial class DataPageViewModel : ObservableObject
         startTime = DateTime.Now;
     }
 
+    
+
 
 
 }
-

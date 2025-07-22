@@ -392,7 +392,8 @@ public partial class MainPageViewModel : ObservableObject
                 EnableAccelerometer = device?.EnableAccelerometer ?? true,
                 EnableWideRangeAccelerometer = device?.EnableWideRangeAccelerometer ?? true,
                 EnableGyroscope = device?.EnableGyroscope ?? true,
-                EnableMagnetometer = device?.EnableMagnetometer ?? true
+                EnableMagnetometer = device?.EnableMagnetometer ?? true,
+                EnableBattery = device?.EnableBattery ?? true
             };
 
             var dataPage = new DataPage(shimmer, sensorConfig);

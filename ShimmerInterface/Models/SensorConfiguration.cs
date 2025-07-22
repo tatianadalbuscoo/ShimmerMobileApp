@@ -25,6 +25,6 @@ public partial class SensorConfiguration : ObservableObject
     [ObservableProperty] private bool enableWideRangeAccelerometer = true;
     [ObservableProperty] private bool enableGyroscope = true;
     [ObservableProperty] private bool enableMagnetometer = true;
-
+    [ObservableProperty] private bool enableBattery = true;
     public string DisplayName => $"Shimmer on {PortName}";
 }
