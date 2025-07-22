@@ -32,7 +32,7 @@ public partial class LoadingPageViewModel : ObservableObject
 
         var shimmer = new XR2Learn_ShimmerIMU
         {
-            EnableAccelerometer = EnableAccelerometer,
+            EnableLowNoiseAccelerometer = EnableAccelerometer,
             EnableGyroscope = EnableGyroscope,
             EnableMagnetometer = EnableMagnetometer
         };

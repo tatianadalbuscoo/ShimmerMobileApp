@@ -30,7 +30,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         {
             // Sampling rate and default sensor config
             _samplingRate = 51.2;
-            _enableAccelerometer = true;
+            _enableLowNoiseAccelerometer = true;
             _enableGyroscope = true;
             _enableMagnetometer = true;
         }
@@ -41,7 +41,7 @@ namespace XR2Learn_ShimmerAPI.IMU
 
 
 
-            if (_enableAccelerometer)
+            if (_enableLowNoiseAccelerometer)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
 
             if (_enableGyroscope)

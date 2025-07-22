@@ -28,7 +28,7 @@ namespace XR2Learn_ShimmerAPI
                 string comPort = port;
                 api.Configure(deviceName, comPort);
 
-                api.EnableAccelerometer = true;
+                api.EnableLowNoiseAccelerometer = true;
                 api.EnableGyroscope = true;
                 api.EnableMagnetometer = true;
 

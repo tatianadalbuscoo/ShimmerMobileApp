@@ -59,7 +59,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
             {
                 var shimmer = new XR2Learn_ShimmerIMU
                 {
-                    EnableAccelerometer = device.EnableAccelerometer,
+                    EnableLowNoiseAccelerometer = device.EnableAccelerometer,
                     EnableGyroscope = device.EnableGyroscope,
                     EnableMagnetometer = device.EnableMagnetometer
                 };
