@@ -604,12 +604,18 @@ public partial class DataPageViewModel : ObservableObject
 
         // Usa l'ultimo campione per il display del testo
         var lastSample = samples.Last();
-        SensorText = $"[{lastSample.TimeStamp.Data}] {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
-                     $"{lastSample.AccelerometerY.Data} [{lastSample.AccelerometerY.Unit}] | {lastSample.AccelerometerZ.Data} [{lastSample.AccelerometerZ.Unit}]\n" +
-                     $"{lastSample.GyroscopeX.Data} [{lastSample.GyroscopeX.Unit}] | " +
-                     $"{lastSample.GyroscopeY.Data} [{lastSample.GyroscopeY.Unit}] | {lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
-                     $"{lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
-                     $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | {lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]\n";
+        SensorText =
+            $"[{lastSample.TimeStamp.Data}]\n" +
+            $"Low-Noise Accelerometer: {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
+            $"{lastSample.AccelerometerY.Data} [{lastSample.AccelerometerY.Unit}] | " +
+            $"{lastSample.AccelerometerZ.Data} [{lastSample.AccelerometerZ.Unit}]\n" +
+            $"Gyroscope: {lastSample.GyroscopeX.Data} [{lastSample.GyroscopeX.Unit}] | " +
+            $"{lastSample.GyroscopeY.Data} [{lastSample.GyroscopeY.Unit}] | " +
+            $"{lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
+            $"Magnetometer: {lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
+            $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | " +
+            $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]";
+
 
         // Processa tutti i campioni per calcolare un valore rappresentativo (es. media)
         var averagedData = CalculateAveragedData(samples);
