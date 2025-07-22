@@ -65,7 +65,7 @@ public partial class DataPageViewModel : ObservableObject
     private string sensorText = "Waiting for data...";
 
     [ObservableProperty]
-    private string selectedParameter = "AccelerometerX";
+    private string selectedParameter = "Low-Noise AccelerometerX";
 
     [ObservableProperty]
     private double yAxisMin = 0;
@@ -473,7 +473,7 @@ public partial class DataPageViewModel : ObservableObject
     {
         return parameter switch
         {
-            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => -5,
+            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => -5,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => -250,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => -2,
             _ => 0
@@ -485,7 +485,7 @@ public partial class DataPageViewModel : ObservableObject
     {
         return parameter switch
         {
-            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => 5,
+            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => 5,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => 250,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => 2,
             _ => 1
@@ -528,9 +528,9 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableAccelerometer)
         {
-            AvailableParameters.Add("AccelerometerX");
-            AvailableParameters.Add("AccelerometerY");
-            AvailableParameters.Add("AccelerometerZ");
+            AvailableParameters.Add("Low-Noise AccelerometerX");
+            AvailableParameters.Add("Low-Noise AccelerometerY");
+            AvailableParameters.Add("Low-Noise AccelerometerZ");
         }
 
         if (enableGyroscope)
@@ -560,7 +560,7 @@ public partial class DataPageViewModel : ObservableObject
     {
         return parameter switch
         {
-            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => enableAccelerometer,
+            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
             _ => false
@@ -744,9 +744,9 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableAccelerometer)
         {
-            values["AccelerometerX"] = (float)data.AccelerometerX.Data;
-            values["AccelerometerY"] = (float)data.AccelerometerY.Data;
-            values["AccelerometerZ"] = (float)data.AccelerometerZ.Data;
+            values["Low-Noise AccelerometerX"] = (float)data.AccelerometerX.Data;
+            values["Low-Noise AccelerometerY"] = (float)data.AccelerometerY.Data;
+            values["Low-Noise AccelerometerZ"] = (float)data.AccelerometerZ.Data;
         }
         if (enableGyroscope)
         {
@@ -812,65 +812,65 @@ public partial class DataPageViewModel : ObservableObject
     {
         switch (parameter)
         {
-            case "AccelerometerX":
-                YAxisLabel = "Acceleration X";
+            case "Low-Noise AccelerometerX":
+                YAxisLabel = "Low-Noise Accelerometer X";
                 YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Acceleration X";
+                ChartTitle = "Real-time Low-Noise Accelerometer X";
                 YAxisMin = -5;
                 YAxisMax = 5;
                 break;
-            case "AccelerometerY":
-                YAxisLabel = "Acceleration Y";
+            case "Low-Noise AccelerometerY":
+                YAxisLabel = "Low-Noise Accelerometer Y";
                 YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Acceleration Y";
+                ChartTitle = "Real-time Low-Noise Accelerometer Y";
                 YAxisMin = -5;
                 YAxisMax = 5;
                 break;
-            case "AccelerometerZ":
-                YAxisLabel = "Acceleration Z";
+            case "Low-Noise AccelerometerZ":
+                YAxisLabel = "Low-Noise Accelerometer Z";
                 YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Acceleration Z";
+                ChartTitle = "Real-time Low-Noise Accelerometer Z";
                 YAxisMin = -5;
                 YAxisMax = 5;
                 break;
             case "GyroscopeX":
-                YAxisLabel = "Angular Velocity X";
-                YAxisUnit = "°/s";
+                YAxisLabel = "Gyroscope X";
+                YAxisUnit = "deg/s";
                 ChartTitle = "Real-time Gyroscope X";
                 YAxisMin = -250;
                 YAxisMax = 250;
                 break;
             case "GyroscopeY":
-                YAxisLabel = "Angular Velocity Y";
-                YAxisUnit = "°/s";
+                YAxisLabel = "Gyroscope Y";
+                YAxisUnit = "deg/s";
                 ChartTitle = "Real-time Gyroscope Y";
                 YAxisMin = -250;
                 YAxisMax = 250;
                 break;
             case "GyroscopeZ":
-                YAxisLabel = "Angular Velocity Z";
-                YAxisUnit = "°/s";
+                YAxisLabel = "Gyroscope Z";
+                YAxisUnit = "deg/s";
                 ChartTitle = "Real-time Gyroscope Z";
                 YAxisMin = -250;
                 YAxisMax = 250;
                 break;
             case "MagnetometerX":
-                YAxisLabel = "Magnetic Field X";
-                YAxisUnit = "µT";
+                YAxisLabel = "Magnetometer X";
+                YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer X";
                 YAxisMin = -2;
                 YAxisMax = 2;
                 break;
             case "MagnetometerY":
-                YAxisLabel = "Magnetic Field Y";
-                YAxisUnit = "µT";
+                YAxisLabel = "Magnetometer Y";
+                YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer Y";
                 YAxisMin = -2;
                 YAxisMax = 2;
                 break;
             case "MagnetometerZ":
-                YAxisLabel = "Magnetic Field Z";
-                YAxisUnit = "µT";
+                YAxisLabel = "Magnetometer Z";
+                YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer Z";
                 YAxisMin = -2;
                 YAxisMax = 2;
@@ -1199,7 +1199,7 @@ public partial class DataPageViewModel : ObservableObject
 
         string sensorName = SelectedParameter switch
         {
-            "AccelerometerX" or "AccelerometerY" or "AccelerometerZ" => "Accelerometer",
+            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => "Low-Noise Accelerometer",
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
             _ => "Sensor"
