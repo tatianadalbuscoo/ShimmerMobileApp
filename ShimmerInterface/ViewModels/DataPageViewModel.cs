@@ -569,6 +569,7 @@ public partial class DataPageViewModel : ObservableObject
         if(enableBattery)
         {
             AvailableParameters.Add("BatteryVoltage");
+            AvailableParameters.Add("BatteryPercent");
         }
 
         // Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
@@ -588,7 +589,7 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
-            "BatteryVoltage" => enableBattery,
+            "BatteryVoltage" or "BatteryPercent" => enableBattery,
             _ => false
         };
     }
@@ -639,21 +640,29 @@ public partial class DataPageViewModel : ObservableObject
         }
 
         // Update sensor text display
+        // Calcola e costruisci batteryText PRIMA di usarlo
+        float batteryPercent = (float)Math.Clamp(
+          ((lastSample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
+
+        batteryText = $"\nBattery: {lastSample.BatteryVoltage.Data} [{lastSample.BatteryVoltage.Unit}] " +
+                      $"({batteryPercent:F1}%)";
+
+        // Ora costruisci tutta la stringa
         SensorText =
-            $"[{lastSample.TimeStamp.Data}]\n" +
-            $"Low-Noise Accelerometer: {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
-            $"{lastSample.AccelerometerY.Data} [{lastSample.AccelerometerY.Unit}] | " +
-            $"{lastSample.AccelerometerZ.Data} [{lastSample.AccelerometerZ.Unit}]\n" +
-            $"Wide-Range Accel: {lastSample.WideRangeAccelerometerX.Data} [{lastSample.WideRangeAccelerometerX.Unit}] | " +
-            $"{lastSample.WideRangeAccelerometerY.Data} [{lastSample.WideRangeAccelerometerY.Unit}] | " +
-            $"{lastSample.WideRangeAccelerometerZ.Data} [{lastSample.WideRangeAccelerometerZ.Unit}]\n" +
-            $"Gyroscope: {lastSample.GyroscopeX.Data} [{lastSample.GyroscopeX.Unit}] | " +
-            $"{lastSample.GyroscopeY.Data} [{lastSample.GyroscopeY.Unit}] | " +
-            $"{lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
-            $"Magnetometer: {lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
-            $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | " +
-            $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]" +
-            batteryText;
+          $"[{lastSample.TimeStamp.Data}]\n" +
+          $"Low-Noise Accelerometer: {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
+          $"{lastSample.AccelerometerY.Data} [{lastSample.AccelerometerY.Unit}] | " +
+          $"{lastSample.AccelerometerZ.Data} [{lastSample.AccelerometerZ.Unit}]\n" +
+          $"Wide-Range Accel: {lastSample.WideRangeAccelerometerX.Data} [{lastSample.WideRangeAccelerometerX.Unit}] | " +
+          $"{lastSample.WideRangeAccelerometerY.Data} [{lastSample.WideRangeAccelerometerY.Unit}] | " +
+          $"{lastSample.WideRangeAccelerometerZ.Data} [{lastSample.WideRangeAccelerometerZ.Unit}]\n" +
+          $"Gyroscope: {lastSample.GyroscopeX.Data} [{lastSample.GyroscopeX.Unit}] | " +
+          $"{lastSample.GyroscopeY.Data} [{lastSample.GyroscopeY.Unit}] | " +
+          $"{lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
+          $"Magnetometer: {lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
+          $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | " +
+          $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]" +
+          batteryText;
 
         // Aggiungi tutti i campioni individuali alle collezioni dati
         UpdateAllDataCollectionsWithAllSamples(samples);
@@ -701,6 +710,8 @@ public partial class DataPageViewModel : ObservableObject
                 if (enableBattery && sample.BatteryVoltage != null)
                 {
                     values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data;
+                    values["BatteryPercent"] = (float)Math.Clamp(
+                        ((sample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
                 }
             }
             catch (Exception ex)
@@ -845,13 +856,16 @@ public partial class DataPageViewModel : ObservableObject
         double avgBatteryVoltage = 0;
         string batteryUnit = "mV";
 
+        double avgBatteryPercent = 0;
+
         if (enableBattery && samples.Count > 0)
         {
             avgBatteryVoltage = samples.Average(s => (double)s.BatteryVoltage.Data);
+            avgBatteryPercent = Math.Clamp((avgBatteryVoltage - 3300) / 900 * 100, 0, 100);
             batteryUnit = samples.First().BatteryVoltage.Unit;
         }
 
-        // 🧾 Create the result object
+        // Create the result object
         var result = new
         {
             TimeStamp = samples.Last().TimeStamp,
@@ -867,7 +881,8 @@ public partial class DataPageViewModel : ObservableObject
             WideRangeAccelerometerX = new { Data = avgWideAccX, Unit = samples.First().WideRangeAccelerometerX.Unit },
             WideRangeAccelerometerY = new { Data = avgWideAccY, Unit = samples.First().WideRangeAccelerometerY.Unit },
             WideRangeAccelerometerZ = new { Data = avgWideAccZ, Unit = samples.First().WideRangeAccelerometerZ.Unit },
-            BatteryVoltage = new { Data = avgBatteryVoltage, Unit = batteryUnit }
+            BatteryVoltage = new { Data = avgBatteryVoltage, Unit = batteryUnit },
+            BatteryPercent = new { Data = avgBatteryPercent, Unit = "%" }
         };
 
         return result;
@@ -1063,6 +1078,14 @@ public partial class DataPageViewModel : ObservableObject
                 YAxisMin = 3000;
                 YAxisMax = 4200;
                 break;
+            case "BatteryPercent":
+                YAxisLabel = "Battery Percent";
+                YAxisUnit = "%";
+                ChartTitle = "Real-time Battery Percentage";
+                YAxisMin = 0;
+                YAxisMax = 100;
+                break;
+
         }
     }
 
