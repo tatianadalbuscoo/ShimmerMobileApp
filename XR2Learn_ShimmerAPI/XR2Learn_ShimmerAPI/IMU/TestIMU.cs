@@ -21,7 +21,10 @@ namespace XR2Learn_ShimmerAPI
 
         public static void Main(string[] args)
         {
-            string[] ports = XR2Learn_SerialPortsManager.GetAvailableSerialPortsNames();
+            //string[] ports = XR2Learn_SerialPortsManager.GetAvailableSerialPortsNames();
+            string[] ports = new string[] { "COM15" };
+
+
             Console.WriteLine("Available ports: [ " + string.Join(", ", ports) + " ]");
             foreach (string port in ports)
             {
@@ -29,8 +32,14 @@ namespace XR2Learn_ShimmerAPI
                 api.Configure(deviceName, comPort);
 
                 api.EnableLowNoiseAccelerometer = true;
+                api.EnableWideRangeAccelerometer = true;
                 api.EnableGyroscope = true;
                 api.EnableMagnetometer = true;
+                api.EnablePressureTemperature = true;
+                api.EnableBattery = true;
+                api.EnableExtA6 = true;
+                api.EnableExtA7 = true;
+                api.EnableExtA15 = true;
 
                 api.SamplingRate = DefaultSamplingRate;
 
@@ -66,9 +75,13 @@ namespace XR2Learn_ShimmerAPI
 
                 Console.WriteLine("[" + data.TimeStamp.Data + "]");
 
-                Console.WriteLine("Accel X: " + data.AccelerometerX.Data + " [" + data.AccelerometerX.Unit + "] | " +
+                Console.WriteLine("LowNoise Accel X: " + data.AccelerometerX.Data + " [" + data.AccelerometerX.Unit + "] | " +
                                   "Y: " + data.AccelerometerY.Data + " [" + data.AccelerometerY.Unit + "] | " +
                                   "Z: " + data.AccelerometerZ.Data + " [" + data.AccelerometerZ.Unit + "]");
+
+                Console.WriteLine("WideRange Accel X: " + data.WideRangeAccelerometerX.Data + " [" + data.WideRangeAccelerometerX.Unit + "] | " +
+                                  "Y: " + data.WideRangeAccelerometerY.Data + " [" + data.WideRangeAccelerometerY.Unit + "] | " +
+                                  "Z: " + data.WideRangeAccelerometerZ.Data + " [" + data.WideRangeAccelerometerZ.Unit + "]");
 
                 Console.WriteLine("Gyro  X: " + data.GyroscopeX.Data + " [" + data.GyroscopeX.Unit + "] | " +
                                   "Y: " + data.GyroscopeY.Data + " [" + data.GyroscopeY.Unit + "] | " +
@@ -77,7 +90,29 @@ namespace XR2Learn_ShimmerAPI
                 Console.WriteLine("Mag   X: " + data.MagnetometerX.Data + " [" + data.MagnetometerX.Unit + "] | " +
                                   "Y: " + data.MagnetometerY.Data + " [" + data.MagnetometerY.Unit + "] | " +
                                   "Z: " + data.MagnetometerZ.Data + " [" + data.MagnetometerZ.Unit + "]");
+
+                Console.WriteLine("Temperature BMP180: " + data.Temperature_BMP180.Data + " [" + data.Temperature_BMP180.Unit + "]");
+                Console.WriteLine("Pressure BMP180: " + data.Pressure_BMP180.Data + " [" + data.Pressure_BMP180.Unit + "]");
+
+                // Converti millivolt in volt
+                double voltage = data.BatteryVoltage.Data / 1000.0;
+
+                // Calcolo della percentuale basato su 3.0V - 4.2V
+                double percentage = Math.Min(100, Math.Max(0, 100 * (voltage - 3.0) / (4.2 - 3.0)));
+
+                // Stampa in millivolt e percentuale
+                Console.WriteLine("Battery Voltage: " + (voltage * 1000).ToString("F0") + " [mV]");
+                Console.WriteLine("Battery Percentage (calculated): " + percentage.ToString("F1") + " [%]");
+
+                Console.WriteLine("Ext ADC A6: " + data.ExtADC_A6.Data + " [" + data.ExtADC_A6.Unit + "]");
+                Console.WriteLine("Ext ADC A7: " + data.ExtADC_A7.Data + " [" + data.ExtADC_A7.Unit + "]");
+                Console.WriteLine("Ext ADC A15: " + data.ExtADC_A15.Data + " [" + data.ExtADC_A15.Unit + "]");
+
+
+
+
             }, null, TimeSpan.Zero, period);
+
         }
 
         private static void WaitAndDisconnect(int t)
