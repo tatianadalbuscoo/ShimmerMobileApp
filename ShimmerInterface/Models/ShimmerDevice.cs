@@ -20,6 +20,9 @@ namespace ShimmerInterface.Models
         private bool enableAccelerometer = true;
 
         [ObservableProperty]
+        private bool enableWideRangeAccelerometer = true;
+
+        [ObservableProperty]
         private bool enableGyroscope = true;
 
         [ObservableProperty]
@@ -32,12 +35,6 @@ namespace ShimmerInterface.Models
         [ObservableProperty]
         private string bluetoothAddress;
 
-        // Proprietà per configurazioni aggiuntive se necessarie
-        [ObservableProperty]
-        private bool enableGSR = false;
-
-        [ObservableProperty]
-        private bool enablePPG = false;
 
         [ObservableProperty]
         private double samplingRate = 51.2;

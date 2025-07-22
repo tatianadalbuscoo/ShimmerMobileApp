@@ -60,8 +60,8 @@ namespace XR2Learn_ShimmerAPI.IMU
             if (_enableLowNoiseAccelerometer)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
 
-            /*if (_enableWideRangeAccelerometer)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;*/
+            if (_enableWideRangeAccelerometer)
+                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
 
 
             if (_enableGyroscope)

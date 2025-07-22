@@ -42,6 +42,7 @@ public partial class DataPageViewModel : ObservableObject
 
     // Sensor enable flags (set from SensorConfiguration passed in constructor)
     private bool enableAccelerometer;
+    private bool enableWideRangeAccelerometer;
     private bool enableGyroscope;
     private bool enableMagnetometer;
 
@@ -176,6 +177,7 @@ public partial class DataPageViewModel : ObservableObject
     {
         shimmer = shimmerDevice;
         enableAccelerometer = config.EnableAccelerometer;
+        enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
         enableGyroscope = config.EnableGyroscope;
         enableMagnetometer = config.EnableMagnetometer;
 
@@ -533,6 +535,14 @@ public partial class DataPageViewModel : ObservableObject
             AvailableParameters.Add("Low-Noise AccelerometerZ");
         }
 
+        if (enableWideRangeAccelerometer)
+        {
+            AvailableParameters.Add("Wide-Range AccelerometerX");
+            AvailableParameters.Add("Wide-Range AccelerometerY");
+            AvailableParameters.Add("Wide-Range AccelerometerZ");
+        }
+
+
         if (enableGyroscope)
         {
             AvailableParameters.Add("GyroscopeX");
@@ -561,6 +571,7 @@ public partial class DataPageViewModel : ObservableObject
         return parameter switch
         {
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableAccelerometer,
+            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
             _ => false
@@ -609,6 +620,9 @@ public partial class DataPageViewModel : ObservableObject
             $"Low-Noise Accelerometer: {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
             $"{lastSample.AccelerometerY.Data} [{lastSample.AccelerometerY.Unit}] | " +
             $"{lastSample.AccelerometerZ.Data} [{lastSample.AccelerometerZ.Unit}]\n" +
+            $"Wide-Range Accel: {lastSample.WideRangeAccelerometerX.Data} [{lastSample.WideRangeAccelerometerX.Unit}] | " +
+            $"{lastSample.WideRangeAccelerometerY.Data} [{lastSample.WideRangeAccelerometerY.Unit}] | " +
+            $"{lastSample.WideRangeAccelerometerZ.Data} [{lastSample.WideRangeAccelerometerZ.Unit}]\n" +
             $"Gyroscope: {lastSample.GyroscopeX.Data} [{lastSample.GyroscopeX.Unit}] | " +
             $"{lastSample.GyroscopeY.Data} [{lastSample.GyroscopeY.Unit}] | " +
             $"{lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
@@ -726,6 +740,11 @@ public partial class DataPageViewModel : ObservableObject
         var avgMagY = samples.Average(s => (double)s.MagnetometerY.Data);
         var avgMagZ = samples.Average(s => (double)s.MagnetometerZ.Data);
 
+        var avgWideAccX = samples.Average(s => (double)s.WideRangeAccelerometerX.Data);
+        var avgWideAccY = samples.Average(s => (double)s.WideRangeAccelerometerY.Data);
+        var avgWideAccZ = samples.Average(s => (double)s.WideRangeAccelerometerZ.Data);
+
+
         // Restituisci un oggetto con i valori mediati
         return new
         {
@@ -738,7 +757,11 @@ public partial class DataPageViewModel : ObservableObject
             GyroscopeZ = new { Data = avgGyroZ, Unit = samples.First().GyroscopeZ.Unit },
             MagnetometerX = new { Data = avgMagX, Unit = samples.First().MagnetometerX.Unit },
             MagnetometerY = new { Data = avgMagY, Unit = samples.First().MagnetometerY.Unit },
-            MagnetometerZ = new { Data = avgMagZ, Unit = samples.First().MagnetometerZ.Unit }
+            MagnetometerZ = new { Data = avgMagZ, Unit = samples.First().MagnetometerZ.Unit },
+            WideRangeAccelerometerX = new { Data = avgWideAccX, Unit = samples.First().WideRangeAccelerometerX.Unit },
+            WideRangeAccelerometerY = new { Data = avgWideAccY, Unit = samples.First().WideRangeAccelerometerY.Unit },
+            WideRangeAccelerometerZ = new { Data = avgWideAccZ, Unit = samples.First().WideRangeAccelerometerZ.Unit }
+
         };
     }
 
@@ -753,6 +776,12 @@ public partial class DataPageViewModel : ObservableObject
             values["Low-Noise AccelerometerX"] = (float)data.AccelerometerX.Data;
             values["Low-Noise AccelerometerY"] = (float)data.AccelerometerY.Data;
             values["Low-Noise AccelerometerZ"] = (float)data.AccelerometerZ.Data;
+        }
+        if (enableWideRangeAccelerometer)
+        {
+            values["Wide-Range AccelerometerX"] = (float)data.WideRangeAccelerometerX.Data;
+            values["Wide-Range AccelerometerY"] = (float)data.WideRangeAccelerometerY.Data;
+            values["Wide-Range AccelerometerZ"] = (float)data.WideRangeAccelerometerZ.Data;
         }
         if (enableGyroscope)
         {
@@ -838,6 +867,27 @@ public partial class DataPageViewModel : ObservableObject
                 ChartTitle = "Real-time Low-Noise Accelerometer Z";
                 YAxisMin = -5;
                 YAxisMax = 5;
+                break;
+            case "Wide-Range AccelerometerX":
+                YAxisLabel = "Wide-Range Accelerometer X";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Wide-Range Accelerometer X";
+                YAxisMin = -20;
+                YAxisMax = 20;
+                break;
+            case "Wide-Range AccelerometerY":
+                YAxisLabel = "Wide-Range Accelerometer Y";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Wide-Range Accelerometer Y";
+                YAxisMin = -20;
+                YAxisMax = 20;
+                break;
+            case "Wide-Range AccelerometerZ":
+                YAxisLabel = "Wide-Range Accelerometer Z";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Wide-Range Accelerometer Z";
+                YAxisMin = -20;
+                YAxisMax = 20;
                 break;
             case "GyroscopeX":
                 YAxisLabel = "Gyroscope X";
@@ -1206,10 +1256,12 @@ public partial class DataPageViewModel : ObservableObject
         string sensorName = SelectedParameter switch
         {
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => "Low-Noise Accelerometer",
+            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
             _ => "Sensor"
         };
+
 
         var disabledMessage = $"{sensorName} Disabled";
         var messageWidth = messagePaint.MeasureText(disabledMessage);
@@ -1352,13 +1404,14 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     // Aggiorna la configurazione dei sensori attivi e rigenera la lista dei parametri.
-    public void UpdateSensorConfiguration(bool enableAccelerometer, bool enableGyroscope, bool enableMagnetometer)
+    public void UpdateSensorConfiguration(bool enableAccelerometer, bool enableWideRangeAccelerometer, bool enableGyroscope, bool enableMagnetometer)
     {
         // Salva il parametro attualmente selezionato
         string currentParameter = SelectedParameter;
 
         // Aggiorna i flag dei sensori (aggiungi questi campi come non-readonly)
         this.enableAccelerometer = enableAccelerometer;
+        this.enableWideRangeAccelerometer = enableWideRangeAccelerometer;
         this.enableGyroscope = enableGyroscope;
         this.enableMagnetometer = enableMagnetometer;
 
@@ -1406,6 +1459,7 @@ public partial class DataPageViewModel : ObservableObject
         return new SensorConfiguration
         {
             EnableAccelerometer = enableAccelerometer,
+            EnableWideRangeAccelerometer = enableWideRangeAccelerometer,
             EnableGyroscope = enableGyroscope,
             EnableMagnetometer = enableMagnetometer
         };

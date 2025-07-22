@@ -22,6 +22,7 @@ public partial class SensorConfiguration : ObservableObject
     [ObservableProperty] private bool isSelected;
 
     [ObservableProperty] private bool enableAccelerometer = true;
+    [ObservableProperty] private bool enableWideRangeAccelerometer = true;
     [ObservableProperty] private bool enableGyroscope = true;
     [ObservableProperty] private bool enableMagnetometer = true;
 

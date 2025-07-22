@@ -10,6 +10,7 @@ public partial class LoadingPageViewModel : ObservableObject
 {
     // Proprietà che indicano se i sensori sono abilitati (Accelerometro, GSR, PPG)
     public bool EnableAccelerometer { get; }
+    public bool EnableWideRangeAccelerometer { get; }
     public bool EnableGyroscope { get; }
     public bool EnableMagnetometer { get; }
 
@@ -33,6 +34,7 @@ public partial class LoadingPageViewModel : ObservableObject
         var shimmer = new XR2Learn_ShimmerIMU
         {
             EnableLowNoiseAccelerometer = EnableAccelerometer,
+            EnableWideRangeAccelerometer = EnableWideRangeAccelerometer,
             EnableGyroscope = EnableGyroscope,
             EnableMagnetometer = EnableMagnetometer
         };

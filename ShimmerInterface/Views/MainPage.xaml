@@ -40,8 +40,10 @@
                                 </HorizontalStackLayout>
 
                                 <!-- Opzioni per abilitare/disabilitare i sensori -->
-                                <Label Text="Accelerometer" />
+                                <Label Text="Low-Range Accelerometer" />
                                 <Switch IsToggled="{Binding EnableAccelerometer}" />
+                                <Label Text="Wide-Range Accelerometer" />
+                                <Switch IsToggled="{Binding EnableWideRangeAccelerometer}" />
                                 <Label Text="Gyroscope" />
                                 <Switch IsToggled="{Binding EnableGyroscope}" />
                                 <Label Text="Magnetometer" />
