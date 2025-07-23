@@ -1217,9 +1217,37 @@ namespace ShimmerAPI
                                     StreamingACKReceived = true;
                                 }
                                 break;
-                            default:
+                            /*default:
                                 System.Console.WriteLine("Misaligned ByteStream Detected");
                                 // If it gets here means the previous packet is invalid so make it null so it wont be added to the buffer
+                                KeepObjectCluster = null;
+                                break;*/
+
+                            default:
+                                Debug.WriteLine(" Misalignment: unrecognized byte → I'll try to resync ");
+
+                                // Scan until the next 0x00 (DATA_PACKET)
+                                int maxSearch = 100;
+                                byte nextByte = 0xFF;
+                                int attempts = 0;
+
+                                while (attempts < maxSearch)
+                                {
+                                    nextByte = (byte)ReadByte();
+                                    if (nextByte == (byte)PacketTypeShimmer2.DATA_PACKET)
+                                    {
+                                        Debug.WriteLine($" Resynced after {attempts} bytes dropped..");
+                                        break;
+                                    }
+                                    attempts++;
+                                }
+
+                                if (nextByte != (byte)PacketTypeShimmer2.DATA_PACKET)
+                                {
+                                    Debug.WriteLine(" Resync failed after 100 bytes. ");
+                                }
+
+                                // Reset stato
                                 KeepObjectCluster = null;
                                 break;
                         }

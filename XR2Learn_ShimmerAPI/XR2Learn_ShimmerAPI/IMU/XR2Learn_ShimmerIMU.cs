@@ -70,8 +70,8 @@ namespace XR2Learn_ShimmerAPI.IMU
             if (_enableMagnetometer)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG;
 
-            /*if (_enablePressureTemperature)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;*/
+            if (_enablePressureTemperature)
+                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
 
             if (_enableBattery)
             {
