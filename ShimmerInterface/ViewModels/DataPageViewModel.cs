@@ -45,6 +45,7 @@ public partial class DataPageViewModel : ObservableObject
     private bool enableWideRangeAccelerometer;
     private bool enableGyroscope;
     private bool enableMagnetometer;
+    private bool enablePressureTemperature;
     private bool enableBattery;
     private bool enableExtA6;
     private bool enableExtA7;
@@ -185,11 +186,11 @@ public partial class DataPageViewModel : ObservableObject
         enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
         enableGyroscope = config.EnableGyroscope;
         enableMagnetometer = config.EnableMagnetometer;
+        enablePressureTemperature = config.EnablePressureTemperature;
         enableBattery = config.EnableBattery;
         enableExtA6 = config.EnableExtA6;
         enableExtA7 = config.EnableExtA7;
         enableExtA15 = config.EnableExtA15;
-
 
 
         samplingRateDisplay = shimmer.SamplingRate;
@@ -489,6 +490,8 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => -20,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => -250,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => -2,
+            "Temperature_BMP180" => 20,         
+            "Pressure_BMP180" => 80,
             "Battery Voltage" => 3300,
             "Battery Percent" => 0,
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
@@ -506,6 +509,8 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => 20,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => 250,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => 2,
+            "Temperature_BMP180" => 50,
+            "Pressure_BMP180" => 110,
             "Battery Voltage" => 4200,
             "Battery Percent" => 100,
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3000,
@@ -577,7 +582,13 @@ public partial class DataPageViewModel : ObservableObject
             AvailableParameters.Add("MagnetometerZ");
         }
 
-        if(enableBattery)
+        if (enablePressureTemperature)
+        {
+            AvailableParameters.Add("Temperature_BMP180");
+            AvailableParameters.Add("Pressure_BMP180");
+        }
+
+        if (enableBattery)
         {
             AvailableParameters.Add("BatteryVoltage");
             AvailableParameters.Add("BatteryPercent");
@@ -607,6 +618,7 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
+            "Temperature_BMP180" or "Pressure_BMP180" => enablePressureTemperature,
             "BatteryVoltage" or "BatteryPercent" => enableBattery,
             "ExtADC_A6" => enableExtA6,
             "ExtADC_A7" => enableExtA7,
@@ -677,6 +689,14 @@ public partial class DataPageViewModel : ObservableObject
         if (enableExtA15)
             adcText += $"\nExt A15: {lastSample.ExtADC_A15.Data} [{lastSample.ExtADC_A15.Unit}]";
 
+        string pressureText = "";
+        if (enablePressureTemperature)
+        {
+            pressureText = $"\nTemperature: {lastSample.Temperature_BMP180.Data} [{lastSample.Temperature_BMP180.Unit}]" +
+                           $"\nPressure: {lastSample.Pressure_BMP180.Data} [{lastSample.Pressure_BMP180.Unit}]";
+        }
+
+
         // Ora costruisci tutta la stringa
         SensorText =
           $"[{lastSample.TimeStamp.Data}]\n" +
@@ -692,6 +712,7 @@ public partial class DataPageViewModel : ObservableObject
           $"Magnetometer: {lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
           $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | " +
           $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]" +
+          pressureText +
           batteryText +
           adcText;
 
@@ -736,6 +757,12 @@ public partial class DataPageViewModel : ObservableObject
                     values["MagnetometerX"] = (float)sample.MagnetometerX.Data;
                     values["MagnetometerY"] = (float)sample.MagnetometerY.Data;
                     values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
+                }
+
+                if (enablePressureTemperature)
+                {
+                    values["Temperature_BMP180"] = (float)sample.Temperature_BMP180.Data;
+                    values["Pressure_BMP180"] = (float)sample.Pressure_BMP180.Data;
                 }
 
                 if (enableBattery && sample.BatteryVoltage != null)
@@ -886,6 +913,10 @@ public partial class DataPageViewModel : ObservableObject
         var avgMagY = samples.Average(s => (double)s.MagnetometerY.Data);
         var avgMagZ = samples.Average(s => (double)s.MagnetometerZ.Data);
 
+        var avgTemp = samples.Average(s => (double)s.Temperature_BMP180.Data);
+        var avgPress = samples.Average(s => (double)s.Pressure_BMP180.Data);
+
+
         var avgWideAccX = samples.Average(s => (double)s.WideRangeAccelerometerX.Data);
         var avgWideAccY = samples.Average(s => (double)s.WideRangeAccelerometerY.Data);
         var avgWideAccZ = samples.Average(s => (double)s.WideRangeAccelerometerZ.Data);
@@ -924,6 +955,8 @@ public partial class DataPageViewModel : ObservableObject
             WideRangeAccelerometerX = new { Data = avgWideAccX, Unit = samples.First().WideRangeAccelerometerX.Unit },
             WideRangeAccelerometerY = new { Data = avgWideAccY, Unit = samples.First().WideRangeAccelerometerY.Unit },
             WideRangeAccelerometerZ = new { Data = avgWideAccZ, Unit = samples.First().WideRangeAccelerometerZ.Unit },
+            Temperature_BMP180 = new { Data = avgTemp, Unit = samples.First().Temperature_BMP180.Unit },
+            Pressure_BMP180 = new { Data = avgPress, Unit = samples.First().Pressure_BMP180.Unit },
             BatteryVoltage = new { Data = avgBatteryVoltage, Unit = batteryUnit },
             BatteryPercent = new { Data = avgBatteryPercent, Unit = "%" },
             ExtADC_A6 = new { Data = avgExtA6, Unit = samples.First().ExtADC_A6.Unit },
@@ -969,6 +1002,11 @@ public partial class DataPageViewModel : ObservableObject
                 values["MagnetometerX"] = (float)data.MagnetometerX.Data;
                 values["MagnetometerY"] = (float)data.MagnetometerY.Data;
                 values["MagnetometerZ"] = (float)data.MagnetometerZ.Data;
+            }
+            if (enablePressureTemperature)
+            {
+                values["Temperature_BMP180"] = (float)data.Temperature_BMP180.Data;
+                values["Pressure_BMP180"] = (float)data.Pressure_BMP180.Data;
             }
 
             if (enableBattery && data.BatteryVoltage != null)
@@ -1123,6 +1161,20 @@ public partial class DataPageViewModel : ObservableObject
                 ChartTitle = "Real-time Magnetometer Z";
                 YAxisMin = -2;
                 YAxisMax = 2;
+                break;
+            case "Temperature_BMP180":
+                YAxisLabel = "Temperature";
+                YAxisUnit = "°C";
+                ChartTitle = "BMP180 Temperature";
+                YAxisMin = 20; 
+                YAxisMax = 50;
+                break;
+            case "Pressure_BMP180":
+                YAxisLabel = "Pressure";
+                YAxisUnit = "kPa";
+                ChartTitle = "BMP180 Pressure";
+                YAxisMin = 90;
+                YAxisMax = 110;
                 break;
             case "BatteryVoltage":
                 YAxisLabel = "Battery Voltage";
@@ -1468,6 +1520,8 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
+            "Temperature_BMP180" => "Temperature (BMP180)",
+            "Pressure_BMP180" => "Pressure (BMP180)",
             "BatteryVoltage" or "BatteryPercent" => "Battery",
             "ExtADC_A6" => "External ADC A6",
             "ExtADC_A7" => "External ADC A7",
@@ -1622,6 +1676,7 @@ public partial class DataPageViewModel : ObservableObject
        bool enableWideRangeAccelerometer,
        bool enableGyroscope,
        bool enableMagnetometer,
+       bool enablePressureTemperature,
        bool enableBattery,
        bool enableExtA6,
        bool enableExtA7,
@@ -1635,6 +1690,7 @@ public partial class DataPageViewModel : ObservableObject
         this.enableWideRangeAccelerometer = enableWideRangeAccelerometer;
         this.enableGyroscope = enableGyroscope;
         this.enableMagnetometer = enableMagnetometer;
+        this.enablePressureTemperature = enablePressureTemperature;
         this.enableBattery = enableBattery;
         this.enableExtA6 = enableExtA6;
         this.enableExtA7 = enableExtA7;
@@ -1687,6 +1743,7 @@ public partial class DataPageViewModel : ObservableObject
             EnableWideRangeAccelerometer = enableWideRangeAccelerometer,
             EnableGyroscope = enableGyroscope,
             EnableMagnetometer = enableMagnetometer,
+            EnablePressureTemperature = enablePressureTemperature,
             EnableBattery = enableBattery,
             EnableExtA6 = enableExtA6,
             EnableExtA7 = enableExtA7,
@@ -1712,7 +1769,6 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     
-
 
 
 }

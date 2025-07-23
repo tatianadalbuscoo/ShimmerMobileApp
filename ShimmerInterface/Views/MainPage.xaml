@@ -50,6 +50,8 @@
                                 <Switch IsToggled="{Binding EnableMagnetometer}" />
                                 <Label Text="Battery Voltage" />
                                 <Switch IsToggled="{Binding EnableBattery}" />
+                                <Label Text="Pressure &amp; Temperature" />
+                                <Switch IsToggled="{Binding EnablePressureTemperature}" />
                                 <Label Text="External ADC A6 (Ext A6)" />
                                 <Switch IsToggled="{Binding EnableExtA6}" />
                                 <Label Text="External ADC A7 (Ext A7)" />

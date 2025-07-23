@@ -63,7 +63,6 @@ namespace XR2Learn_ShimmerAPI.IMU
             if (_enableWideRangeAccelerometer)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
 
-
             if (_enableGyroscope)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_MPU9150_GYRO;
 
@@ -74,9 +73,7 @@ namespace XR2Learn_ShimmerAPI.IMU
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
 
             if (_enableBattery)
-            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
-            }
 
             if (_enableExtA6)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;

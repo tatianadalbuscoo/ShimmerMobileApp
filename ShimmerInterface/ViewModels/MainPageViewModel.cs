@@ -394,6 +394,7 @@ public partial class MainPageViewModel : ObservableObject
                 EnableGyroscope = device?.EnableGyroscope ?? true,
                 EnableMagnetometer = device?.EnableMagnetometer ?? true,
                 EnableBattery = device?.EnableBattery ?? true,
+                EnablePressureTemperature = device?.EnablePressureTemperature ?? true,
                 EnableExtA6 = device?.EnableExtA6 ?? true,
                 EnableExtA7 = device?.EnableExtA7 ?? true,
                 EnableExtA15 = device?.EnableExtA15 ?? true

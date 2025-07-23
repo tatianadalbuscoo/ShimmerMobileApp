@@ -13,8 +13,8 @@ public partial class LoadingPageViewModel : ObservableObject
     public bool EnableWideRangeAccelerometer { get; }
     public bool EnableGyroscope { get; }
     public bool EnableMagnetometer { get; }
+    public bool EnablePressureTemperature { get; }
     public bool EnableBattery { get; }
-
     public bool EnableExtA6 { get; } = true;
     public bool EnableExtA7 { get; } = true;
     public bool EnableExtA15 { get; } = true;
@@ -22,16 +22,17 @@ public partial class LoadingPageViewModel : ObservableObject
 
     // Costruttore: salva le impostazioni dei sensori da abilitare
     public LoadingPageViewModel
-    (bool accelerometer, bool wideRangeAccelerometer, bool gyroscope, bool magnetometer, bool battery, bool enableExtA6, bool enableExtA7, bool enableExtA15)
+    (bool accelerometer, bool wideRangeAccelerometer, bool gyroscope, bool magnetometer, bool battery, bool extA6, bool extA7, bool extA15, bool pressureTemperature)
     {
         EnableAccelerometer = accelerometer;
         EnableWideRangeAccelerometer = wideRangeAccelerometer;
         EnableGyroscope = gyroscope;
         EnableMagnetometer = magnetometer;
+        EnablePressureTemperature = pressureTemperature;
         EnableBattery = battery;
-        EnableExtA6 = enableExtA6;
-        EnableExtA7 = enableExtA7;
-        EnableExtA15 = enableExtA15;
+        EnableExtA6 = extA6;
+        EnableExtA7 = extA7;
+        EnableExtA15 = extA15;
     }
 
     // Metodo asincrono che prova a connettersi a un dispositivo Shimmer.
@@ -49,7 +50,11 @@ public partial class LoadingPageViewModel : ObservableObject
             EnableWideRangeAccelerometer = EnableWideRangeAccelerometer,
             EnableGyroscope = EnableGyroscope,
             EnableMagnetometer = EnableMagnetometer,
+            EnablePressureTemperature = EnablePressureTemperature,
             EnableBattery = EnableBattery,
+            EnableExtA6 = EnableExtA6,
+            EnableExtA7 = EnableExtA7,
+            EnableExtA15 = EnableExtA15
         };
 
         shimmer.Configure("Shimmer3", ports[0]);

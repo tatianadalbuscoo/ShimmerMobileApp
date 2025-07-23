@@ -40,6 +40,9 @@ namespace ShimmerInterface.Models
         [ObservableProperty]
         private bool enableExtA15 = true;
 
+        [ObservableProperty] 
+        private bool enablePressureTemperature = true;
+
 
         // Nuove proprietà per il nome Shimmer e l'indirizzo Bluetooth
         [ObservableProperty]

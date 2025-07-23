@@ -63,6 +63,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
                     EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
                     EnableGyroscope = device.EnableGyroscope,
                     EnableMagnetometer = device.EnableMagnetometer,
+                    EnablePressureTemperature = device.EnablePressureTemperature,
                     EnableBattery = device.EnableBattery,
                     EnableExtA6 = device.EnableExtA6,
                     EnableExtA7 = device.EnableExtA7,
