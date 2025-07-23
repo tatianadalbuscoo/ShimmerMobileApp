@@ -3,6 +3,7 @@
 using ShimmerAPI;
 using ShimmerLibrary;
 using System;
+using System.Diagnostics;
 using XR2Learn_ShimmerAPI.IMU;
 
 namespace XR2Learn_ShimmerAPI.IMU
@@ -51,38 +52,78 @@ namespace XR2Learn_ShimmerAPI.IMU
             _enableExtA15 = true;
         }
 
-        public void Configure(string deviceName, string comPort)
+        public void Configure(string deviceName, string comPort,
+            bool enableLowNoiseAcc, bool enableWideRangeAcc,
+            bool enableGyro, bool enableMag, bool enablePressureTemp,
+            bool enableBattery, bool enableExtA6, bool enableExtA7, bool enableExtA15)
+
         {
             int enabledSensors = 0;
 
+            _enableLowNoiseAccelerometer = enableLowNoiseAcc;
+            _enableWideRangeAccelerometer = enableWideRangeAcc;
+            _enableGyroscope = enableGyro;
+            _enableMagnetometer = enableMag;
+            _enablePressureTemperature = enablePressureTemp;
+            _enableBattery = enableBattery;
+            _enableExtA6 = enableExtA6;
+            _enableExtA7 = enableExtA7;
+            _enableExtA15 = enableExtA15;
 
 
             if (_enableLowNoiseAccelerometer)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
+                Debug.WriteLine("Accelerometer");
+            }
 
             if (_enableWideRangeAccelerometer)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
+                Debug.WriteLine("Wide range");
+            }
 
             if (_enableGyroscope)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_MPU9150_GYRO;
+                Debug.WriteLine("Gyroscope");
+            }
 
             if (_enableMagnetometer)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG;
+                Debug.WriteLine("Magn");
+            }
 
             if (_enablePressureTemperature)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
+                Debug.WriteLine("pressure");
+            }
 
             if (_enableBattery)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
+                Debug.WriteLine("battery");
+            }
 
             if (_enableExtA6)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;
+                Debug.WriteLine("A6");
+            }
 
             if (_enableExtA7)
+            {
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A7;
+                Debug.WriteLine("A7");
+            }
 
-            if (_enableExtA15)
+            if (_enableExtA15) 
+            { 
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
+                Debug.WriteLine("A15");
+            }
 
 
 

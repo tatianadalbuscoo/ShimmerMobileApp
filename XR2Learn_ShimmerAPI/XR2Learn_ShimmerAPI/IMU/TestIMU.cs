@@ -29,17 +29,18 @@ namespace XR2Learn_ShimmerAPI
             foreach (string port in ports)
             {
                 string comPort = port;
-                api.Configure(deviceName, comPort);
 
-                api.EnableLowNoiseAccelerometer = true;
-                api.EnableWideRangeAccelerometer = true;
-                api.EnableGyroscope = true;
-                api.EnableMagnetometer = true;
-                api.EnablePressureTemperature = true;
-                api.EnableBattery = true;
-                api.EnableExtA6 = true;
-                api.EnableExtA7 = true;
-                api.EnableExtA15 = true;
+                api.Configure(deviceName, comPort,
+                enableLowNoiseAcc: true,
+                enableWideRangeAcc: true,
+                enableGyro: true,
+                enableMag: true,
+                enablePressureTemp: true,
+                enableBattery: true,
+                enableExtA6: true,
+                enableExtA7: true,
+                enableExtA15: true);
+
 
                 api.SamplingRate = DefaultSamplingRate;
 

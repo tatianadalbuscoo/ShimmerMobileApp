@@ -57,7 +57,17 @@ public partial class LoadingPageViewModel : ObservableObject
             EnableExtA15 = EnableExtA15
         };
 
-        shimmer.Configure("Shimmer3", ports[0]);
+        shimmer.Configure("Shimmer3", ports[0],
+            EnableAccelerometer,
+            EnableWideRangeAccelerometer,
+            EnableGyroscope,
+            EnableMagnetometer,
+            EnablePressureTemperature,
+            EnableBattery,
+            EnableExtA6,
+            EnableExtA7,
+            EnableExtA15);
+
         shimmer.Connect();
 
         if (shimmer.IsConnected())

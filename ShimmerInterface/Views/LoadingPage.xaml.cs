@@ -70,7 +70,17 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
                     EnableExtA15 = device.EnableExtA15
                 };
 
-                shimmer.Configure("Shimmer", port);
+                shimmer.Configure("Shimmer", port,
+                device.EnableAccelerometer,
+                device.EnableWideRangeAccelerometer,
+                device.EnableGyroscope,
+                device.EnableMagnetometer,
+                device.EnablePressureTemperature,
+                device.EnableBattery,
+                device.EnableExtA6,
+                device.EnableExtA7,
+                device.EnableExtA15);
+
                 shimmer.Connect();
 
                 if (shimmer.IsConnected())
