@@ -50,7 +50,12 @@
                                 <Switch IsToggled="{Binding EnableMagnetometer}" />
                                 <Label Text="Battery Voltage" />
                                 <Switch IsToggled="{Binding EnableBattery}" />
-
+                                <Label Text="External ADC A6 (Ext A6)" />
+                                <Switch IsToggled="{Binding EnableExtA6}" />
+                                <Label Text="External ADC A7 (Ext A7)" />
+                                <Switch IsToggled="{Binding EnableExtA7}" />
+                                <Label Text="External ADC A15 (Ext A15)" />
+                                <Switch IsToggled="{Binding EnableExtA15}" />
                             </VerticalStackLayout>
                         </Frame>
                     </DataTemplate>

@@ -46,6 +46,10 @@ public partial class DataPageViewModel : ObservableObject
     private bool enableGyroscope;
     private bool enableMagnetometer;
     private bool enableBattery;
+    private bool enableExtA6;
+    private bool enableExtA7;
+    private bool enableExtA15;
+
 
     // Valori di backup per il ripristino in caso di input non validi
     private double _lastValidYAxisMin = 0;
@@ -182,6 +186,11 @@ public partial class DataPageViewModel : ObservableObject
         enableGyroscope = config.EnableGyroscope;
         enableMagnetometer = config.EnableMagnetometer;
         enableBattery = config.EnableBattery;
+        enableExtA6 = config.EnableExtA6;
+        enableExtA7 = config.EnableExtA7;
+        enableExtA15 = config.EnableExtA15;
+
+
 
         samplingRateDisplay = shimmer.SamplingRate;
 
@@ -482,6 +491,7 @@ public partial class DataPageViewModel : ObservableObject
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => -2,
             "Battery Voltage" => 3300,
             "Battery Percent" => 0,
+            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
             _ => 0
         };
     }
@@ -498,6 +508,7 @@ public partial class DataPageViewModel : ObservableObject
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => 2,
             "Battery Voltage" => 4200,
             "Battery Percent" => 100,
+            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3000,
             _ => 1
         };
     }
@@ -572,6 +583,13 @@ public partial class DataPageViewModel : ObservableObject
             AvailableParameters.Add("BatteryPercent");
         }
 
+        if (enableExtA6)
+            AvailableParameters.Add("ExtADC_A6");
+        if (enableExtA7)
+            AvailableParameters.Add("ExtADC_A7");
+        if (enableExtA15)
+            AvailableParameters.Add("ExtADC_A15");
+
         // Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
         // Forza un parametro valido se quello selezionato non lo è più
         if (!AvailableParameters.Contains(SelectedParameter))
@@ -590,6 +608,9 @@ public partial class DataPageViewModel : ObservableObject
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
             "BatteryVoltage" or "BatteryPercent" => enableBattery,
+            "ExtADC_A6" => enableExtA6,
+            "ExtADC_A7" => enableExtA7,
+            "ExtADC_A15" => enableExtA15,
             _ => false
         };
     }
@@ -647,6 +668,15 @@ public partial class DataPageViewModel : ObservableObject
         batteryText = $"\nBattery: {lastSample.BatteryVoltage.Data} [{lastSample.BatteryVoltage.Unit}] " +
                       $"({batteryPercent:F1}%)";
 
+        // 🔌 External ADC Info
+        string adcText = "";
+        if (enableExtA6)
+            adcText += $"\nExt A6: {lastSample.ExtADC_A6.Data} [{lastSample.ExtADC_A6.Unit}]";
+        if (enableExtA7)
+            adcText += $"\nExt A7: {lastSample.ExtADC_A7.Data} [{lastSample.ExtADC_A7.Unit}]";
+        if (enableExtA15)
+            adcText += $"\nExt A15: {lastSample.ExtADC_A15.Data} [{lastSample.ExtADC_A15.Unit}]";
+
         // Ora costruisci tutta la stringa
         SensorText =
           $"[{lastSample.TimeStamp.Data}]\n" +
@@ -662,7 +692,8 @@ public partial class DataPageViewModel : ObservableObject
           $"Magnetometer: {lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
           $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | " +
           $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]" +
-          batteryText;
+          batteryText +
+          adcText;
 
         // Aggiungi tutti i campioni individuali alle collezioni dati
         UpdateAllDataCollectionsWithAllSamples(samples);
@@ -713,6 +744,13 @@ public partial class DataPageViewModel : ObservableObject
                     values["BatteryPercent"] = (float)Math.Clamp(
                         ((sample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
                 }
+                if (enableExtA6)
+                    values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data;
+                if (enableExtA7)
+                    values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data;
+                if (enableExtA15)
+                    values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data;
+
             }
             catch (Exception ex)
             {
@@ -852,6 +890,11 @@ public partial class DataPageViewModel : ObservableObject
         var avgWideAccY = samples.Average(s => (double)s.WideRangeAccelerometerY.Data);
         var avgWideAccZ = samples.Average(s => (double)s.WideRangeAccelerometerZ.Data);
 
+        var avgExtA6 = samples.Average(s => (double)s.ExtADC_A6.Data);
+        var avgExtA7 = samples.Average(s => (double)s.ExtADC_A7.Data);
+        var avgExtA15 = samples.Average(s => (double)s.ExtADC_A15.Data);
+
+
         // 🪫 Battery average (senza reflection)
         double avgBatteryVoltage = 0;
         string batteryUnit = "mV";
@@ -882,7 +925,10 @@ public partial class DataPageViewModel : ObservableObject
             WideRangeAccelerometerY = new { Data = avgWideAccY, Unit = samples.First().WideRangeAccelerometerY.Unit },
             WideRangeAccelerometerZ = new { Data = avgWideAccZ, Unit = samples.First().WideRangeAccelerometerZ.Unit },
             BatteryVoltage = new { Data = avgBatteryVoltage, Unit = batteryUnit },
-            BatteryPercent = new { Data = avgBatteryPercent, Unit = "%" }
+            BatteryPercent = new { Data = avgBatteryPercent, Unit = "%" },
+            ExtADC_A6 = new { Data = avgExtA6, Unit = samples.First().ExtADC_A6.Unit },
+            ExtADC_A7 = new { Data = avgExtA7, Unit = samples.First().ExtADC_A7.Unit },
+            ExtADC_A15 = new { Data = avgExtA15, Unit = samples.First().ExtADC_A15.Unit }
         };
 
         return result;
@@ -929,6 +975,13 @@ public partial class DataPageViewModel : ObservableObject
             {
                 values["BatteryVoltage"] = (float)data.BatteryVoltage.Data;
             }
+            if (enableExtA6)
+                values["ExtADC_A6"] = (float)data.ExtADC_A6.Data;
+            if (enableExtA7)
+                values["ExtADC_A7"] = (float)data.ExtADC_A7.Data;
+            if (enableExtA15)
+                values["ExtADC_A15"] = (float)data.ExtADC_A15.Data;
+
         }
         catch (Exception ex)
         {
@@ -1084,6 +1137,27 @@ public partial class DataPageViewModel : ObservableObject
                 ChartTitle = "Real-time Battery Percentage";
                 YAxisMin = 0;
                 YAxisMax = 100;
+                break;
+            case "ExtADC_A6":
+                YAxisLabel = "External ADC A6";
+                YAxisUnit = "mV";
+                ChartTitle = "External ADC A6";
+                YAxisMin = 0;
+                YAxisMax = 3000;
+                break;
+            case "ExtADC_A7":
+                YAxisLabel = "External ADC A7";
+                YAxisUnit = "mV";
+                ChartTitle = "External ADC A7";
+                YAxisMin = 0;
+                YAxisMax = 3000;
+                break;
+            case "ExtADC_A15":
+                YAxisLabel = "External ADC A15";
+                YAxisUnit = "mV";
+                ChartTitle = "External ADC A15";
+                YAxisMin = 0;
+                YAxisMax = 3000;
                 break;
 
         }
@@ -1394,7 +1468,10 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
-            "Battery" => "Battery",
+            "BatteryVoltage" or "BatteryPercent" => "Battery",
+            "ExtADC_A6" => "External ADC A6",
+            "ExtADC_A7" => "External ADC A7",
+            "ExtADC_A15" => "External ADC A15",
             _ => "Sensor"
         };
 
@@ -1540,17 +1617,28 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     // Aggiorna la configurazione dei sensori attivi e rigenera la lista dei parametri.
-    public void UpdateSensorConfiguration(bool enableAccelerometer, bool enableWideRangeAccelerometer, bool enableGyroscope, bool enableMagnetometer)
+    public void UpdateSensorConfiguration(
+       bool enableAccelerometer,
+       bool enableWideRangeAccelerometer,
+       bool enableGyroscope,
+       bool enableMagnetometer,
+       bool enableBattery,
+       bool enableExtA6,
+       bool enableExtA7,
+       bool enableExtA15)
     {
         // Salva il parametro attualmente selezionato
         string currentParameter = SelectedParameter;
 
-        // Aggiorna i flag dei sensori (aggiungi questi campi come non-readonly)
+        // Aggiorna i flag dei sensori
         this.enableAccelerometer = enableAccelerometer;
         this.enableWideRangeAccelerometer = enableWideRangeAccelerometer;
         this.enableGyroscope = enableGyroscope;
         this.enableMagnetometer = enableMagnetometer;
         this.enableBattery = enableBattery;
+        this.enableExtA6 = enableExtA6;
+        this.enableExtA7 = enableExtA7;
+        this.enableExtA15 = enableExtA15;
 
         // Rigenera la lista dei parametri disponibili
         InitializeAvailableParameters();
@@ -1599,7 +1687,11 @@ public partial class DataPageViewModel : ObservableObject
             EnableWideRangeAccelerometer = enableWideRangeAccelerometer,
             EnableGyroscope = enableGyroscope,
             EnableMagnetometer = enableMagnetometer,
-            EnableBattery = enableBattery
+            EnableBattery = enableBattery,
+            EnableExtA6 = enableExtA6,
+            EnableExtA7 = enableExtA7,
+            EnableExtA15 = enableExtA15
+
         };
     }
 

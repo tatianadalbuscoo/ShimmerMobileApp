@@ -62,7 +62,11 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
                     EnableLowNoiseAccelerometer = device.EnableAccelerometer,
                     EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
                     EnableGyroscope = device.EnableGyroscope,
-                    EnableMagnetometer = device.EnableMagnetometer
+                    EnableMagnetometer = device.EnableMagnetometer,
+                    EnableBattery = device.EnableBattery,
+                    EnableExtA6 = device.EnableExtA6,
+                    EnableExtA7 = device.EnableExtA7,
+                    EnableExtA15 = device.EnableExtA15
                 };
 
                 shimmer.Configure("Shimmer", port);

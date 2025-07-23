@@ -31,6 +31,16 @@ namespace ShimmerInterface.Models
         [ObservableProperty]
         private bool enableBattery = true;
 
+        [ObservableProperty]
+        private bool enableExtA6 = true;
+
+        [ObservableProperty]
+        private bool enableExtA7 = true;
+
+        [ObservableProperty]
+        private bool enableExtA15 = true;
+
+
         // Nuove proprietà per il nome Shimmer e l'indirizzo Bluetooth
         [ObservableProperty]
         private string shimmerName;

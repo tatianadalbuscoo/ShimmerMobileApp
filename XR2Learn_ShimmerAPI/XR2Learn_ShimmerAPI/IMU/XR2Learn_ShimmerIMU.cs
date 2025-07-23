@@ -78,14 +78,14 @@ namespace XR2Learn_ShimmerAPI.IMU
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
             }
 
-            /*if (_enableExtA6)
+            if (_enableExtA6)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;
 
             if (_enableExtA7)
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A7;
 
             if (_enableExtA15)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;*/
+                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
 
 
 

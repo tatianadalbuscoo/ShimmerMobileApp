@@ -15,14 +15,23 @@ public partial class LoadingPageViewModel : ObservableObject
     public bool EnableMagnetometer { get; }
     public bool EnableBattery { get; }
 
+    public bool EnableExtA6 { get; } = true;
+    public bool EnableExtA7 { get; } = true;
+    public bool EnableExtA15 { get; } = true;
+
+
     // Costruttore: salva le impostazioni dei sensori da abilitare
-    public LoadingPageViewModel(bool accelerometer, bool wideRangeAccelerometer, bool gyroscope, bool magnetometer, bool battery)
+    public LoadingPageViewModel
+    (bool accelerometer, bool wideRangeAccelerometer, bool gyroscope, bool magnetometer, bool battery, bool enableExtA6, bool enableExtA7, bool enableExtA15)
     {
         EnableAccelerometer = accelerometer;
         EnableWideRangeAccelerometer = wideRangeAccelerometer;
         EnableGyroscope = gyroscope;
         EnableMagnetometer = magnetometer;
         EnableBattery = battery;
+        EnableExtA6 = enableExtA6;
+        EnableExtA7 = enableExtA7;
+        EnableExtA15 = enableExtA15;
     }
 
     // Metodo asincrono che prova a connettersi a un dispositivo Shimmer.
