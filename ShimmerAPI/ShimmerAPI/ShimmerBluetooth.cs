@@ -1104,11 +1104,11 @@ namespace ShimmerAPI
                                         UnalignedBytesReceived.Clear();
                                     }
                                     int count = dataByte.Count();
-                                    for (i = 0; i < (packetSize- count); i++)
+                                    for (i = 0; i < (packetSize - count); i++)
                                     {
                                         dataByte.Add((byte)ReadByte());
                                     }
-                                    
+
                                     bool check = true;
                                     if (BluetoothCRCMode != BTCRCMode.OFF)
                                     {
@@ -1116,19 +1116,20 @@ namespace ShimmerAPI
                                         byte[] fullPacket = new byte[dataArray.Length + 1];
                                         System.Array.Copy(dataArray, 0, fullPacket, 1, dataArray.Length);
                                         fullPacket[0] = (byte)PacketTypeShimmer2.DATA_PACKET;
-                                        check = CheckCrc(fullPacket, PacketSize+1);
+                                        check = CheckCrc(fullPacket, PacketSize + 1);
                                     }
                                     if (check)
                                     {
                                         //Debug.WriteLine("CRC Pass");
                                         objectCluster = BuildMsg(dataByte);
 
-                                    } else
+                                    }
+                                    else
                                     {
                                         Debug.WriteLine("CRC Failed");
                                         //dataByte.RemoveAt(0);
                                         UnalignedBytesReceived = new List<Byte>();
-                                        UnalignedBytesReceived = dataByte.ToArray().ToList() ;
+                                        UnalignedBytesReceived = dataByte.ToArray().ToList();
                                         objectCluster = null;
                                     }
 
@@ -1217,38 +1218,60 @@ namespace ShimmerAPI
                                     StreamingACKReceived = true;
                                 }
                                 break;
-                            /*default:
-                                System.Console.WriteLine("Misaligned ByteStream Detected");
-                                // If it gets here means the previous packet is invalid so make it null so it wont be added to the buffer
-                                KeepObjectCluster = null;
-                                break;*/
-
                             default:
-                                Debug.WriteLine(" Misalignment: unrecognized byte → I'll try to resync ");
 
-                                // Scan until the next 0x00 (DATA_PACKET)
-                                int maxSearch = 100;
-                                byte nextByte = 0xFF;
-                                int attempts = 0;
-
-                                while (attempts < maxSearch)
+                                // Sensore di Pressione non attivo
+                                if ((EnabledSensors & (int)SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE) == 0 &&
+                                (EnabledSensors & (int)SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG) == 0)
                                 {
-                                    nextByte = (byte)ReadByte();
-                                    if (nextByte == (byte)PacketTypeShimmer2.DATA_PACKET)
+                                    Debug.WriteLine("Misaligned ByteStream Detected Temperature Disable");
+                                    // If it gets here means the previous packet is invalid so make it null so it wont be added to the buffer
+                                    KeepObjectCluster = null;
+
+                                }
+
+                             
+
+
+                                // Sensore di pressione attivo
+                                else { 
+                                    Debug.WriteLine(" Misalignment: unrecognized byte → I'll try to resync ");
+
+                                    // Scan until the next 0x00 (DATA_PACKET)
+                                    int maxSearch = 100;
+                                    byte nextByte = 0xFF;
+                                    int attempts = 0;
+
+                                    while (attempts < maxSearch)
                                     {
-                                        Debug.WriteLine($" Resynced after {attempts} bytes dropped..");
-                                        break;
+                                        nextByte = (byte)ReadByte();
+                                        if ((EnabledSensors & (int)SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE) == 0)
+                                        {
+                                            if (nextByte == (byte)PacketTypeShimmer2.DATA_PACKET || nextByte == (byte)PacketTypeShimmer2.ACK_COMMAND)
+                                            {
+                                                Debug.WriteLine($" Resynced after {attempts} bytes dropped..");
+                                                break;
+                                            }
+                                        }
+                                        if ((EnabledSensors & (int)SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE) != 0)
+                                        {
+                                            if (nextByte == (byte)PacketTypeShimmer2.DATA_PACKET)
+                                            {
+                                                Debug.WriteLine($" Resynced after {attempts} bytes dropped..");
+                                                break;
+                                            }
+                                        }
+                                        attempts++;
                                     }
-                                    attempts++;
-                                }
 
-                                if (nextByte != (byte)PacketTypeShimmer2.DATA_PACKET)
-                                {
-                                    Debug.WriteLine(" Resync failed after 100 bytes. ");
-                                }
+                                    if (nextByte != (byte)PacketTypeShimmer2.DATA_PACKET)
+                                    {
+                                        Debug.WriteLine(" Resync failed after 100 bytes. ");
+                                    }
 
-                                // Reset stato
-                                KeepObjectCluster = null;
+                                    // Reset stato
+                                    KeepObjectCluster = null;
+                                }
                                 break;
                         }
                     }

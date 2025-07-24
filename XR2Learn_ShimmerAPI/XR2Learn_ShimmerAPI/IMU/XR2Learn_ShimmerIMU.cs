@@ -4,6 +4,7 @@ using ShimmerAPI;
 using ShimmerLibrary;
 using System;
 using System.Diagnostics;
+using System.Threading;
 using XR2Learn_ShimmerAPI.IMU;
 
 namespace XR2Learn_ShimmerAPI.IMU
@@ -124,6 +125,8 @@ namespace XR2Learn_ShimmerAPI.IMU
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
                 Debug.WriteLine("A15");
             }
+
+            Thread.Sleep(500);
 
 
 
