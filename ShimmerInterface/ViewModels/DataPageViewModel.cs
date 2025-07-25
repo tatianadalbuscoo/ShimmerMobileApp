@@ -335,16 +335,14 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+    // Modifica il metodo ValidateAndUpdateSamplingRate
     private void ValidateAndUpdateSamplingRate(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
             const double defaultRate = 51.2;
-            shimmer.SamplingRate = defaultRate;
-            SamplingRateDisplay = defaultRate;
-            _lastValidSamplingRate = defaultRate;
+            UpdateSamplingRateAndRestart(defaultRate);
             ValidationMessage = "";
-            RestartTimer(); // This will use the new sampling rate
             return;
         }
 
@@ -363,16 +361,104 @@ public partial class DataPageViewModel : ObservableObject
                 return;
             }
 
-            shimmer.SamplingRate = result;
-            SamplingRateDisplay = result;
-            _lastValidSamplingRate = result;
+            // Limita il sampling rate a valori ragionevoli
+            if (result > 1000)
+            {
+                ValidationMessage = "Sampling rate too high. Maximum 1000 Hz.";
+                ResetSamplingRateText();
+                return;
+            }
+
+            if (result < 0.1)
+            {
+                ValidationMessage = "Sampling rate too low. Minimum 0.1 Hz.";
+                ResetSamplingRateText();
+                return;
+            }
+
+            UpdateSamplingRateAndRestart(result);
             ValidationMessage = "";
-            RestartTimer(); // Restart with new timer interval
         }
         else
         {
             ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
             ResetSamplingRateText();
+        }
+    }
+
+    private void UpdateSamplingRateAndRestart(double newRate)
+    {
+        // Ferma il timer esistente
+        StopTimer();
+
+        // Aggiorna il sampling rate
+        shimmer.SamplingRate = newRate;
+        SamplingRateDisplay = newRate;
+        _lastValidSamplingRate = newRate;
+
+        // IMPORTANTE: Pulisci TUTTI i dati esistenti per evitare problemi di mapping
+        ClearAllDataCollections();
+
+        // Resetta completamente i contatori
+        ResetAllCounters();
+
+        // Riavvia il timer con il nuovo intervallo
+        StartTimer();
+
+        // Aggiorna il grafico (mostrerà "Waiting for data...")
+        UpdateChart();
+
+        System.Diagnostics.Debug.WriteLine($"Sampling rate changed to {newRate}Hz - All data cleared");
+    }
+
+    private void ClearAllDataCollections()
+    {
+        foreach (var parameter in AvailableParameters)
+        {
+            if (dataPointsCollections.ContainsKey(parameter))
+            {
+                dataPointsCollections[parameter].Clear();
+            }
+            if (timeStampsCollections.ContainsKey(parameter))
+            {
+                timeStampsCollections[parameter].Clear();
+            }
+        }
+    }
+
+    private void ResetAllCounters()
+    {
+        sampleCounter = 0;
+        secondsElapsed = 0;
+        startTime = DateTime.Now;
+    }
+
+
+    private void RestartTimerWithNewSamplingRate()
+    {
+        // Questo metodo ora è sostituito da UpdateSamplingRateAndRestart
+        // Mantienilo per compatibilità se usato altrove
+        UpdateSamplingRateAndRestart(shimmer.SamplingRate);
+    }
+
+
+    // Nuovo metodo per ricalcolare i punti massimi
+    private void RecalculateMaxPointsForAllCollections()
+    {
+        var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
+
+        foreach (var parameter in AvailableParameters)
+        {
+            if (dataPointsCollections.ContainsKey(parameter) &&
+                timeStampsCollections.ContainsKey(parameter))
+            {
+                // Taglia la collezione se ha troppi punti
+                while (dataPointsCollections[parameter].Count > maxPoints)
+                {
+                    dataPointsCollections[parameter].RemoveAt(0);
+                    timeStampsCollections[parameter].RemoveAt(0);
+                }
+            }
         }
     }
 
@@ -638,19 +724,23 @@ public partial class DataPageViewModel : ObservableObject
     // Avvia il timer che legge e aggiorna i dati a intervalli regolari.
     public void StartTimer()
     {
-        // Calculate interval based on sampling rate for real-time updates
-        int intervalMs = (int)(1000.0 / shimmer.SamplingRate);
+        // Ferma eventuali timer esistenti
+        StopTimer();
 
-        // Ensure minimum interval of 10ms to avoid overloading the system
-        intervalMs = Math.Max(intervalMs, 10);
+        // Calcola l'intervallo basato sul sampling rate
+        double intervalMs = 1000.0 / shimmer.SamplingRate;
 
-        timer?.Stop();
-        timer?.Dispose();
+        // Assicurati che l'intervallo sia ragionevole
+        intervalMs = Math.Max(intervalMs, 10);   // Minimo 10ms (100Hz max)
+        intervalMs = Math.Min(intervalMs, 1000); // Massimo 1000ms (1Hz min)
 
         timer = new System.Timers.Timer(intervalMs);
         timer.Elapsed += OnTimerElapsed;
         timer.Start();
+
+        System.Diagnostics.Debug.WriteLine($"Timer started with interval: {intervalMs}ms for sampling rate: {shimmer.SamplingRate}Hz");
     }
+
 
     private void RestartTimer()
     {
@@ -664,28 +754,36 @@ public partial class DataPageViewModel : ObservableObject
     // 1. First, modify the OnTimerElapsed method to handle battery data safely
     private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        // Get single sample instead of collecting for a full second
-        var sample = shimmer.LatestData;
-        if (sample == null) return;
-
-        // Increment sample counter instead of seconds
-        sampleCounter++;
-
-        // Calculate current time in seconds (fractional)
-        double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
-
-        // Update sensor text display only every second (every ~51 samples at 51.2Hz)
-        if (sampleCounter % (int)Math.Round(shimmer.SamplingRate) == 0)
+        try
         {
-            secondsElapsed = (int)Math.Floor(currentTimeSeconds);
-            UpdateSensorTextDisplay(sample);
+            // Get single sample instead of collecting for a full second
+            var sample = shimmer.LatestData;
+            if (sample == null) return;
+
+            // Increment sample counter
+            sampleCounter++;
+
+            // Calculate current time in seconds (fractional)
+            double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
+
+            // Update sensor text display every second (approximately)
+            int samplesPerSecond = (int)Math.Round(shimmer.SamplingRate);
+            if (samplesPerSecond > 0 && sampleCounter % samplesPerSecond == 0)
+            {
+                secondsElapsed = (int)Math.Floor(currentTimeSeconds);
+                UpdateSensorTextDisplay(sample);
+            }
+
+            // Update data collections with single sample
+            UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
+
+            // Update chart
+            UpdateChart();
         }
-
-        // Update data collections with single sample
-        UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
-
-        // Update chart immediately
-        UpdateChart();
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error in OnTimerElapsed: {ex.Message}");
+        }
     }
 
     private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
@@ -752,6 +850,9 @@ public partial class DataPageViewModel : ObservableObject
         // Convert current time to milliseconds for timestamp
         int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
 
+        // Calculate max points based on current sampling rate
+        var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
+
         // Update each collection with the new sample
         foreach (var parameter in AvailableParameters)
         {
@@ -761,7 +862,6 @@ public partial class DataPageViewModel : ObservableObject
                 timeStampsCollections[parameter].Add(timestampMs);
 
                 // Maintain time window by removing old samples
-                var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
                 while (dataPointsCollections[parameter].Count > maxPoints)
                 {
                     dataPointsCollections[parameter].RemoveAt(0);
@@ -1506,6 +1606,11 @@ public partial class DataPageViewModel : ObservableObject
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
+    public void Cleanup()
+    {
+        StopTimer();
+        ClearAllDataCollections();
+    }
 
     public void ToggleGrid()
     {
@@ -1864,12 +1969,13 @@ public partial class DataPageViewModel : ObservableObject
         };
     }
 
-    // Ferma il timer che aggiorna i dati.
+
     public void StopTimer()
     {
         if (timer != null)
         {
             timer.Stop();
+            timer.Elapsed -= OnTimerElapsed;
             timer.Dispose();
             timer = null;
         }
