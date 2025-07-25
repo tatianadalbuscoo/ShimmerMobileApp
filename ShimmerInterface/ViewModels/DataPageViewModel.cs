@@ -37,6 +37,7 @@ public partial class DataPageViewModel : ObservableObject
 
     // Elapsed seconds since data collection started
     private int secondsElapsed = 0;
+    private int sampleCounter = 0;
 
     private DateTime startTime = DateTime.Now;
 
@@ -336,7 +337,6 @@ public partial class DataPageViewModel : ObservableObject
 
     private void ValidateAndUpdateSamplingRate(string value)
     {
-
         if (string.IsNullOrWhiteSpace(value))
         {
             const double defaultRate = 51.2;
@@ -344,7 +344,7 @@ public partial class DataPageViewModel : ObservableObject
             SamplingRateDisplay = defaultRate;
             _lastValidSamplingRate = defaultRate;
             ValidationMessage = "";
-            RestartTimer();
+            RestartTimer(); // This will use the new sampling rate
             return;
         }
 
@@ -367,13 +367,20 @@ public partial class DataPageViewModel : ObservableObject
             SamplingRateDisplay = result;
             _lastValidSamplingRate = result;
             ValidationMessage = "";
-            RestartTimer();
+            RestartTimer(); // Restart with new timer interval
         }
         else
         {
             ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
             ResetSamplingRateText();
         }
+    }
+
+
+    public void ResetSampleCounter()
+    {
+        sampleCounter = 0;
+        secondsElapsed = 0;
     }
 
 
@@ -629,11 +636,13 @@ public partial class DataPageViewModel : ObservableObject
 
 
     // Avvia il timer che legge e aggiorna i dati a intervalli regolari.
-
     public void StartTimer()
     {
-        // Timer fisso a 1 secondo per l'aggiornamento della visualizzazione
-        int intervalMs = 1000;
+        // Calculate interval based on sampling rate for real-time updates
+        int intervalMs = (int)(1000.0 / shimmer.SamplingRate);
+
+        // Ensure minimum interval of 10ms to avoid overloading the system
+        intervalMs = Math.Max(intervalMs, 10);
 
         timer?.Stop();
         timer?.Dispose();
@@ -655,72 +664,114 @@ public partial class DataPageViewModel : ObservableObject
     // 1. First, modify the OnTimerElapsed method to handle battery data safely
     private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        // Raccogli tutti i campioni disponibili nell'ultimo secondo
-        var samples = CollectSamplesForLastSecond();
-        if (samples.Count == 0) return;
+        // Get single sample instead of collecting for a full second
+        var sample = shimmer.LatestData;
+        if (sample == null) return;
 
-        secondsElapsed++;
-        var currentTime = DateTime.Now;
+        // Increment sample counter instead of seconds
+        sampleCounter++;
 
-        // Usa l'ultimo campione per il display del testo
-        var lastSample = samples.Last();
+        // Calculate current time in seconds (fractional)
+        double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
 
-        // Battery info senza reflection
-        string batteryText = "";
-        if (enableBattery && lastSample.BatteryVoltage != null)
+        // Update sensor text display only every second (every ~51 samples at 51.2Hz)
+        if (sampleCounter % (int)Math.Round(shimmer.SamplingRate) == 0)
         {
-            batteryText = $"\nBattery: {lastSample.BatteryVoltage.Data} [{lastSample.BatteryVoltage.Unit}]";
+            secondsElapsed = (int)Math.Floor(currentTimeSeconds);
+            UpdateSensorTextDisplay(sample);
         }
 
-        // Update sensor text display
-        // Calcola e costruisci batteryText PRIMA di usarlo
-        float batteryPercent = (float)Math.Clamp(
-          ((lastSample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
+        // Update data collections with single sample
+        UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
 
-        batteryText = $"\nBattery: {lastSample.BatteryVoltage.Data} [{lastSample.BatteryVoltage.Unit}] " +
-                      $"({batteryPercent:F1}%)";
-
-        // 🔌 External ADC Info
-        string adcText = "";
-        if (enableExtA6)
-            adcText += $"\nExt A6: {lastSample.ExtADC_A6.Data} [{lastSample.ExtADC_A6.Unit}]";
-        if (enableExtA7)
-            adcText += $"\nExt A7: {lastSample.ExtADC_A7.Data} [{lastSample.ExtADC_A7.Unit}]";
-        if (enableExtA15)
-            adcText += $"\nExt A15: {lastSample.ExtADC_A15.Data} [{lastSample.ExtADC_A15.Unit}]";
-
-        string pressureText = "";
-        if (enablePressureTemperature)
-        {
-            pressureText = $"\nTemperature: {lastSample.Temperature_BMP180.Data} [{lastSample.Temperature_BMP180.Unit}]" +
-                           $"\nPressure: {lastSample.Pressure_BMP180.Data} [{lastSample.Pressure_BMP180.Unit}]";
-        }
-
-
-        // Ora costruisci tutta la stringa
-        SensorText =
-          $"[{lastSample.TimeStamp.Data}]\n" +
-          $"Low-Noise Accelerometer: {lastSample.AccelerometerX.Data} [{lastSample.AccelerometerX.Unit}] | " +
-          $"{lastSample.AccelerometerY.Data} [{lastSample.AccelerometerY.Unit}] | " +
-          $"{lastSample.AccelerometerZ.Data} [{lastSample.AccelerometerZ.Unit}]\n" +
-          $"Wide-Range Accel: {lastSample.WideRangeAccelerometerX.Data} [{lastSample.WideRangeAccelerometerX.Unit}] | " +
-          $"{lastSample.WideRangeAccelerometerY.Data} [{lastSample.WideRangeAccelerometerY.Unit}] | " +
-          $"{lastSample.WideRangeAccelerometerZ.Data} [{lastSample.WideRangeAccelerometerZ.Unit}]\n" +
-          $"Gyroscope: {lastSample.GyroscopeX.Data} [{lastSample.GyroscopeX.Unit}] | " +
-          $"{lastSample.GyroscopeY.Data} [{lastSample.GyroscopeY.Unit}] | " +
-          $"{lastSample.GyroscopeZ.Data} [{lastSample.GyroscopeZ.Unit}]\n" +
-          $"Magnetometer: {lastSample.MagnetometerX.Data} [{lastSample.MagnetometerX.Unit}] | " +
-          $"{lastSample.MagnetometerY.Data} [{lastSample.MagnetometerY.Unit}] | " +
-          $"{lastSample.MagnetometerZ.Data} [{lastSample.MagnetometerZ.Unit}]" +
-          pressureText +
-          batteryText +
-          adcText;
-
-        // Aggiungi tutti i campioni individuali alle collezioni dati
-        UpdateAllDataCollectionsWithAllSamples(samples);
-
+        // Update chart immediately
         UpdateChart();
     }
+
+    private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
+    {
+        var values = new Dictionary<string, float>();
+
+        try
+        {
+            if (enableAccelerometer)
+            {
+                values["Low-Noise AccelerometerX"] = (float)sample.AccelerometerX.Data;
+                values["Low-Noise AccelerometerY"] = (float)sample.AccelerometerY.Data;
+                values["Low-Noise AccelerometerZ"] = (float)sample.AccelerometerZ.Data;
+            }
+
+            if (enableWideRangeAccelerometer)
+            {
+                values["Wide-Range AccelerometerX"] = (float)sample.WideRangeAccelerometerX.Data;
+                values["Wide-Range AccelerometerY"] = (float)sample.WideRangeAccelerometerY.Data;
+                values["Wide-Range AccelerometerZ"] = (float)sample.WideRangeAccelerometerZ.Data;
+            }
+
+            if (enableGyroscope)
+            {
+                values["GyroscopeX"] = (float)sample.GyroscopeX.Data;
+                values["GyroscopeY"] = (float)sample.GyroscopeY.Data;
+                values["GyroscopeZ"] = (float)sample.GyroscopeZ.Data;
+            }
+
+            if (enableMagnetometer)
+            {
+                values["MagnetometerX"] = (float)sample.MagnetometerX.Data;
+                values["MagnetometerY"] = (float)sample.MagnetometerY.Data;
+                values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
+            }
+
+            if (enablePressureTemperature)
+            {
+                values["Temperature_BMP180"] = (float)sample.Temperature_BMP180.Data;
+                values["Pressure_BMP180"] = (float)sample.Pressure_BMP180.Data;
+            }
+
+            if (enableBattery && sample.BatteryVoltage != null)
+            {
+                values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data;
+                values["BatteryPercent"] = (float)Math.Clamp(
+                    ((sample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
+            }
+
+            if (enableExtA6)
+                values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data;
+            if (enableExtA7)
+                values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data;
+            if (enableExtA15)
+                values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data;
+
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error processing sample: {ex.Message}");
+            return;
+        }
+
+        // Convert current time to milliseconds for timestamp
+        int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
+
+        // Update each collection with the new sample
+        foreach (var parameter in AvailableParameters)
+        {
+            if (values.ContainsKey(parameter))
+            {
+                dataPointsCollections[parameter].Add(values[parameter]);
+                timeStampsCollections[parameter].Add(timestampMs);
+
+                // Maintain time window by removing old samples
+                var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
+                while (dataPointsCollections[parameter].Count > maxPoints)
+                {
+                    dataPointsCollections[parameter].RemoveAt(0);
+                    timeStampsCollections[parameter].RemoveAt(0);
+                }
+            }
+        }
+    }
+
+
 
 
     private void UpdateAllDataCollectionsWithAllSamples(List<dynamic> samples)
@@ -860,6 +911,55 @@ public partial class DataPageViewModel : ObservableObject
 
 
         }
+    }
+
+    private void UpdateSensorTextDisplay(dynamic sample)
+    {
+        // Battery info
+        string batteryText = "";
+        if (enableBattery && sample.BatteryVoltage != null)
+        {
+            float batteryPercent = (float)Math.Clamp(
+                ((sample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
+
+            batteryText = $"\nBattery: {sample.BatteryVoltage.Data} [{sample.BatteryVoltage.Unit}] " +
+                          $"({batteryPercent:F1}%)";
+        }
+
+        // External ADC Info
+        string adcText = "";
+        if (enableExtA6)
+            adcText += $"\nExt A6: {sample.ExtADC_A6.Data} [{sample.ExtADC_A6.Unit}]";
+        if (enableExtA7)
+            adcText += $"\nExt A7: {sample.ExtADC_A7.Data} [{sample.ExtADC_A7.Unit}]";
+        if (enableExtA15)
+            adcText += $"\nExt A15: {sample.ExtADC_A15.Data} [{sample.ExtADC_A15.Unit}]";
+
+        string pressureText = "";
+        if (enablePressureTemperature)
+        {
+            pressureText = $"\nTemperature: {sample.Temperature_BMP180.Data} [{sample.Temperature_BMP180.Unit}]" +
+                           $"\nPressure: {sample.Pressure_BMP180.Data} [{sample.Pressure_BMP180.Unit}]";
+        }
+
+        // Build complete sensor text
+        SensorText =
+            $"[{sample.TimeStamp.Data}]\n" +
+            $"Low-Noise Accelerometer: {sample.AccelerometerX.Data} [{sample.AccelerometerX.Unit}] | " +
+            $"{sample.AccelerometerY.Data} [{sample.AccelerometerY.Unit}] | " +
+            $"{sample.AccelerometerZ.Data} [{sample.AccelerometerZ.Unit}]\n" +
+            $"Wide-Range Accel: {sample.WideRangeAccelerometerX.Data} [{sample.WideRangeAccelerometerX.Unit}] | " +
+            $"{sample.WideRangeAccelerometerY.Data} [{sample.WideRangeAccelerometerY.Unit}] | " +
+            $"{sample.WideRangeAccelerometerZ.Data} [{sample.WideRangeAccelerometerZ.Unit}]\n" +
+            $"Gyroscope: {sample.GyroscopeX.Data} [{sample.GyroscopeX.Unit}] | " +
+            $"{sample.GyroscopeY.Data} [{sample.GyroscopeY.Unit}] | " +
+            $"{sample.GyroscopeZ.Data} [{sample.GyroscopeZ.Unit}]\n" +
+            $"Magnetometer: {sample.MagnetometerX.Data} [{sample.MagnetometerX.Unit}] | " +
+            $"{sample.MagnetometerY.Data} [{sample.MagnetometerY.Unit}] | " +
+            $"{sample.MagnetometerZ.Data} [{sample.MagnetometerZ.Unit}]" +
+            pressureText +
+            batteryText +
+            adcText;
     }
 
 
@@ -1251,14 +1351,14 @@ public partial class DataPageViewModel : ObservableObject
     {
         canvas.Clear(SKColors.White);
 
-        // PRIMO CONTROLLO: Verifica se il sensore è disabilitato
+        // First check: Verify if sensor is disabled
         if (!IsSensorEnabled(SelectedParameter))
         {
             DrawDisabledSensorMessage(canvas, info);
             return;
         }
 
-        // SECONDO CONTROLLO: Verifica se il parametro è disponibile
+        // Second check: Verify if parameter is available
         if (!AvailableParameters.Contains(SelectedParameter))
         {
             DrawDisabledSensorMessage(canvas, info);
@@ -1268,7 +1368,7 @@ public partial class DataPageViewModel : ObservableObject
         var currentDataPoints = dataPointsCollections[SelectedParameter];
         var currentTimeStamps = timeStampsCollections[SelectedParameter];
 
-        // Nessun dato o tutti -1/0
+        // No data or all invalid values
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
         {
             DrawNoDataMessage(canvas, info);
@@ -1289,14 +1389,13 @@ public partial class DataPageViewModel : ObservableObject
         };
         canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
 
-        // *** CORREZIONE: Chiamare DrawOscilloscopeGrid ***
         DrawOscilloscopeGrid(canvas, leftMargin, margin, graphWidth, graphHeight);
 
         var yRange = YAxisMax - YAxisMin;
         var bottomY = margin + graphHeight;
         var topY = margin;
 
-        // Linea del segnale
+        // Signal line with higher resolution
         using var linePaint = new SKPaint
         {
             Color = SKColors.Blue,
@@ -1306,9 +1405,20 @@ public partial class DataPageViewModel : ObservableObject
         };
 
         using var path = new SKPath();
+
+        // Calculate time range for X-axis mapping
+        double currentTime = sampleCounter / shimmer.SamplingRate;
+        double timeStart = Math.Max(0, currentTime - TimeWindowSeconds);
+        double timeRange = TimeWindowSeconds;
+
         for (int i = 0; i < currentDataPoints.Count; i++)
         {
-            var x = leftMargin + (i * graphWidth / Math.Max(currentDataPoints.Count - 1, 1));
+            // Map timestamp to X position
+            double sampleTime = currentTimeStamps[i] / 1000.0; // Convert ms to seconds
+            double normalizedX = (sampleTime - timeStart) / timeRange;
+            var x = leftMargin + (float)(normalizedX * graphWidth);
+
+            // Map value to Y position
             var normalizedValue = (currentDataPoints[i] - YAxisMin) / yRange;
             var y = bottomY - (float)(normalizedValue * graphHeight);
             y = Math.Clamp(y, topY, bottomY);
@@ -1321,6 +1431,7 @@ public partial class DataPageViewModel : ObservableObject
 
         canvas.DrawPath(path, linePaint);
 
+        // Rest of the drawing code remains the same...
         using var textPaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -1328,24 +1439,31 @@ public partial class DataPageViewModel : ObservableObject
             IsAntialias = true
         };
 
-        // Etichette X sincronizzate con la griglia e filtrate ogni XAxisLabelInterval secondi
+        // X-axis labels synchronized with grid and real timestamps
         int numDivisions = TimeWindowSeconds;
         int labelInterval = IsXAxisLabelIntervalEnabled ? XAxisLabelInterval : 1;
 
+        // Calculate current time and time range
+        double currentTimeInSeconds = sampleCounter / shimmer.SamplingRate;
+        double timeEnd = currentTimeInSeconds;
+
         for (int i = 0; i <= numDivisions; i++)
         {
-            int timeValue = secondsElapsed - TimeWindowSeconds + i;
-            if (timeValue < 0 || (timeValue % labelInterval != 0)) continue;
+            // Calculate the actual time value for this grid position
+            double actualTime = timeStart + (i * TimeWindowSeconds / (double)numDivisions);
+            int timeValueForLabel = (int)Math.Floor(actualTime);
+
+            // Only show label if it meets the interval requirement and is valid
+            if (timeValueForLabel < 0 || (timeValueForLabel % labelInterval != 0)) continue;
 
             float x = leftMargin + (i * graphWidth / numDivisions);
 
-            string label = FormatTimeLabel(timeValue);
+            string label = FormatTimeLabel((int)actualTime);
             var textWidth = textPaint.MeasureText(label);
             canvas.DrawText(label, x - textWidth / 2, bottomY + 20, textPaint);
         }
 
-
-        // Etichette Y
+        // Y-axis labels
         for (int i = 0; i <= 4; i++)
         {
             var value = YAxisMin + (yRange * i / 4);
@@ -1354,7 +1472,7 @@ public partial class DataPageViewModel : ObservableObject
             canvas.DrawText(label, leftMargin - 45, y + 6, textPaint);
         }
 
-        // Etichette assi
+        // Axis labels
         using var axisLabelPaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -1364,15 +1482,9 @@ public partial class DataPageViewModel : ObservableObject
         };
 
         string xAxisLabel = "Time [s]";
-
-
-
-
         var labelX = (info.Width - axisLabelPaint.MeasureText(xAxisLabel)) / 2;
-        var labelY = info.Height - 8; // più in alto di "5" per evitare taglio in basso
-
+        var labelY = info.Height - 8;
         canvas.DrawText(xAxisLabel, labelX, labelY, axisLabelPaint);
-
 
         var yAxisLabelText = $"{YAxisLabel} [{YAxisUnit}]";
         canvas.Save();
@@ -1381,7 +1493,7 @@ public partial class DataPageViewModel : ObservableObject
         canvas.DrawText(yAxisLabelText, 0, 0, axisLabelPaint);
         canvas.Restore();
 
-        // Titolo
+        // Title
         using var titlePaint = new SKPaint
         {
             Color = SKColors.Black,
