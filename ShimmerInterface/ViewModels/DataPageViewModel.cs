@@ -212,20 +212,15 @@ public partial class DataPageViewModel : ObservableObject
         enableExtA7 = config.EnableExtA7;
         enableExtA15 = config.EnableExtA15;
 
-
         samplingRateDisplay = shimmer.SamplingRate;
-
 
         InitializeAvailableParameters();
 
         if (!AvailableParameters.Contains(SelectedParameter))
             SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
 
-        foreach (var parameter in AvailableParameters)
-        {
-            dataPointsCollections[parameter] = new List<float>();
-            timeStampsCollections[parameter] = new List<int>();
-        }
+        // CORREZIONE: Crea collezioni solo per parametri che hanno dati reali
+        InitializeDataCollections();
 
         if (!string.IsNullOrEmpty(SelectedParameter))
         {
@@ -245,6 +240,59 @@ public partial class DataPageViewModel : ObservableObject
 
         UpdateTextProperties();
 
+    }
+
+    private void InitializeDataCollections()
+    {
+        // Lista di TUTTI i parametri che hanno dati reali (non gruppi)
+        var dataParameters = new List<string>();
+
+        if (enableAccelerometer)
+        {
+            dataParameters.AddRange(new[] { "Low-Noise AccelerometerX", "Low-Noise AccelerometerY", "Low-Noise AccelerometerZ" });
+        }
+
+        if (enableWideRangeAccelerometer)
+        {
+            dataParameters.AddRange(new[] { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" });
+        }
+
+        if (enableGyroscope)
+        {
+            dataParameters.AddRange(new[] { "GyroscopeX", "GyroscopeY", "GyroscopeZ" });
+        }
+
+        if (enableMagnetometer)
+        {
+            dataParameters.AddRange(new[] { "MagnetometerX", "MagnetometerY", "MagnetometerZ" });
+        }
+
+        if (enableBattery)
+        {
+            dataParameters.AddRange(new[] { "BatteryVoltage", "BatteryPercent" });
+        }
+
+        if (enablePressureTemperature)
+        {
+            dataParameters.AddRange(new[] { "Temperature_BMP180", "Pressure_BMP180" });
+        }
+
+        if (enableExtA6)
+            dataParameters.Add("ExtADC_A6");
+        if (enableExtA7)
+            dataParameters.Add("ExtADC_A7");
+        if (enableExtA15)
+            dataParameters.Add("ExtADC_A15");
+
+        // Crea collezioni solo per parametri con dati
+        foreach (var parameter in dataParameters)
+        {
+            if (!dataPointsCollections.ContainsKey(parameter))
+            {
+                dataPointsCollections[parameter] = new List<float>();
+                timeStampsCollections[parameter] = new List<int>();
+            }
+        }
     }
 
     partial void OnAutoYAxisChanged(bool value)
@@ -548,20 +596,6 @@ public partial class DataPageViewModel : ObservableObject
         System.Diagnostics.Debug.WriteLine($"Sampling rate changed to {newRate}Hz - All data cleared");
     }
 
-    private void ClearAllDataCollections()
-    {
-        foreach (var parameter in AvailableParameters)
-        {
-            if (dataPointsCollections.ContainsKey(parameter))
-            {
-                dataPointsCollections[parameter].Clear();
-            }
-            if (timeStampsCollections.ContainsKey(parameter))
-            {
-                timeStampsCollections[parameter].Clear();
-            }
-        }
-    }
 
     private void ResetAllCounters()
     {
@@ -584,7 +618,8 @@ public partial class DataPageViewModel : ObservableObject
     {
         var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
 
-        foreach (var parameter in AvailableParameters)
+        // Itera direttamente sulle chiavi delle collezioni invece che su AvailableParameters
+        foreach (var parameter in dataPointsCollections.Keys.ToList())
         {
             if (dataPointsCollections.ContainsKey(parameter) &&
                 timeStampsCollections.ContainsKey(parameter))
@@ -617,60 +652,60 @@ public partial class DataPageViewModel : ObservableObject
 
 
     // Valida e aggiorna la finestra temporale in secondi.
-    private void ValidateAndUpdateTimeWindow(string value)
+   private void ValidateAndUpdateTimeWindow(string value)
+{
+    if (string.IsNullOrWhiteSpace(value))
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            const int defaultTimeWindow = 20;
-            ValidationMessage = "";
-            TimeWindowSeconds = defaultTimeWindow;
-            _lastValidTimeWindowSeconds = defaultTimeWindow;
+        const int defaultTimeWindow = 20;
+        ValidationMessage = "";
+        TimeWindowSeconds = defaultTimeWindow;
+        _lastValidTimeWindowSeconds = defaultTimeWindow;
 
-            // Taglia tutte le collezioni alla nuova dimensione
-            var maxPoints = (int)(defaultTimeWindow * shimmer.SamplingRate);
-            foreach (var parameter in AvailableParameters)
+        // Taglia tutte le collezioni alla nuova dimensione usando le chiavi delle collezioni
+        var maxPoints = (int)(defaultTimeWindow * shimmer.SamplingRate);
+        foreach (var parameter in dataPointsCollections.Keys.ToList())
+        {
+            while (dataPointsCollections[parameter].Count > maxPoints)
             {
-                while (dataPointsCollections[parameter].Count > maxPoints)
-                {
-                    dataPointsCollections[parameter].RemoveAt(0);
-                    timeStampsCollections[parameter].RemoveAt(0);
-                }
+                dataPointsCollections[parameter].RemoveAt(0);
+                timeStampsCollections[parameter].RemoveAt(0);
             }
-            UpdateChart();
+        }
+        UpdateChart();
+        return;
+    }
+
+    if (TryParseInt(value, out int result))
+    {
+        if (result <= 0)
+        {
+            ValidationMessage = "Time Window must be greater than 0 seconds.";
+            ResetTimeWindowText();
             return;
         }
 
-        if (TryParseInt(value, out int result))
-        {
-            if (result <= 0)
-            {
-                ValidationMessage = "Time Window must be greater than 0 seconds.";
-                ResetTimeWindowText();
-                return;
-            }
+        ValidationMessage = "";
+        TimeWindowSeconds = result;
+        _lastValidTimeWindowSeconds = result;
 
-            ValidationMessage = "";
-            TimeWindowSeconds = result;
-            _lastValidTimeWindowSeconds = result;
-
-            // Taglia tutte le collezioni alla nuova dimensione basata sul sampling rate
-            var maxPoints = (int)(result * shimmer.SamplingRate);
-            foreach (var parameter in AvailableParameters)
-            {
-                while (dataPointsCollections[parameter].Count > maxPoints)
-                {
-                    dataPointsCollections[parameter].RemoveAt(0);
-                    timeStampsCollections[parameter].RemoveAt(0);
-                }
-            }
-            UpdateChart();
-        }
-        else
+        // Taglia tutte le collezioni alla nuova dimensione basata sul sampling rate
+        var maxPoints = (int)(result * shimmer.SamplingRate);
+        foreach (var parameter in dataPointsCollections.Keys.ToList())
         {
-            ValidationMessage = "Time Window must be a valid positive number.";
-            ResetTimeWindowText();
+            while (dataPointsCollections[parameter].Count > maxPoints)
+            {
+                dataPointsCollections[parameter].RemoveAt(0);
+                timeStampsCollections[parameter].RemoveAt(0);
+            }
         }
+        UpdateChart();
     }
+    else
+    {
+        ValidationMessage = "Time Window must be a valid positive number.";
+        ResetTimeWindowText();
+    }
+}
 
     // Valida e aggiorna l’intervallo tra le etichette sull’asse X.
     private void ValidateAndUpdateXAxisInterval(string value)
@@ -785,34 +820,34 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableAccelerometer)
         {
-            AvailableParameters.Add("Low-Noise Accelerometer"); // Gruppo
-            AvailableParameters.Add("Low-Noise AccelerometerX");
-            AvailableParameters.Add("Low-Noise AccelerometerY");
-            AvailableParameters.Add("Low-Noise AccelerometerZ");
+            AvailableParameters.Add("Low-Noise Accelerometer"); // Gruppo principale
+            AvailableParameters.Add("    → Low-Noise AccelerometerX"); // Sub-parametri con indentazione
+            AvailableParameters.Add("    → Low-Noise AccelerometerY");
+            AvailableParameters.Add("    → Low-Noise AccelerometerZ");
         }
 
         if (enableWideRangeAccelerometer)
         {
-            AvailableParameters.Add("Wide-Range Accelerometer"); // Gruppo
-            AvailableParameters.Add("Wide-Range AccelerometerX");
-            AvailableParameters.Add("Wide-Range AccelerometerY");
-            AvailableParameters.Add("Wide-Range AccelerometerZ");
+            AvailableParameters.Add("Wide-Range Accelerometer"); // Gruppo principale
+            AvailableParameters.Add("    → Wide-Range AccelerometerX"); // Sub-parametri con indentazione
+            AvailableParameters.Add("    → Wide-Range AccelerometerY");
+            AvailableParameters.Add("    → Wide-Range AccelerometerZ");
         }
 
         if (enableGyroscope)
         {
-            AvailableParameters.Add("Gyroscope"); // Gruppo
-            AvailableParameters.Add("GyroscopeX");
-            AvailableParameters.Add("GyroscopeY");
-            AvailableParameters.Add("GyroscopeZ");
+            AvailableParameters.Add("Gyroscope"); // Gruppo principale
+            AvailableParameters.Add("    → GyroscopeX"); // Sub-parametri con indentazione
+            AvailableParameters.Add("    → GyroscopeY");
+            AvailableParameters.Add("    → GyroscopeZ");
         }
 
         if (enableMagnetometer)
         {
-            AvailableParameters.Add("Magnetometer"); // Gruppo
-            AvailableParameters.Add("MagnetometerX");
-            AvailableParameters.Add("MagnetometerY");
-            AvailableParameters.Add("MagnetometerZ");
+            AvailableParameters.Add("Magnetometer"); // Gruppo principale
+            AvailableParameters.Add("    → MagnetometerX"); // Sub-parametri con indentazione
+            AvailableParameters.Add("    → MagnetometerY");
+            AvailableParameters.Add("    → MagnetometerZ");
         }
 
         // Batteria: solo parametri singoli, NO gruppo
@@ -841,41 +876,69 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+    private string CleanParameterName(string displayName)
+    {
+        if (displayName.StartsWith("    → "))
+        {
+            return displayName.Substring(6); // Rimuove "    → "
+        }
+        return displayName;
+    }
+
+    private string GetDisplayName(string cleanName)
+    {
+        // Se il parametro è un sub-parametro, restituisce la versione con freccia
+        if (cleanName.Contains("AccelerometerX") || cleanName.Contains("AccelerometerY") || cleanName.Contains("AccelerometerZ") ||
+            cleanName.Contains("GyroscopeX") || cleanName.Contains("GyroscopeY") || cleanName.Contains("GyroscopeZ") ||
+            cleanName.Contains("MagnetometerX") || cleanName.Contains("MagnetometerY") || cleanName.Contains("MagnetometerZ"))
+        {
+            return "    → " + cleanName;
+        }
+        return cleanName;
+    }
+
 
 
     private bool IsMultiChart(string parameter)
     {
-        return parameter is "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
+        // Pulisce il nome del parametro prima di verificare
+        string cleanName = CleanParameterName(parameter);
+        return cleanName is "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
                           "Gyroscope" or "Magnetometer";
     }
 
 
     private List<string> GetSubParameters(string groupParameter)
     {
-        return groupParameter switch
+        // Pulisce il nome del parametro prima di verificare
+        string cleanName = CleanParameterName(groupParameter);
+        return cleanName switch
         {
             "Low-Noise Accelerometer" => new List<string> { "Low-Noise AccelerometerX", "Low-Noise AccelerometerY", "Low-Noise AccelerometerZ" },
             "Wide-Range Accelerometer" => new List<string> { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" },
             "Gyroscope" => new List<string> { "GyroscopeX", "GyroscopeY", "GyroscopeZ" },
             "Magnetometer" => new List<string> { "MagnetometerX", "MagnetometerY", "MagnetometerZ" },
-            // Rimosso il caso "Battery"
             _ => new List<string>()
         };
     }
 
 
+
     // Restituisce true se il sensore associato al parametro è abilitato.
     private bool IsSensorEnabled(string parameter)
     {
-        return parameter switch
+        // Pulisce il nome del parametro prima di verificare
+        string cleanName = CleanParameterName(parameter);
+
+        return cleanName switch
         {
-            // Gruppi multi-parametro (senza Battery)
+            // Gruppi multi-parametro
             "Low-Noise Accelerometer" => enableAccelerometer,
             "Wide-Range Accelerometer" => enableWideRangeAccelerometer,
             "Gyroscope" => enableGyroscope,
             "Magnetometer" => enableMagnetometer,
 
-            // Parametri singoli (inclusi quelli della batteria)
+            // Parametri singoli
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableAccelerometer,
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
@@ -889,19 +952,40 @@ public partial class DataPageViewModel : ObservableObject
         };
     }
 
+    private void ClearAllDataCollections()
+    {
+        // Itera direttamente sulle chiavi delle collezioni (nomi puliti)
+        foreach (var key in dataPointsCollections.Keys.ToList())
+        {
+            dataPointsCollections[key].Clear();
+        }
+        foreach (var key in timeStampsCollections.Keys.ToList())
+        {
+            timeStampsCollections[key].Clear();
+        }
+    }
+
+
+
+
     public List<float> GetDataPoints(string parameter)
     {
-        return dataPointsCollections.ContainsKey(parameter) ? dataPointsCollections[parameter] : new List<float>();
+        // Pulisce il nome del parametro prima di accedere ai dati
+        string cleanName = CleanParameterName(parameter);
+        return dataPointsCollections.ContainsKey(cleanName) ? dataPointsCollections[cleanName] : new List<float>();
     }
 
     public List<int> GetTimeStamps(string parameter)
     {
-        return timeStampsCollections.ContainsKey(parameter) ? timeStampsCollections[parameter] : new List<int>();
+        // Pulisce il nome del parametro prima di accedere ai dati
+        string cleanName = CleanParameterName(parameter);
+        return timeStampsCollections.ContainsKey(cleanName) ? timeStampsCollections[cleanName] : new List<int>();
     }
-
     public List<string> GetCurrentSubParameters()
     {
-        return IsMultiChart(SelectedParameter) ? GetSubParameters(SelectedParameter) : new List<string> { SelectedParameter };
+        // Pulisce il nome del parametro prima di verificare
+        string cleanName = CleanParameterName(SelectedParameter);
+        return IsMultiChart(cleanName) ? GetSubParameters(cleanName) : new List<string> { cleanName };
     }
 
 
@@ -1040,19 +1124,21 @@ public partial class DataPageViewModel : ObservableObject
         // Update each collection with the new sample
         foreach (var parameter in AvailableParameters)
         {
-            if (values.ContainsKey(parameter))
+            string cleanName = CleanParameterName(parameter);
+            if (values.ContainsKey(cleanName))
             {
-                dataPointsCollections[parameter].Add(values[parameter]);
-                timeStampsCollections[parameter].Add(timestampMs);
+                dataPointsCollections[cleanName].Add(values[cleanName]);
+                timeStampsCollections[cleanName].Add(timestampMs);
 
-                // Maintain time window by removing old samples
-                while (dataPointsCollections[parameter].Count > maxPoints)
+                // Mantieni solo TimeWindowSeconds * samplingRate punti
+                while (dataPointsCollections[cleanName].Count > maxPoints)
                 {
-                    dataPointsCollections[parameter].RemoveAt(0);
-                    timeStampsCollections[parameter].RemoveAt(0);
+                    dataPointsCollections[cleanName].RemoveAt(0);
+                    timeStampsCollections[cleanName].RemoveAt(0);
                 }
             }
         }
+
 
         // Se l'asse Y è in modalità automatica, ricalcola il range
         if (AutoYAxis)
@@ -1457,10 +1543,13 @@ public partial class DataPageViewModel : ObservableObject
     // Gestisce il cambio di parametro selezionato e aggiorna le impostazioni asse Y.
     partial void OnSelectedParameterChanged(string value)
     {
-        // Determina la modalità di visualizzazione
-        ChartDisplayMode = IsMultiChart(value) ? ChartDisplayMode.Multi : ChartDisplayMode.Single;
+        // Pulisce il nome del parametro prima di verificare
+        string cleanName = CleanParameterName(value);
 
-        UpdateYAxisSettings(value);
+        // Determina la modalità di visualizzazione
+        ChartDisplayMode = IsMultiChart(cleanName) ? ChartDisplayMode.Multi : ChartDisplayMode.Single;
+
+        UpdateYAxisSettings(value); // Passa il valore originale che viene pulito dentro il metodo
 
         if (AutoYAxis)
         {
@@ -1473,7 +1562,7 @@ public partial class DataPageViewModel : ObservableObject
         _lastValidYAxisMax = YAxisMax;
 
         UpdateTextProperties();
-        IsXAxisLabelIntervalEnabled = value != "HeartRate";
+        IsXAxisLabelIntervalEnabled = cleanName != "HeartRate";
         ValidationMessage = "";
 
         UpdateChart();
@@ -1484,7 +1573,10 @@ public partial class DataPageViewModel : ObservableObject
     // Imposta etichette e limiti asse Y in base al parametro selezionato.
     private void UpdateYAxisSettings(string parameter)
     {
-        switch (parameter)
+        // Pulisce il nome del parametro prima di verificare
+        string cleanName = CleanParameterName(parameter);
+
+        switch (cleanName)
         {
             case "Low-Noise Accelerometer":
                 YAxisLabel = "Low-Noise Accelerometer";
@@ -1511,6 +1603,90 @@ public partial class DataPageViewModel : ObservableObject
                 YAxisLabel = "Magnetometer";
                 YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer (X,Y,Z)";
+                YAxisMin = -2;
+                YAxisMax = 2;
+                break;
+            case "Low-Noise AccelerometerX":
+                YAxisLabel = "Low-Noise Accelerometer X";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Low-Noise Accelerometer X";
+                YAxisMin = -5;
+                YAxisMax = 5;
+                break;
+            case "Low-Noise AccelerometerY":
+                YAxisLabel = "Low-Noise Accelerometer Y";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Low-Noise Accelerometer Y";
+                YAxisMin = -5;
+                YAxisMax = 5;
+                break;
+            case "Low-Noise AccelerometerZ":
+                YAxisLabel = "Low-Noise Accelerometer Z";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Low-Noise Accelerometer Z";
+                YAxisMin = -5;
+                YAxisMax = 5;
+                break;
+            case "Wide-Range AccelerometerX":
+                YAxisLabel = "Wide-Range Accelerometer X";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Wide-Range Accelerometer X";
+                YAxisMin = -20;
+                YAxisMax = 20;
+                break;
+            case "Wide-Range AccelerometerY":
+                YAxisLabel = "Wide-Range Accelerometer Y";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Wide-Range Accelerometer Y";
+                YAxisMin = -20;
+                YAxisMax = 20;
+                break;
+            case "Wide-Range AccelerometerZ":
+                YAxisLabel = "Wide-Range Accelerometer Z";
+                YAxisUnit = "m/s²";
+                ChartTitle = "Real-time Wide-Range Accelerometer Z";
+                YAxisMin = -20;
+                YAxisMax = 20;
+                break;
+            case "GyroscopeX":
+                YAxisLabel = "Gyroscope X";
+                YAxisUnit = "deg/s";
+                ChartTitle = "Real-time Gyroscope X";
+                YAxisMin = -250;
+                YAxisMax = 250;
+                break;
+            case "GyroscopeY":
+                YAxisLabel = "Gyroscope Y";
+                YAxisUnit = "deg/s";
+                ChartTitle = "Real-time Gyroscope Y";
+                YAxisMin = -250;
+                YAxisMax = 250;
+                break;
+            case "GyroscopeZ":
+                YAxisLabel = "Gyroscope Z";
+                YAxisUnit = "deg/s";
+                ChartTitle = "Real-time Gyroscope Z";
+                YAxisMin = -250;
+                YAxisMax = 250;
+                break;
+            case "MagnetometerX":
+                YAxisLabel = "Magnetometer X";
+                YAxisUnit = "local_flux*";
+                ChartTitle = "Real-time Magnetometer X";
+                YAxisMin = -2;
+                YAxisMax = 2;
+                break;
+            case "MagnetometerY":
+                YAxisLabel = "Magnetometer Y";
+                YAxisUnit = "local_flux*";
+                ChartTitle = "Real-time Magnetometer Y";
+                YAxisMin = -2;
+                YAxisMax = 2;
+                break;
+            case "MagnetometerZ":
+                YAxisLabel = "Magnetometer Z";
+                YAxisUnit = "local_flux*";
+                ChartTitle = "Real-time Magnetometer Z";
                 YAxisMin = -2;
                 YAxisMax = 2;
                 break;
@@ -1660,11 +1836,22 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     private void DrawSingleParameter(SKCanvas canvas, float leftMargin, float margin,
-                                    float graphWidth, float graphHeight, double yRange,
-                                    float bottomY, float topY, double timeStart, double timeRange)
+                                float graphWidth, float graphHeight, double yRange,
+                                float bottomY, float topY, double timeStart, double timeRange)
     {
-        var currentDataPoints = dataPointsCollections[SelectedParameter];
-        var currentTimeStamps = timeStampsCollections[SelectedParameter];
+        // Pulisce il nome del parametro per accedere ai dati
+        string cleanParameterName = CleanParameterName(SelectedParameter);
+
+        if (!dataPointsCollections.ContainsKey(cleanParameterName) ||
+            !timeStampsCollections.ContainsKey(cleanParameterName))
+        {
+            DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + margin),
+                                                     (int)(margin + graphHeight + 65)));
+            return;
+        }
+
+        var currentDataPoints = dataPointsCollections[cleanParameterName];
+        var currentTimeStamps = timeStampsCollections[cleanParameterName];
 
         // No data or all invalid values
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
@@ -1704,11 +1891,12 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     private void DrawMultipleParameters(SKCanvas canvas, float leftMargin, float margin,
-                                   float graphWidth, float graphHeight, double yRange,
-                                   float bottomY, float topY, double timeStart, double timeRange)
+                                    float graphWidth, float graphHeight, double yRange,
+                                    float bottomY, float topY, double timeStart, double timeRange)
     {
         var subParameters = GetCurrentSubParameters();
-        var colors = GetParameterColors(SelectedParameter);
+        // Pulisce il nome del parametro per ottenere i colori corretti
+        var colors = GetParameterColors(CleanParameterName(SelectedParameter));
 
         bool hasData = false;
 
@@ -1731,7 +1919,7 @@ public partial class DataPageViewModel : ObservableObject
 
             using var linePaint = new SKPaint
             {
-                Color = colors[paramIndex],
+                Color = colors[paramIndex % colors.Length], // Protezione da overflow
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 2,
                 IsAntialias = true
@@ -1739,8 +1927,6 @@ public partial class DataPageViewModel : ObservableObject
 
             using var path = new SKPath();
 
-            // Ora tutti i parametri usano gli stessi range di YAxisMin/YAxisMax
-            // Non c'è più bisogno di logica speciale per Battery
             for (int i = 0; i < currentDataPoints.Count; i++)
             {
                 double sampleTime = currentTimeStamps[i] / 1000.0;
@@ -1771,11 +1957,11 @@ public partial class DataPageViewModel : ObservableObject
 
     private SKColor[] GetParameterColors(string groupParameter)
     {
+        // Ora riceve già il nome pulito, non serve pulirlo di nuovo
         return groupParameter switch
         {
             "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
             "Gyroscope" or "Magnetometer" => new[] { SKColors.Red, SKColors.Green, SKColors.Blue },
-            // Rimosso il caso "Battery"
             _ => new[] { SKColors.Blue }
         };
     }
@@ -1978,12 +2164,15 @@ public partial class DataPageViewModel : ObservableObject
             FakeBoldText = true
         };
 
-        string sensorName = SelectedParameter switch
+        // Pulisce il nome del parametro per determinare il sensore
+        string cleanParameterName = CleanParameterName(SelectedParameter);
+
+        string sensorName = cleanParameterName switch
         {
-            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => "Low-Noise Accelerometer",
-            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
-            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
-            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
+            "Low-Noise Accelerometer" or "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => "Low-Noise Accelerometer",
+            "Wide-Range Accelerometer" or "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
+            "Gyroscope" or "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
+            "Magnetometer" or "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
             "Temperature_BMP180" => "Temperature (BMP180)",
             "Pressure_BMP180" => "Pressure (BMP180)",
             "BatteryVoltage" or "BatteryPercent" => "Battery",
@@ -1992,7 +2181,6 @@ public partial class DataPageViewModel : ObservableObject
             "ExtADC_A15" => "External ADC A15",
             _ => "Sensor"
         };
-
 
         var disabledMessage = $"{sensorName} Disabled";
         var messageWidth = messagePaint.MeasureText(disabledMessage);
@@ -2022,6 +2210,7 @@ public partial class DataPageViewModel : ObservableObject
         var titleWidth = titlePaint.MeasureText(ChartTitle);
         canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
+
 
     // Disegna un messaggio quando non ci sono dati validi da mostrare.
     private void DrawNoDataMessage(SKCanvas canvas, SKImageInfo info)
@@ -2178,24 +2367,14 @@ public partial class DataPageViewModel : ObservableObject
     // Aggiorna le collezioni di dati per riflettere i sensori attivi.
     private void UpdateDataCollections()
     {
-        // Rimuovi le collezioni per parametri non più disponibili
-        var parametersToRemove = dataPointsCollections.Keys.Where(p => !AvailableParameters.Contains(p)).ToList();
-        foreach (var parameter in parametersToRemove)
-        {
-            dataPointsCollections.Remove(parameter);
-            timeStampsCollections.Remove(parameter);
-        }
+        // Cancella tutto e ricrea
+        dataPointsCollections.Clear();
+        timeStampsCollections.Clear();
 
-        // Aggiungi collezioni per nuovi parametri
-        foreach (var parameter in AvailableParameters)
-        {
-            if (!dataPointsCollections.ContainsKey(parameter))
-            {
-                dataPointsCollections[parameter] = new List<float>();
-                timeStampsCollections[parameter] = new List<int>();
-            }
-        }
+        // Reinizializza con la configurazione attuale
+        InitializeDataCollections();
     }
+
 
     // Metodo per ottenere la configurazione corrente
     // Restituisce un oggetto che rappresenta la configurazione attuale dei sensori.
