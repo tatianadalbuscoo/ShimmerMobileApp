@@ -334,30 +334,31 @@ public partial class DataPageViewModel : ObservableObject
 
     private void CalculateAutoYAxisRange()
     {
-        if (IsMultiChart(SelectedParameter))
+        string cleanParam = CleanParameterName(SelectedParameter);
+
+        if (IsMultiChart(cleanParam))
         {
-            var subParams = GetSubParameters(SelectedParameter);
+            var subParams = GetSubParameters(cleanParam);
             var allValues = new List<float>();
 
             foreach (var param in subParams)
             {
                 if (dataPointsCollections.ContainsKey(param) && dataPointsCollections[param].Count > 0)
-                {
                     allValues.AddRange(dataPointsCollections[param]);
-                }
             }
 
             if (allValues.Count == 0)
             {
-                _autoYAxisMin = GetDefaultYAxisMin(SelectedParameter);
-                _autoYAxisMax = GetDefaultYAxisMax(SelectedParameter);
+                _autoYAxisMin = GetDefaultYAxisMin(cleanParam);
+                _autoYAxisMax = GetDefaultYAxisMax(cleanParam);
                 return;
             }
 
             var min = allValues.Min();
             var max = allValues.Max();
+            var range = max - min;
 
-            if (Math.Abs(max - min) < 0.001)
+            if (Math.Abs(range) < 0.001)
             {
                 var center = (min + max) / 2;
                 var margin = Math.Abs(center) * 0.1 + 0.1;
@@ -366,7 +367,6 @@ public partial class DataPageViewModel : ObservableObject
             }
             else
             {
-                var range = max - min;
                 var margin = range * 0.1;
                 _autoYAxisMin = min - margin;
                 _autoYAxisMax = max + margin;
@@ -374,20 +374,19 @@ public partial class DataPageViewModel : ObservableObject
         }
         else
         {
-            // Logica esistente per parametri singoli...
-            if (!dataPointsCollections.ContainsKey(SelectedParameter) ||
-                dataPointsCollections[SelectedParameter].Count == 0)
+            if (!dataPointsCollections.ContainsKey(cleanParam) || dataPointsCollections[cleanParam].Count == 0)
             {
-                _autoYAxisMin = GetDefaultYAxisMin(SelectedParameter);
-                _autoYAxisMax = GetDefaultYAxisMax(SelectedParameter);
+                _autoYAxisMin = GetDefaultYAxisMin(cleanParam);
+                _autoYAxisMax = GetDefaultYAxisMax(cleanParam);
                 return;
             }
 
-            var data = dataPointsCollections[SelectedParameter];
+            var data = dataPointsCollections[cleanParam];
             var min = data.Min();
             var max = data.Max();
+            var range = max - min;
 
-            if (Math.Abs(max - min) < 0.001)
+            if (Math.Abs(range) < 0.001)
             {
                 var center = (min + max) / 2;
                 var margin = Math.Abs(center) * 0.1 + 0.1;
@@ -396,13 +395,14 @@ public partial class DataPageViewModel : ObservableObject
             }
             else
             {
-                var range = max - min;
                 var margin = range * 0.1;
                 _autoYAxisMin = min - margin;
                 _autoYAxisMax = max + margin;
             }
         }
     }
+
+
 
 
 
@@ -1850,7 +1850,8 @@ public partial class DataPageViewModel : ObservableObject
             return;
         }
 
-        var currentDataPoints = dataPointsCollections[cleanParameterName];
+        var currentDataPoints = dataPointsCollections[CleanParameterName(SelectedParameter)];
+
         var currentTimeStamps = timeStampsCollections[cleanParameterName];
 
         // No data or all invalid values
