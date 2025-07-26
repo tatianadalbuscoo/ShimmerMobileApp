@@ -67,6 +67,10 @@ public partial class DataPageViewModel : ObservableObject
     private string _timeWindowSecondsText = "20";
     private string _xAxisLabelIntervalText = "5";
 
+    // Campi per memorizzare i valori automatici
+    private double _autoYAxisMin = 0;
+    private double _autoYAxisMax = 1;
+
     // Testo mostrato sopra il grafico che riassume i valori dei sensori in tempo reale.
     // Viene aggiornato ogni secondo con i nuovi dati letti dal dispositivo Shimmer.
     [ObservableProperty]
@@ -110,6 +114,13 @@ public partial class DataPageViewModel : ObservableObject
 
     [ObservableProperty]
     private bool showGrid = true;
+
+    [ObservableProperty]
+    private bool autoYAxis = false;
+
+    // Proprietà per abilitare/disabilitare i campi manuali Y
+    [ObservableProperty]
+    private bool isYAxisManualEnabled = true;
 
 
     private string _samplingRateText = "51.2";
@@ -228,6 +239,77 @@ public partial class DataPageViewModel : ObservableObject
 
     }
 
+    partial void OnAutoYAxisChanged(bool value)
+    {
+        // Aggiorna lo stato dei campi manuali
+        IsYAxisManualEnabled = !value;
+
+        if (value)
+        {
+            // Passa alla modalità automatica
+            // Salva i valori manuali correnti come backup
+            _lastValidYAxisMin = YAxisMin;
+            _lastValidYAxisMax = YAxisMax;
+
+            // Calcola i valori automatici basati sui dati attuali
+            CalculateAutoYAxisRange();
+
+            // Applica i valori automatici
+            YAxisMin = _autoYAxisMin;
+            YAxisMax = _autoYAxisMax;
+        }
+        else
+        {
+            // Passa alla modalità manuale
+            // Ripristina i valori manuali salvati
+            YAxisMin = _lastValidYAxisMin;
+            YAxisMax = _lastValidYAxisMax;
+        }
+
+        // Aggiorna i testi per riflettere i nuovi valori
+        UpdateTextProperties();
+
+        // Pulisci eventuali messaggi di validazione
+        ValidationMessage = "";
+
+        UpdateChart();
+    }
+
+
+    private void CalculateAutoYAxisRange()
+    {
+        if (!dataPointsCollections.ContainsKey(SelectedParameter) ||
+            dataPointsCollections[SelectedParameter].Count == 0)
+        {
+            // Se non ci sono dati, usa i valori di default del parametro
+            _autoYAxisMin = GetDefaultYAxisMin(SelectedParameter);
+            _autoYAxisMax = GetDefaultYAxisMax(SelectedParameter);
+            return;
+        }
+
+        var data = dataPointsCollections[SelectedParameter];
+        var min = data.Min();
+        var max = data.Max();
+
+        // Se min e max sono uguali, aggiungi un piccolo margine
+        if (Math.Abs(max - min) < 0.001)
+        {
+            var center = (min + max) / 2;
+            var margin = Math.Abs(center) * 0.1 + 0.1; // 10% + piccolo offset
+            _autoYAxisMin = center - margin;
+            _autoYAxisMax = center + margin;
+        }
+        else
+        {
+            // Aggiungi un margine del 10% sopra e sotto
+            var range = max - min;
+            var margin = range * 0.1;
+            _autoYAxisMin = min - margin;
+            _autoYAxisMax = max + margin;
+        }
+    }
+
+
 
     // Aggiorna i testi dei campi di input in base ai valori numerici correnti.
     private void UpdateTextProperties()
@@ -249,6 +331,11 @@ public partial class DataPageViewModel : ObservableObject
     // Valida e aggiorna il valore minimo dell'asse Y.
     private void ValidateAndUpdateYAxisMin(string value)
     {
+        // Se siamo in modalità automatica, ignora gli input manuali
+        if (AutoYAxis)
+            return;
+
+        // Resto del metodo rimane uguale...
         // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -264,14 +351,11 @@ public partial class DataPageViewModel : ObservableObject
         if (value.Trim() == "-" || value.Trim() == "+")
         {
             ValidationMessage = "";
-            // Non aggiornare YAxisMin, mantieni il valore precedente
-            // Non chiamare UpdateChart() per evitare refresh continui
             return;
         }
 
         if (TryParseDouble(value, out double result))
         {
-
             if (result >= YAxisMax)
             {
                 ValidationMessage = "Y Min cannot be greater than or equal to Y Max.";
@@ -291,9 +375,16 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+
+
     // Valida e aggiorna il valore massimo dell'asse Y.
     private void ValidateAndUpdateYAxisMax(string value)
     {
+        // Se siamo in modalità automatica, ignora gli input manuali
+        if (AutoYAxis)
+            return;
+
+        // Resto del metodo rimane uguale...
         // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -309,8 +400,6 @@ public partial class DataPageViewModel : ObservableObject
         if (value.Trim() == "-" || value.Trim() == "+")
         {
             ValidationMessage = "";
-            // Non aggiornare YAxisMax, mantieni il valore precedente
-            // Non chiamare UpdateChart() per evitare refresh continui
             return;
         }
 
@@ -334,6 +423,7 @@ public partial class DataPageViewModel : ObservableObject
             ResetYAxisMaxText();
         }
     }
+
 
     // Modifica il metodo ValidateAndUpdateSamplingRate
     private void ValidateAndUpdateSamplingRate(string value)
@@ -869,7 +959,25 @@ public partial class DataPageViewModel : ObservableObject
                 }
             }
         }
+
+        // Se l'asse Y è in modalità automatica, ricalcola il range
+        if (AutoYAxis)
+        {
+            CalculateAutoYAxisRange();
+
+            // Aggiorna solo se i valori sono cambiati significativamente
+            if (Math.Abs(YAxisMin - _autoYAxisMin) > 0.01 || Math.Abs(YAxisMax - _autoYAxisMax) > 0.01)
+            {
+                YAxisMin = _autoYAxisMin;
+                YAxisMax = _autoYAxisMax;
+
+                // Aggiorna i testi solo se necessario
+                UpdateTextProperties();
+            }
+        }
     }
+
+
 
 
 
@@ -1257,6 +1365,14 @@ public partial class DataPageViewModel : ObservableObject
     {
         UpdateYAxisSettings(value);
 
+        if (AutoYAxis)
+        {
+            // Se siamo in modalità automatica, ricalcola il range per il nuovo parametro
+            CalculateAutoYAxisRange();
+            YAxisMin = _autoYAxisMin;
+            YAxisMax = _autoYAxisMax;
+        }
+
         // Aggiorna i valori di backup dopo il cambio di parametro
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
@@ -1272,6 +1388,8 @@ public partial class DataPageViewModel : ObservableObject
 
         UpdateChart();
     }
+
+
 
     // Imposta etichette e limiti asse Y in base al parametro selezionato.
     private void UpdateYAxisSettings(string parameter)

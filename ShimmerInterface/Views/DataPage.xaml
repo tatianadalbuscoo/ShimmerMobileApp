@@ -24,7 +24,7 @@
             <Label Text="Chart Configuration"
                    Style="{StaticResource TitleLabel}" />
 
-            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto" 
+            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto" 
                   ColumnSpacing="10" RowSpacing="10">
 
                 <!-- Selezione parametro -->
@@ -39,49 +39,61 @@
                         FontSize="16"
                         BackgroundColor="White" />
 
-                <!-- Scala Y minima -->
+                <!-- Switch per asse Y automatico -->
                 <Label Grid.Row="1" Grid.Column="0" 
+                       Text="Auto Y-Axis:" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Switch Grid.Row="1" Grid.Column="1" 
+                        IsToggled="{Binding AutoYAxis}" 
+                        VerticalOptions="Center" />
+
+                <!-- Scala Y minima -->
+                <Label Grid.Row="2" Grid.Column="0" 
                        Text="Y Min:" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="1" Grid.Column="1"
+                <Entry Grid.Row="2" Grid.Column="1"
                        Text="{Binding YAxisMinText}"
                        Keyboard="Numeric"
                        FontSize="16"
-                       BackgroundColor="White" />
+                       BackgroundColor="White"
+                       IsEnabled="{Binding IsYAxisManualEnabled}" />
 
                 <!-- Scala Y massima -->
-                <Label Grid.Row="2" Grid.Column="0" 
+                <Label Grid.Row="3" Grid.Column="0" 
                        Text="Y Max:" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="2" Grid.Column="1"
+                <Entry Grid.Row="3" Grid.Column="1"
                        Text="{Binding YAxisMaxText}"
                        Keyboard="Numeric"
                        FontSize="16"
-                       BackgroundColor="White" />
+                       BackgroundColor="White"
+                       IsEnabled="{Binding IsYAxisManualEnabled}" />
 
                 <!-- Finestra temporale -->
-                <Label Grid.Row="3" Grid.Column="0" 
+                <Label Grid.Row="4" Grid.Column="0" 
                        Text="Time Window (s):" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="3" Grid.Column="1"
+                <Entry Grid.Row="4" Grid.Column="1"
                        Text="{Binding TimeWindowSecondsText}"
                        Keyboard="Numeric"
                        FontSize="16"
                        BackgroundColor="White" />
 
                 <!-- Intervallo etichette X -->
-                <Label Grid.Row="4" Grid.Column="0" 
+                <Label Grid.Row="5" Grid.Column="0" 
                        Text="X Labels every (s):" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="4" Grid.Column="1"
+                <Entry Grid.Row="5" Grid.Column="1"
                        Text="{Binding XAxisLabelIntervalText}"
                        IsEnabled="{Binding IsXAxisLabelIntervalEnabled}"
                        Keyboard="Numeric"
@@ -89,12 +101,12 @@
                        BackgroundColor="White" />
 
                 <!-- Sample Rate -->
-                <Label Grid.Row="5" Grid.Column="0" 
+                <Label Grid.Row="6" Grid.Column="0" 
                        Text="Sampling Rate (Hz):" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="5" Grid.Column="1"
+                <Entry Grid.Row="6" Grid.Column="1"
                        Text="{Binding SamplingRateText}"
                        Keyboard="Numeric"
                        FontSize="16"
@@ -169,9 +181,6 @@
                     <Label Text="{Binding ShowGrid, StringFormat='Show Grid: {0:On;Off}'}"
                            FontSize="14"
                            TextColor="{StaticResource TextSecondary}" />
-
-
-
                 </StackLayout>
             </Frame>
 
