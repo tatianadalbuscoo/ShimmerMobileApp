@@ -815,14 +815,13 @@ public partial class DataPageViewModel : ObservableObject
             AvailableParameters.Add("MagnetometerZ");
         }
 
+        // Batteria: solo parametri singoli, NO gruppo
         if (enableBattery)
         {
-            AvailableParameters.Add("Battery"); // Gruppo
             AvailableParameters.Add("BatteryVoltage");
             AvailableParameters.Add("BatteryPercent");
         }
 
-        // Resto invariato...
         if (enablePressureTemperature)
         {
             AvailableParameters.Add("Temperature_BMP180");
@@ -842,11 +841,14 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+
+
     private bool IsMultiChart(string parameter)
     {
         return parameter is "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
-                          "Gyroscope" or "Magnetometer" or "Battery";
+                          "Gyroscope" or "Magnetometer";
     }
+
 
     private List<string> GetSubParameters(string groupParameter)
     {
@@ -856,7 +858,7 @@ public partial class DataPageViewModel : ObservableObject
             "Wide-Range Accelerometer" => new List<string> { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" },
             "Gyroscope" => new List<string> { "GyroscopeX", "GyroscopeY", "GyroscopeZ" },
             "Magnetometer" => new List<string> { "MagnetometerX", "MagnetometerY", "MagnetometerZ" },
-            "Battery" => new List<string> { "BatteryVoltage", "BatteryPercent" },
+            // Rimosso il caso "Battery"
             _ => new List<string>()
         };
     }
@@ -867,14 +869,13 @@ public partial class DataPageViewModel : ObservableObject
     {
         return parameter switch
         {
-            // Gruppi multi-parametro
+            // Gruppi multi-parametro (senza Battery)
             "Low-Noise Accelerometer" => enableAccelerometer,
             "Wide-Range Accelerometer" => enableWideRangeAccelerometer,
             "Gyroscope" => enableGyroscope,
             "Magnetometer" => enableMagnetometer,
-            "Battery" => enableBattery,
 
-            // Parametri singoli (esistenti)
+            // Parametri singoli (inclusi quelli della batteria)
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableAccelerometer,
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
@@ -1517,7 +1518,7 @@ public partial class DataPageViewModel : ObservableObject
                 YAxisLabel = "Temperature";
                 YAxisUnit = "°C";
                 ChartTitle = "BMP180 Temperature";
-                YAxisMin = 20; 
+                YAxisMin = 20;
                 YAxisMax = 50;
                 break;
             case "Pressure_BMP180":
@@ -1530,7 +1531,7 @@ public partial class DataPageViewModel : ObservableObject
             case "BatteryVoltage":
                 YAxisLabel = "Battery Voltage";
                 YAxisUnit = "mV";
-                ChartTitle = "Real-time Battery";
+                ChartTitle = "Real-time Battery Voltage";
                 YAxisMin = 3000;
                 YAxisMax = 4200;
                 break;
@@ -1562,9 +1563,9 @@ public partial class DataPageViewModel : ObservableObject
                 YAxisMin = 0;
                 YAxisMax = 3000;
                 break;
-
         }
     }
+
 
 
     // Aggiorna manualmente i limiti degli assi e la finestra temporale.
@@ -1703,8 +1704,8 @@ public partial class DataPageViewModel : ObservableObject
     }
 
     private void DrawMultipleParameters(SKCanvas canvas, float leftMargin, float margin,
-                                       float graphWidth, float graphHeight, double yRange,
-                                       float bottomY, float topY, double timeStart, double timeRange)
+                                   float graphWidth, float graphHeight, double yRange,
+                                   float bottomY, float topY, double timeStart, double timeRange)
     {
         var subParameters = GetCurrentSubParameters();
         var colors = GetParameterColors(SelectedParameter);
@@ -1738,35 +1739,15 @@ public partial class DataPageViewModel : ObservableObject
 
             using var path = new SKPath();
 
-            // Handle special case for Battery with different scales
-            double adjustedYMin = YAxisMin;
-            double adjustedYMax = YAxisMax;
-
-            if (SelectedParameter == "Battery")
-            {
-                if (parameter == "BatteryVoltage")
-                {
-                    // Use voltage range (3000-4200 mV)
-                    adjustedYMin = 3000;
-                    adjustedYMax = 4200;
-                }
-                else if (parameter == "BatteryPercent")
-                {
-                    // Use percentage range (0-100%)
-                    adjustedYMin = 0;
-                    adjustedYMax = 100;
-                }
-            }
-
-            double adjustedYRange = adjustedYMax - adjustedYMin;
-
+            // Ora tutti i parametri usano gli stessi range di YAxisMin/YAxisMax
+            // Non c'è più bisogno di logica speciale per Battery
             for (int i = 0; i < currentDataPoints.Count; i++)
             {
                 double sampleTime = currentTimeStamps[i] / 1000.0;
                 double normalizedX = (sampleTime - timeStart) / timeRange;
                 var x = leftMargin + (float)(normalizedX * graphWidth);
 
-                var normalizedValue = (currentDataPoints[i] - adjustedYMin) / adjustedYRange;
+                var normalizedValue = (currentDataPoints[i] - YAxisMin) / yRange;
                 var y = bottomY - (float)(normalizedValue * graphHeight);
                 y = Math.Clamp(y, topY, bottomY);
 
@@ -1787,16 +1768,18 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
+
     private SKColor[] GetParameterColors(string groupParameter)
     {
         return groupParameter switch
         {
             "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
             "Gyroscope" or "Magnetometer" => new[] { SKColors.Red, SKColors.Green, SKColors.Blue },
-            "Battery" => new[] { SKColors.Orange, SKColors.Purple },
+            // Rimosso il caso "Battery"
             _ => new[] { SKColors.Blue }
         };
     }
+
 
     private void DrawAxesAndTitle(SKCanvas canvas, SKImageInfo info, float leftMargin,
                                  float margin, float graphWidth, float graphHeight,
