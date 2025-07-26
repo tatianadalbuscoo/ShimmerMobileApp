@@ -24,7 +24,7 @@
             <Label Text="Chart Configuration"
                    Style="{StaticResource TitleLabel}" />
 
-            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto" 
+            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto" 
                   ColumnSpacing="10" RowSpacing="10">
 
                 <!-- Selezione parametro -->
@@ -39,23 +39,44 @@
                         FontSize="16"
                         BackgroundColor="White" />
 
-                <!-- Switch per asse Y automatico -->
+                <!-- Indicatore modalità grafico -->
                 <Label Grid.Row="1" Grid.Column="0" 
+                       Text="Chart Mode:" 
+                       VerticalOptions="Center" 
+                       FontSize="16" 
+                       FontAttributes="Bold" />
+                <Label Grid.Row="1" Grid.Column="1"
+                       VerticalOptions="Center" 
+                       FontSize="16"
+                       TextColor="{StaticResource Primary}"
+                       Text="Single Parameter">
+                    <Label.Triggers>
+                        <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Single">
+                            <Setter Property="Text" Value="Single Parameter" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Multi">
+                            <Setter Property="Text" Value="Multi Parameter (X,Y,Z)" />
+                        </DataTrigger>
+                    </Label.Triggers>
+                </Label>
+
+                <!-- Switch per asse Y automatico -->
+                <Label Grid.Row="2" Grid.Column="0" 
                        Text="Auto Y-Axis:" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Switch Grid.Row="1" Grid.Column="1" 
+                <Switch Grid.Row="2" Grid.Column="1" 
                         IsToggled="{Binding AutoYAxis}" 
                         VerticalOptions="Center" />
 
                 <!-- Scala Y minima -->
-                <Label Grid.Row="2" Grid.Column="0" 
+                <Label Grid.Row="3" Grid.Column="0" 
                        Text="Y Min:" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="2" Grid.Column="1"
+                <Entry Grid.Row="3" Grid.Column="1"
                        Text="{Binding YAxisMinText}"
                        Keyboard="Numeric"
                        FontSize="16"
@@ -63,12 +84,12 @@
                        IsEnabled="{Binding IsYAxisManualEnabled}" />
 
                 <!-- Scala Y massima -->
-                <Label Grid.Row="3" Grid.Column="0" 
+                <Label Grid.Row="4" Grid.Column="0" 
                        Text="Y Max:" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="3" Grid.Column="1"
+                <Entry Grid.Row="4" Grid.Column="1"
                        Text="{Binding YAxisMaxText}"
                        Keyboard="Numeric"
                        FontSize="16"
@@ -76,24 +97,24 @@
                        IsEnabled="{Binding IsYAxisManualEnabled}" />
 
                 <!-- Finestra temporale -->
-                <Label Grid.Row="4" Grid.Column="0" 
+                <Label Grid.Row="5" Grid.Column="0" 
                        Text="Time Window (s):" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="4" Grid.Column="1"
+                <Entry Grid.Row="5" Grid.Column="1"
                        Text="{Binding TimeWindowSecondsText}"
                        Keyboard="Numeric"
                        FontSize="16"
                        BackgroundColor="White" />
 
                 <!-- Intervallo etichette X -->
-                <Label Grid.Row="5" Grid.Column="0" 
+                <Label Grid.Row="6" Grid.Column="0" 
                        Text="X Labels every (s):" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="5" Grid.Column="1"
+                <Entry Grid.Row="6" Grid.Column="1"
                        Text="{Binding XAxisLabelIntervalText}"
                        IsEnabled="{Binding IsXAxisLabelIntervalEnabled}"
                        Keyboard="Numeric"
@@ -101,12 +122,12 @@
                        BackgroundColor="White" />
 
                 <!-- Sample Rate -->
-                <Label Grid.Row="6" Grid.Column="0" 
+                <Label Grid.Row="7" Grid.Column="0" 
                        Text="Sampling Rate (Hz):" 
                        VerticalOptions="Center" 
                        FontSize="16" 
                        FontAttributes="Bold" />
-                <Entry Grid.Row="6" Grid.Column="1"
+                <Entry Grid.Row="7" Grid.Column="1"
                        Text="{Binding SamplingRateText}"
                        Keyboard="Numeric"
                        FontSize="16"
@@ -122,8 +143,16 @@
             <!-- Messaggio di validazione -->
             <Label Text="{Binding ValidationMessage}"
                    TextColor="Red"
-                   FontSize="14"
-                   IsVisible="{Binding ValidationMessage, Converter={StaticResource StringToBoolConverter}}" />
+                   FontSize="14">
+                <Label.Triggers>
+                    <DataTrigger TargetType="Label" Binding="{Binding ValidationMessage}" Value="">
+                        <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                    <DataTrigger TargetType="Label" Binding="{Binding ValidationMessage}" Value="{x:Null}">
+                        <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                </Label.Triggers>
+            </Label>
 
             <!-- Separatore -->
             <BoxView HeightRequest="1"
@@ -133,6 +162,91 @@
             <!-- Sezione grafico -->
             <Label Text="Real-time Chart"
                    Style="{StaticResource TitleLabel}" />
+
+            <!-- Legenda per grafici multipli -->
+            <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
+                <StackLayout.Triggers>
+                    <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Single">
+                        <Setter Property="IsVisible" Value="False" />
+                    </DataTrigger>
+                </StackLayout.Triggers>
+
+                <!-- Legenda per sensori XYZ -->
+                <HorizontalStackLayout Spacing="5">
+                    <HorizontalStackLayout.Triggers>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Battery">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </HorizontalStackLayout.Triggers>
+                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Red" VerticalOptions="Center" />
+                    <Label Text="X" FontSize="12" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <HorizontalStackLayout Spacing="5">
+                    <HorizontalStackLayout.Triggers>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Battery">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </HorizontalStackLayout.Triggers>
+                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Green" VerticalOptions="Center" />
+                    <Label Text="Y" FontSize="12" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <HorizontalStackLayout Spacing="5">
+                    <HorizontalStackLayout.Triggers>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Battery">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </HorizontalStackLayout.Triggers>
+                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Blue" VerticalOptions="Center" />
+                    <Label Text="Z" FontSize="12" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <!-- Legenda per Battery -->
+                <HorizontalStackLayout Spacing="5">
+                    <HorizontalStackLayout.Triggers>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Battery">
+                            <Setter Property="IsVisible" Value="True" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Low-Noise Accelerometer">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Wide-Range Accelerometer">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Gyroscope">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Magnetometer">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </HorizontalStackLayout.Triggers>
+                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Orange" VerticalOptions="Center" />
+                    <Label Text="Voltage (mV)" FontSize="12" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
+                <HorizontalStackLayout Spacing="5">
+                    <HorizontalStackLayout.Triggers>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Battery">
+                            <Setter Property="IsVisible" Value="True" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Low-Noise Accelerometer">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Wide-Range Accelerometer">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Gyroscope">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding SelectedParameter}" Value="Magnetometer">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </HorizontalStackLayout.Triggers>
+                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Purple" VerticalOptions="Center" />
+                    <Label Text="Percent (%)" FontSize="12" VerticalOptions="Center" />
+                </HorizontalStackLayout>
+            </StackLayout>
 
             <Border BackgroundColor="White"
                     Stroke="{StaticResource Gray200}"
@@ -153,6 +267,19 @@
                            FontSize="16"
                            FontAttributes="Bold"
                            TextColor="{StaticResource Primary}" />
+
+                    <!-- Modalità grafico -->
+                    <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Single">
+                                <Setter Property="Text" Value="Display Mode: Single Parameter" />
+                            </DataTrigger>
+                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Multi">
+                                <Setter Property="Text" Value="Display Mode: Multiple Parameters" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+
                     <Label Text="{Binding YAxisLabel, StringFormat='Measuring: {0}'}"
                            FontSize="14"
                            TextColor="{StaticResource TextSecondary}" />
@@ -173,14 +300,26 @@
                            TextColor="{StaticResource TextSecondary}" />
                     <Label Text="{Binding XAxisLabelInterval, StringFormat='X Labels every: {0}s'}"
                            FontSize="14"
-                           TextColor="{StaticResource TextSecondary}"
-                           IsVisible="{Binding IsXAxisLabelIntervalEnabled}" />
+                           TextColor="{StaticResource TextSecondary}">
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding IsXAxisLabelIntervalEnabled}" Value="False">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
                     <Label Text="{Binding SamplingRateDisplay, StringFormat='Sample Rate: {0:F1} Hz'}"
                            FontSize="14"
                            TextColor="{StaticResource TextSecondary}" />
-                    <Label Text="{Binding ShowGrid, StringFormat='Show Grid: {0:On;Off}'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
+                    <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding ShowGrid}" Value="True">
+                                <Setter Property="Text" Value="Show Grid: On" />
+                            </DataTrigger>
+                            <DataTrigger TargetType="Label" Binding="{Binding ShowGrid}" Value="False">
+                                <Setter Property="Text" Value="Show Grid: Off" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
                 </StackLayout>
             </Frame>
 

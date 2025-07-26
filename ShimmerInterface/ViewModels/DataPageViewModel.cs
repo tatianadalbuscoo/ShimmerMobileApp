@@ -21,6 +21,11 @@ public enum TimeDisplayMode
     Clock
 }
 
+public enum ChartDisplayMode
+{
+    Single,
+    Multi
+}
 
 public partial class DataPageViewModel : ObservableObject
 {
@@ -121,6 +126,9 @@ public partial class DataPageViewModel : ObservableObject
     // Proprietà per abilitare/disabilitare i campi manuali Y
     [ObservableProperty]
     private bool isYAxisManualEnabled = true;
+
+    [ObservableProperty]
+    private ChartDisplayMode chartDisplayMode = ChartDisplayMode.Single;
 
 
     private string _samplingRateText = "51.2";
@@ -278,34 +286,73 @@ public partial class DataPageViewModel : ObservableObject
 
     private void CalculateAutoYAxisRange()
     {
-        if (!dataPointsCollections.ContainsKey(SelectedParameter) ||
-            dataPointsCollections[SelectedParameter].Count == 0)
+        if (IsMultiChart(SelectedParameter))
         {
-            // Se non ci sono dati, usa i valori di default del parametro
-            _autoYAxisMin = GetDefaultYAxisMin(SelectedParameter);
-            _autoYAxisMax = GetDefaultYAxisMax(SelectedParameter);
-            return;
-        }
+            var subParams = GetSubParameters(SelectedParameter);
+            var allValues = new List<float>();
 
-        var data = dataPointsCollections[SelectedParameter];
-        var min = data.Min();
-        var max = data.Max();
+            foreach (var param in subParams)
+            {
+                if (dataPointsCollections.ContainsKey(param) && dataPointsCollections[param].Count > 0)
+                {
+                    allValues.AddRange(dataPointsCollections[param]);
+                }
+            }
 
-        // Se min e max sono uguali, aggiungi un piccolo margine
-        if (Math.Abs(max - min) < 0.001)
-        {
-            var center = (min + max) / 2;
-            var margin = Math.Abs(center) * 0.1 + 0.1; // 10% + piccolo offset
-            _autoYAxisMin = center - margin;
-            _autoYAxisMax = center + margin;
+            if (allValues.Count == 0)
+            {
+                _autoYAxisMin = GetDefaultYAxisMin(SelectedParameter);
+                _autoYAxisMax = GetDefaultYAxisMax(SelectedParameter);
+                return;
+            }
+
+            var min = allValues.Min();
+            var max = allValues.Max();
+
+            if (Math.Abs(max - min) < 0.001)
+            {
+                var center = (min + max) / 2;
+                var margin = Math.Abs(center) * 0.1 + 0.1;
+                _autoYAxisMin = center - margin;
+                _autoYAxisMax = center + margin;
+            }
+            else
+            {
+                var range = max - min;
+                var margin = range * 0.1;
+                _autoYAxisMin = min - margin;
+                _autoYAxisMax = max + margin;
+            }
         }
         else
         {
-            // Aggiungi un margine del 10% sopra e sotto
-            var range = max - min;
-            var margin = range * 0.1;
-            _autoYAxisMin = min - margin;
-            _autoYAxisMax = max + margin;
+            // Logica esistente per parametri singoli...
+            if (!dataPointsCollections.ContainsKey(SelectedParameter) ||
+                dataPointsCollections[SelectedParameter].Count == 0)
+            {
+                _autoYAxisMin = GetDefaultYAxisMin(SelectedParameter);
+                _autoYAxisMax = GetDefaultYAxisMax(SelectedParameter);
+                return;
+            }
+
+            var data = dataPointsCollections[SelectedParameter];
+            var min = data.Min();
+            var max = data.Max();
+
+            if (Math.Abs(max - min) < 0.001)
+            {
+                var center = (min + max) / 2;
+                var margin = Math.Abs(center) * 0.1 + 0.1;
+                _autoYAxisMin = center - margin;
+                _autoYAxisMax = center + margin;
+            }
+            else
+            {
+                var range = max - min;
+                var margin = range * 0.1;
+                _autoYAxisMin = min - margin;
+                _autoYAxisMax = max + margin;
+            }
         }
     }
 
@@ -738,6 +785,7 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableAccelerometer)
         {
+            AvailableParameters.Add("Low-Noise Accelerometer"); // Gruppo
             AvailableParameters.Add("Low-Noise AccelerometerX");
             AvailableParameters.Add("Low-Noise AccelerometerY");
             AvailableParameters.Add("Low-Noise AccelerometerZ");
@@ -745,14 +793,15 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableWideRangeAccelerometer)
         {
+            AvailableParameters.Add("Wide-Range Accelerometer"); // Gruppo
             AvailableParameters.Add("Wide-Range AccelerometerX");
             AvailableParameters.Add("Wide-Range AccelerometerY");
             AvailableParameters.Add("Wide-Range AccelerometerZ");
         }
 
-
         if (enableGyroscope)
         {
+            AvailableParameters.Add("Gyroscope"); // Gruppo
             AvailableParameters.Add("GyroscopeX");
             AvailableParameters.Add("GyroscopeY");
             AvailableParameters.Add("GyroscopeZ");
@@ -760,21 +809,24 @@ public partial class DataPageViewModel : ObservableObject
 
         if (enableMagnetometer)
         {
+            AvailableParameters.Add("Magnetometer"); // Gruppo
             AvailableParameters.Add("MagnetometerX");
             AvailableParameters.Add("MagnetometerY");
             AvailableParameters.Add("MagnetometerZ");
         }
 
+        if (enableBattery)
+        {
+            AvailableParameters.Add("Battery"); // Gruppo
+            AvailableParameters.Add("BatteryVoltage");
+            AvailableParameters.Add("BatteryPercent");
+        }
+
+        // Resto invariato...
         if (enablePressureTemperature)
         {
             AvailableParameters.Add("Temperature_BMP180");
             AvailableParameters.Add("Pressure_BMP180");
-        }
-
-        if (enableBattery)
-        {
-            AvailableParameters.Add("BatteryVoltage");
-            AvailableParameters.Add("BatteryPercent");
         }
 
         if (enableExtA6)
@@ -784,19 +836,45 @@ public partial class DataPageViewModel : ObservableObject
         if (enableExtA15)
             AvailableParameters.Add("ExtADC_A15");
 
-        // Se PPG è disabilitato, HeartRate NON dovrebbe essere nella lista
-        // Forza un parametro valido se quello selezionato non lo è più
         if (!AvailableParameters.Contains(SelectedParameter))
         {
             SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
         }
     }
 
+    private bool IsMultiChart(string parameter)
+    {
+        return parameter is "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
+                          "Gyroscope" or "Magnetometer" or "Battery";
+    }
+
+    private List<string> GetSubParameters(string groupParameter)
+    {
+        return groupParameter switch
+        {
+            "Low-Noise Accelerometer" => new List<string> { "Low-Noise AccelerometerX", "Low-Noise AccelerometerY", "Low-Noise AccelerometerZ" },
+            "Wide-Range Accelerometer" => new List<string> { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" },
+            "Gyroscope" => new List<string> { "GyroscopeX", "GyroscopeY", "GyroscopeZ" },
+            "Magnetometer" => new List<string> { "MagnetometerX", "MagnetometerY", "MagnetometerZ" },
+            "Battery" => new List<string> { "BatteryVoltage", "BatteryPercent" },
+            _ => new List<string>()
+        };
+    }
+
+
     // Restituisce true se il sensore associato al parametro è abilitato.
     private bool IsSensorEnabled(string parameter)
     {
         return parameter switch
         {
+            // Gruppi multi-parametro
+            "Low-Noise Accelerometer" => enableAccelerometer,
+            "Wide-Range Accelerometer" => enableWideRangeAccelerometer,
+            "Gyroscope" => enableGyroscope,
+            "Magnetometer" => enableMagnetometer,
+            "Battery" => enableBattery,
+
+            // Parametri singoli (esistenti)
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableAccelerometer,
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
@@ -808,6 +886,21 @@ public partial class DataPageViewModel : ObservableObject
             "ExtADC_A15" => enableExtA15,
             _ => false
         };
+    }
+
+    public List<float> GetDataPoints(string parameter)
+    {
+        return dataPointsCollections.ContainsKey(parameter) ? dataPointsCollections[parameter] : new List<float>();
+    }
+
+    public List<int> GetTimeStamps(string parameter)
+    {
+        return timeStampsCollections.ContainsKey(parameter) ? timeStampsCollections[parameter] : new List<int>();
+    }
+
+    public List<string> GetCurrentSubParameters()
+    {
+        return IsMultiChart(SelectedParameter) ? GetSubParameters(SelectedParameter) : new List<string> { SelectedParameter };
     }
 
 
@@ -1363,27 +1456,23 @@ public partial class DataPageViewModel : ObservableObject
     // Gestisce il cambio di parametro selezionato e aggiorna le impostazioni asse Y.
     partial void OnSelectedParameterChanged(string value)
     {
+        // Determina la modalità di visualizzazione
+        ChartDisplayMode = IsMultiChart(value) ? ChartDisplayMode.Multi : ChartDisplayMode.Single;
+
         UpdateYAxisSettings(value);
 
         if (AutoYAxis)
         {
-            // Se siamo in modalità automatica, ricalcola il range per il nuovo parametro
             CalculateAutoYAxisRange();
             YAxisMin = _autoYAxisMin;
             YAxisMax = _autoYAxisMax;
         }
 
-        // Aggiorna i valori di backup dopo il cambio di parametro
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
 
-        // Aggiorna i testi per riflettere i nuovi valori
         UpdateTextProperties();
-
-        // Disabilita l'intervallo X per Heart Rate
         IsXAxisLabelIntervalEnabled = value != "HeartRate";
-
-        // Pulisci eventuali messaggi di validazione
         ValidationMessage = "";
 
         UpdateChart();
@@ -1396,87 +1485,31 @@ public partial class DataPageViewModel : ObservableObject
     {
         switch (parameter)
         {
-            case "Low-Noise AccelerometerX":
-                YAxisLabel = "Low-Noise Accelerometer X";
+            case "Low-Noise Accelerometer":
+                YAxisLabel = "Low-Noise Accelerometer";
                 YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Low-Noise Accelerometer X";
+                ChartTitle = "Real-time Low-Noise Accelerometer (X,Y,Z)";
                 YAxisMin = -5;
                 YAxisMax = 5;
                 break;
-            case "Low-Noise AccelerometerY":
-                YAxisLabel = "Low-Noise Accelerometer Y";
+            case "Wide-Range Accelerometer":
+                YAxisLabel = "Wide-Range Accelerometer";
                 YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Low-Noise Accelerometer Y";
-                YAxisMin = -5;
-                YAxisMax = 5;
-                break;
-            case "Low-Noise AccelerometerZ":
-                YAxisLabel = "Low-Noise Accelerometer Z";
-                YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Low-Noise Accelerometer Z";
-                YAxisMin = -5;
-                YAxisMax = 5;
-                break;
-            case "Wide-Range AccelerometerX":
-                YAxisLabel = "Wide-Range Accelerometer X";
-                YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Wide-Range Accelerometer X";
+                ChartTitle = "Real-time Wide-Range Accelerometer (X,Y,Z)";
                 YAxisMin = -20;
                 YAxisMax = 20;
                 break;
-            case "Wide-Range AccelerometerY":
-                YAxisLabel = "Wide-Range Accelerometer Y";
-                YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Wide-Range Accelerometer Y";
-                YAxisMin = -20;
-                YAxisMax = 20;
-                break;
-            case "Wide-Range AccelerometerZ":
-                YAxisLabel = "Wide-Range Accelerometer Z";
-                YAxisUnit = "m/s²";
-                ChartTitle = "Real-time Wide-Range Accelerometer Z";
-                YAxisMin = -20;
-                YAxisMax = 20;
-                break;
-            case "GyroscopeX":
-                YAxisLabel = "Gyroscope X";
+            case "Gyroscope":
+                YAxisLabel = "Gyroscope";
                 YAxisUnit = "deg/s";
-                ChartTitle = "Real-time Gyroscope X";
+                ChartTitle = "Real-time Gyroscope (X,Y,Z)";
                 YAxisMin = -250;
                 YAxisMax = 250;
                 break;
-            case "GyroscopeY":
-                YAxisLabel = "Gyroscope Y";
-                YAxisUnit = "deg/s";
-                ChartTitle = "Real-time Gyroscope Y";
-                YAxisMin = -250;
-                YAxisMax = 250;
-                break;
-            case "GyroscopeZ":
-                YAxisLabel = "Gyroscope Z";
-                YAxisUnit = "deg/s";
-                ChartTitle = "Real-time Gyroscope Z";
-                YAxisMin = -250;
-                YAxisMax = 250;
-                break;
-            case "MagnetometerX":
-                YAxisLabel = "Magnetometer X";
+            case "Magnetometer":
+                YAxisLabel = "Magnetometer";
                 YAxisUnit = "local_flux*";
-                ChartTitle = "Real-time Magnetometer X";
-                YAxisMin = -2;
-                YAxisMax = 2;
-                break;
-            case "MagnetometerY":
-                YAxisLabel = "Magnetometer Y";
-                YAxisUnit = "local_flux*";
-                ChartTitle = "Real-time Magnetometer Y";
-                YAxisMin = -2;
-                YAxisMax = 2;
-                break;
-            case "MagnetometerZ":
-                YAxisLabel = "Magnetometer Z";
-                YAxisUnit = "local_flux*";
-                ChartTitle = "Real-time Magnetometer Z";
+                ChartTitle = "Real-time Magnetometer (X,Y,Z)";
                 YAxisMin = -2;
                 YAxisMax = 2;
                 break;
@@ -1583,16 +1616,6 @@ public partial class DataPageViewModel : ObservableObject
             return;
         }
 
-        var currentDataPoints = dataPointsCollections[SelectedParameter];
-        var currentTimeStamps = timeStampsCollections[SelectedParameter];
-
-        // No data or all invalid values
-        if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
-        {
-            DrawNoDataMessage(canvas, info);
-            return;
-        }
-
         var margin = 40f;
         var bottomMargin = 65f;
         var leftMargin = 65f;
@@ -1613,7 +1636,43 @@ public partial class DataPageViewModel : ObservableObject
         var bottomY = margin + graphHeight;
         var topY = margin;
 
-        // Signal line with higher resolution
+        // Calculate time range for X-axis mapping
+        double currentTime = sampleCounter / shimmer.SamplingRate;
+        double timeStart = Math.Max(0, currentTime - TimeWindowSeconds);
+        double timeRange = TimeWindowSeconds;
+
+        // Check if we're in multi-chart mode
+        if (ChartDisplayMode == ChartDisplayMode.Multi)
+        {
+            DrawMultipleParameters(canvas, leftMargin, margin, graphWidth, graphHeight,
+                                  yRange, bottomY, topY, timeStart, timeRange);
+        }
+        else
+        {
+            DrawSingleParameter(canvas, leftMargin, margin, graphWidth, graphHeight,
+                               yRange, bottomY, topY, timeStart, timeRange);
+        }
+
+        // Draw axes labels and title (common for both modes)
+        DrawAxesAndTitle(canvas, info, leftMargin, margin, graphWidth, graphHeight,
+                        yRange, bottomY, timeStart);
+    }
+
+    private void DrawSingleParameter(SKCanvas canvas, float leftMargin, float margin,
+                                    float graphWidth, float graphHeight, double yRange,
+                                    float bottomY, float topY, double timeStart, double timeRange)
+    {
+        var currentDataPoints = dataPointsCollections[SelectedParameter];
+        var currentTimeStamps = timeStampsCollections[SelectedParameter];
+
+        // No data or all invalid values
+        if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
+        {
+            DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + margin),
+                                                     (int)(margin + graphHeight + 65)));
+            return;
+        }
+
         using var linePaint = new SKPaint
         {
             Color = SKColors.Blue,
@@ -1624,19 +1683,12 @@ public partial class DataPageViewModel : ObservableObject
 
         using var path = new SKPath();
 
-        // Calculate time range for X-axis mapping
-        double currentTime = sampleCounter / shimmer.SamplingRate;
-        double timeStart = Math.Max(0, currentTime - TimeWindowSeconds);
-        double timeRange = TimeWindowSeconds;
-
         for (int i = 0; i < currentDataPoints.Count; i++)
         {
-            // Map timestamp to X position
-            double sampleTime = currentTimeStamps[i] / 1000.0; // Convert ms to seconds
+            double sampleTime = currentTimeStamps[i] / 1000.0;
             double normalizedX = (sampleTime - timeStart) / timeRange;
             var x = leftMargin + (float)(normalizedX * graphWidth);
 
-            // Map value to Y position
             var normalizedValue = (currentDataPoints[i] - YAxisMin) / yRange;
             var y = bottomY - (float)(normalizedValue * graphHeight);
             y = Math.Clamp(y, topY, bottomY);
@@ -1648,8 +1700,108 @@ public partial class DataPageViewModel : ObservableObject
         }
 
         canvas.DrawPath(path, linePaint);
+    }
 
-        // Rest of the drawing code remains the same...
+    private void DrawMultipleParameters(SKCanvas canvas, float leftMargin, float margin,
+                                       float graphWidth, float graphHeight, double yRange,
+                                       float bottomY, float topY, double timeStart, double timeRange)
+    {
+        var subParameters = GetCurrentSubParameters();
+        var colors = GetParameterColors(SelectedParameter);
+
+        bool hasData = false;
+
+        for (int paramIndex = 0; paramIndex < subParameters.Count; paramIndex++)
+        {
+            var parameter = subParameters[paramIndex];
+
+            if (!dataPointsCollections.ContainsKey(parameter) ||
+                dataPointsCollections[parameter].Count == 0)
+                continue;
+
+            var currentDataPoints = dataPointsCollections[parameter];
+            var currentTimeStamps = timeStampsCollections[parameter];
+
+            // Skip if all values are invalid
+            if (currentDataPoints.All(v => v == -1 || v == 0))
+                continue;
+
+            hasData = true;
+
+            using var linePaint = new SKPaint
+            {
+                Color = colors[paramIndex],
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 2,
+                IsAntialias = true
+            };
+
+            using var path = new SKPath();
+
+            // Handle special case for Battery with different scales
+            double adjustedYMin = YAxisMin;
+            double adjustedYMax = YAxisMax;
+
+            if (SelectedParameter == "Battery")
+            {
+                if (parameter == "BatteryVoltage")
+                {
+                    // Use voltage range (3000-4200 mV)
+                    adjustedYMin = 3000;
+                    adjustedYMax = 4200;
+                }
+                else if (parameter == "BatteryPercent")
+                {
+                    // Use percentage range (0-100%)
+                    adjustedYMin = 0;
+                    adjustedYMax = 100;
+                }
+            }
+
+            double adjustedYRange = adjustedYMax - adjustedYMin;
+
+            for (int i = 0; i < currentDataPoints.Count; i++)
+            {
+                double sampleTime = currentTimeStamps[i] / 1000.0;
+                double normalizedX = (sampleTime - timeStart) / timeRange;
+                var x = leftMargin + (float)(normalizedX * graphWidth);
+
+                var normalizedValue = (currentDataPoints[i] - adjustedYMin) / adjustedYRange;
+                var y = bottomY - (float)(normalizedValue * graphHeight);
+                y = Math.Clamp(y, topY, bottomY);
+
+                if (i == 0)
+                    path.MoveTo(x, y);
+                else
+                    path.LineTo(x, y);
+            }
+
+            canvas.DrawPath(path, linePaint);
+        }
+
+        // If no data for any parameter, show no data message
+        if (!hasData)
+        {
+            DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + margin),
+                                                     (int)(margin + graphHeight + 65)));
+        }
+    }
+
+    private SKColor[] GetParameterColors(string groupParameter)
+    {
+        return groupParameter switch
+        {
+            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
+            "Gyroscope" or "Magnetometer" => new[] { SKColors.Red, SKColors.Green, SKColors.Blue },
+            "Battery" => new[] { SKColors.Orange, SKColors.Purple },
+            _ => new[] { SKColors.Blue }
+        };
+    }
+
+    private void DrawAxesAndTitle(SKCanvas canvas, SKImageInfo info, float leftMargin,
+                                 float margin, float graphWidth, float graphHeight,
+                                 double yRange, float bottomY, double timeStart)
+    {
         using var textPaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -1661,17 +1813,11 @@ public partial class DataPageViewModel : ObservableObject
         int numDivisions = TimeWindowSeconds;
         int labelInterval = IsXAxisLabelIntervalEnabled ? XAxisLabelInterval : 1;
 
-        // Calculate current time and time range
-        double currentTimeInSeconds = sampleCounter / shimmer.SamplingRate;
-        double timeEnd = currentTimeInSeconds;
-
         for (int i = 0; i <= numDivisions; i++)
         {
-            // Calculate the actual time value for this grid position
             double actualTime = timeStart + (i * TimeWindowSeconds / (double)numDivisions);
             int timeValueForLabel = (int)Math.Floor(actualTime);
 
-            // Only show label if it meets the interval requirement and is valid
             if (timeValueForLabel < 0 || (timeValueForLabel % labelInterval != 0)) continue;
 
             float x = leftMargin + (i * graphWidth / numDivisions);
