@@ -47,7 +47,7 @@ public partial class DataPageViewModel : ObservableObject
     private DateTime startTime = DateTime.Now;
 
     // Sensor enable flags (set from SensorConfiguration passed in constructor)
-    private bool enableAccelerometer;
+    private bool enableLowNoiseAccelerometer;
     private bool enableWideRangeAccelerometer;
     private bool enableGyroscope;
     private bool enableMagnetometer;
@@ -202,7 +202,7 @@ public partial class DataPageViewModel : ObservableObject
     public DataPageViewModel(XR2Learn_ShimmerIMU shimmerDevice, SensorConfiguration config)
     {
         shimmer = shimmerDevice;
-        enableAccelerometer = config.EnableAccelerometer;
+        enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
         enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
         enableGyroscope = config.EnableGyroscope;
         enableMagnetometer = config.EnableMagnetometer;
@@ -247,7 +247,7 @@ public partial class DataPageViewModel : ObservableObject
         // Lista di TUTTI i parametri che hanno dati reali (non gruppi)
         var dataParameters = new List<string>();
 
-        if (enableAccelerometer)
+        if (enableLowNoiseAccelerometer)
         {
             dataParameters.AddRange(new[] { "Low-Noise AccelerometerX", "Low-Noise AccelerometerY", "Low-Noise AccelerometerZ" });
         }
@@ -818,7 +818,7 @@ public partial class DataPageViewModel : ObservableObject
     {
         AvailableParameters.Clear();
 
-        if (enableAccelerometer)
+        if (enableLowNoiseAccelerometer)
         {
             AvailableParameters.Add("Low-Noise Accelerometer"); // Gruppo principale
             AvailableParameters.Add("    → Low-Noise AccelerometerX"); // Sub-parametri con indentazione
@@ -933,13 +933,13 @@ public partial class DataPageViewModel : ObservableObject
         return cleanName switch
         {
             // Gruppi multi-parametro
-            "Low-Noise Accelerometer" => enableAccelerometer,
+            "Low-Noise Accelerometer" => enableLowNoiseAccelerometer,
             "Wide-Range Accelerometer" => enableWideRangeAccelerometer,
             "Gyroscope" => enableGyroscope,
             "Magnetometer" => enableMagnetometer,
 
             // Parametri singoli
-            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableAccelerometer,
+            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableLowNoiseAccelerometer,
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
@@ -1060,11 +1060,11 @@ public partial class DataPageViewModel : ObservableObject
 
         try
         {
-            if (enableAccelerometer)
+            if (enableLowNoiseAccelerometer)
             {
-                values["Low-Noise AccelerometerX"] = (float)sample.AccelerometerX.Data;
-                values["Low-Noise AccelerometerY"] = (float)sample.AccelerometerY.Data;
-                values["Low-Noise AccelerometerZ"] = (float)sample.AccelerometerZ.Data;
+                values["Low-Noise AccelerometerX"] = (float)sample.LowNoiseAccelerometerX.Data;
+                values["Low-Noise AccelerometerY"] = (float)sample.LowNoiseAccelerometerY.Data;
+                values["Low-Noise AccelerometerZ"] = (float)sample.LowNoiseAccelerometerZ.Data;
             }
 
             if (enableWideRangeAccelerometer)
@@ -1170,11 +1170,11 @@ public partial class DataPageViewModel : ObservableObject
 
             try
             {
-                if (enableAccelerometer)
+                if (enableLowNoiseAccelerometer)
                 {
-                    values["Low-Noise AccelerometerX"] = (float)sample.AccelerometerX.Data;
-                    values["Low-Noise AccelerometerY"] = (float)sample.AccelerometerY.Data;
-                    values["Low-Noise AccelerometerZ"] = (float)sample.AccelerometerZ.Data;
+                    values["Low-Noise AccelerometerX"] = (float)sample.LowNoiseAccelerometerX.Data;
+                    values["Low-Noise AccelerometerY"] = (float)sample.LowNoiseAccelerometerY.Data;
+                    values["Low-Noise AccelerometerZ"] = (float)sample.LowNoiseAccelerometerZ.Data;
                 }
 
                 if (enableWideRangeAccelerometer)
@@ -1333,9 +1333,9 @@ public partial class DataPageViewModel : ObservableObject
         // Build complete sensor text
         SensorText =
             $"[{sample.TimeStamp.Data}]\n" +
-            $"Low-Noise Accelerometer: {sample.AccelerometerX.Data} [{sample.AccelerometerX.Unit}] | " +
-            $"{sample.AccelerometerY.Data} [{sample.AccelerometerY.Unit}] | " +
-            $"{sample.AccelerometerZ.Data} [{sample.AccelerometerZ.Unit}]\n" +
+            $"Low-Noise Accelerometer: {sample.LowNoiseAccelerometerX.Data} [{sample.LowNoiseAccelerometerX.Unit}] | " +
+            $"{sample.LowNoiseAccelerometerY.Data} [{sample.LowNoiseAccelerometerY.Unit}] | " +
+            $"{sample.LowNoiseAccelerometerZ.Data} [{sample.LowNoiseAccelerometerZ.Unit}]\n" +
             $"Wide-Range Accel: {sample.WideRangeAccelerometerX.Data} [{sample.WideRangeAccelerometerX.Unit}] | " +
             $"{sample.WideRangeAccelerometerY.Data} [{sample.WideRangeAccelerometerY.Unit}] | " +
             $"{sample.WideRangeAccelerometerZ.Data} [{sample.WideRangeAccelerometerZ.Unit}]\n" +
@@ -1389,9 +1389,9 @@ public partial class DataPageViewModel : ObservableObject
         if (samples.Count == 0) return null;
 
         // Calculate averages for standard sensors
-        var avgAccelX = samples.Average(s => (double)s.AccelerometerX.Data);
-        var avgAccelY = samples.Average(s => (double)s.AccelerometerY.Data);
-        var avgAccelZ = samples.Average(s => (double)s.AccelerometerZ.Data);
+        var avgAccelX = samples.Average(s => (double)s.LowNoiseAccelerometerX.Data);
+        var avgAccelY = samples.Average(s => (double)s.LowNoiseAccelerometerY.Data);
+        var avgAccelZ = samples.Average(s => (double)s.LowNoiseAccelerometerZ.Data);
 
         var avgGyroX = samples.Average(s => (double)s.GyroscopeX.Data);
         var avgGyroY = samples.Average(s => (double)s.GyroscopeY.Data);
@@ -1431,9 +1431,9 @@ public partial class DataPageViewModel : ObservableObject
         var result = new
         {
             TimeStamp = samples.Last().TimeStamp,
-            AccelerometerX = new { Data = avgAccelX, Unit = samples.First().AccelerometerX.Unit },
-            AccelerometerY = new { Data = avgAccelY, Unit = samples.First().AccelerometerY.Unit },
-            AccelerometerZ = new { Data = avgAccelZ, Unit = samples.First().AccelerometerZ.Unit },
+            AccelerometerX = new { Data = avgAccelX, Unit = samples.First().LowNoiseAccelerometerX.Unit },
+            AccelerometerY = new { Data = avgAccelY, Unit = samples.First().LowNoiseAccelerometerY.Unit },
+            AccelerometerZ = new { Data = avgAccelZ, Unit = samples.First().LowNoiseAccelerometerZ.Unit },
             GyroscopeX = new { Data = avgGyroX, Unit = samples.First().GyroscopeX.Unit },
             GyroscopeY = new { Data = avgGyroY, Unit = samples.First().GyroscopeY.Unit },
             GyroscopeZ = new { Data = avgGyroZ, Unit = samples.First().GyroscopeZ.Unit },
@@ -1464,11 +1464,11 @@ public partial class DataPageViewModel : ObservableObject
 
         try
         {
-            if (enableAccelerometer)
+            if (enableLowNoiseAccelerometer)
             {
-                values["Low-Noise AccelerometerX"] = (float)data.AccelerometerX.Data;
-                values["Low-Noise AccelerometerY"] = (float)data.AccelerometerY.Data;
-                values["Low-Noise AccelerometerZ"] = (float)data.AccelerometerZ.Data;
+                values["Low-Noise AccelerometerX"] = (float)data.LowNoiseAccelerometerX.Data;
+                values["Low-Noise AccelerometerY"] = (float)data.LowNoiseAccelerometerY.Data;
+                values["Low-Noise AccelerometerZ"] = (float)data.LowNoiseAccelerometerZ.Data;
             }
 
             if (enableWideRangeAccelerometer)
@@ -2340,7 +2340,7 @@ public partial class DataPageViewModel : ObservableObject
         string currentParameter = SelectedParameter;
 
         // Aggiorna i flag dei sensori
-        this.enableAccelerometer = enableAccelerometer;
+        this.enableLowNoiseAccelerometer = enableAccelerometer;
         this.enableWideRangeAccelerometer = enableWideRangeAccelerometer;
         this.enableGyroscope = enableGyroscope;
         this.enableMagnetometer = enableMagnetometer;
@@ -2383,7 +2383,7 @@ public partial class DataPageViewModel : ObservableObject
     {
         return new SensorConfiguration
         {
-            EnableAccelerometer = enableAccelerometer,
+            EnableLowNoiseAccelerometer = enableLowNoiseAccelerometer,
             EnableWideRangeAccelerometer = enableWideRangeAccelerometer,
             EnableGyroscope = enableGyroscope,
             EnableMagnetometer = enableMagnetometer,

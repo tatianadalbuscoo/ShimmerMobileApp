@@ -17,7 +17,7 @@ namespace ShimmerInterface.Models
         private bool isSelected;
 
         [ObservableProperty]
-        private bool enableAccelerometer = true;
+        private bool enableLowNoiseAccelerometer = true;
 
         [ObservableProperty]
         private bool enableWideRangeAccelerometer = true;

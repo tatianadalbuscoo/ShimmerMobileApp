@@ -59,7 +59,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
             {
                 var shimmer = new XR2Learn_ShimmerIMU
                 {
-                    EnableLowNoiseAccelerometer = device.EnableAccelerometer,
+                    EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
                     EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
                     EnableGyroscope = device.EnableGyroscope,
                     EnableMagnetometer = device.EnableMagnetometer,
@@ -71,7 +71,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
                 };
 
                 shimmer.Configure("Shimmer", port,
-                device.EnableAccelerometer,
+                device.EnableLowNoiseAccelerometer,
                 device.EnableWideRangeAccelerometer,
                 device.EnableGyroscope,
                 device.EnableMagnetometer,

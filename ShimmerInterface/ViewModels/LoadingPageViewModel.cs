@@ -9,7 +9,7 @@ namespace ShimmerInterface.ViewModels;
 public partial class LoadingPageViewModel : ObservableObject
 {
     // Proprietà che indicano se i sensori sono abilitati (Accelerometro, GSR, PPG)
-    public bool EnableAccelerometer { get; }
+    public bool EnableLowNoiseAccelerometer { get; }
     public bool EnableWideRangeAccelerometer { get; }
     public bool EnableGyroscope { get; }
     public bool EnableMagnetometer { get; }
@@ -24,7 +24,7 @@ public partial class LoadingPageViewModel : ObservableObject
     public LoadingPageViewModel
     (bool accelerometer, bool wideRangeAccelerometer, bool gyroscope, bool magnetometer, bool battery, bool extA6, bool extA7, bool extA15, bool pressureTemperature)
     {
-        EnableAccelerometer = accelerometer;
+        EnableLowNoiseAccelerometer = accelerometer;
         EnableWideRangeAccelerometer = wideRangeAccelerometer;
         EnableGyroscope = gyroscope;
         EnableMagnetometer = magnetometer;
@@ -46,7 +46,7 @@ public partial class LoadingPageViewModel : ObservableObject
 
         var shimmer = new XR2Learn_ShimmerIMU
         {
-            EnableLowNoiseAccelerometer = EnableAccelerometer,
+            EnableLowNoiseAccelerometer = EnableLowNoiseAccelerometer,
             EnableWideRangeAccelerometer = EnableWideRangeAccelerometer,
             EnableGyroscope = EnableGyroscope,
             EnableMagnetometer = EnableMagnetometer,
@@ -58,7 +58,7 @@ public partial class LoadingPageViewModel : ObservableObject
         };
 
         shimmer.Configure("Shimmer3", ports[0],
-            EnableAccelerometer,
+            EnableLowNoiseAccelerometer,
             EnableWideRangeAccelerometer,
             EnableGyroscope,
             EnableMagnetometer,

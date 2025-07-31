@@ -389,7 +389,7 @@ public partial class MainPageViewModel : ObservableObject
         {
             var sensorConfig = new SensorConfiguration
             {
-                EnableAccelerometer = device?.EnableAccelerometer ?? true,
+                EnableLowNoiseAccelerometer = device?.EnableLowNoiseAccelerometer ?? true,
                 EnableWideRangeAccelerometer = device?.EnableWideRangeAccelerometer ?? true,
                 EnableGyroscope = device?.EnableGyroscope ?? true,
                 EnableMagnetometer = device?.EnableMagnetometer ?? true,

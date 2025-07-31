@@ -8,9 +8,9 @@ namespace XR2Learn_ShimmerAPI.IMU
     {
         public readonly SensorData TimeStamp;
 
-        public readonly SensorData AccelerometerX;
-        public readonly SensorData AccelerometerY;
-        public readonly SensorData AccelerometerZ;
+        public readonly SensorData LowNoiseAccelerometerX;
+        public readonly SensorData LowNoiseAccelerometerY;
+        public readonly SensorData LowNoiseAccelerometerZ;
 
         public readonly SensorData GyroscopeX;
         public readonly SensorData GyroscopeY;
@@ -47,9 +47,9 @@ namespace XR2Learn_ShimmerAPI.IMU
         {
             TimeStamp = timeStamp;
 
-            AccelerometerX = accelerometerX;
-            AccelerometerY = accelerometerY;
-            AccelerometerZ = accelerometerZ;
+            LowNoiseAccelerometerX = accelerometerX;
+            LowNoiseAccelerometerY = accelerometerY;
+            LowNoiseAccelerometerZ = accelerometerZ;
 
             GyroscopeX = gyroscopeX;
             GyroscopeY = gyroscopeY;

@@ -76,9 +76,9 @@ namespace XR2Learn_ShimmerAPI
 
                 Console.WriteLine("[" + data.TimeStamp.Data + "]");
 
-                Console.WriteLine("LowNoise Accel X: " + data.AccelerometerX.Data + " [" + data.AccelerometerX.Unit + "] | " +
-                                  "Y: " + data.AccelerometerY.Data + " [" + data.AccelerometerY.Unit + "] | " +
-                                  "Z: " + data.AccelerometerZ.Data + " [" + data.AccelerometerZ.Unit + "]");
+                Console.WriteLine("LowNoise Accel X: " + data.LowNoiseAccelerometerX.Data + " [" + data.LowNoiseAccelerometerX.Unit + "] | " +
+                                  "Y: " + data.LowNoiseAccelerometerY.Data + " [" + data.LowNoiseAccelerometerY.Unit + "] | " +
+                                  "Z: " + data.LowNoiseAccelerometerZ.Data + " [" + data.LowNoiseAccelerometerZ.Unit + "]");
 
                 Console.WriteLine("WideRange Accel X: " + data.WideRangeAccelerometerX.Data + " [" + data.WideRangeAccelerometerX.Unit + "] | " +
                                   "Y: " + data.WideRangeAccelerometerY.Data + " [" + data.WideRangeAccelerometerY.Unit + "] | " +
