@@ -1,4 +1,5 @@
-﻿using System.Collections.ObjectModel;
+﻿
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ShimmerInterface.Models;
@@ -12,17 +13,28 @@ using System.Management;
 
 namespace ShimmerInterface.ViewModels;
 
+/// <summary>
+/// ViewModel for the main page. Handles Shimmer device selection and connection
+/// </summary>
 public partial class MainPageViewModel : ObservableObject
 {
+
+    /// List of all available Shimmer devices detected on serial ports
     public ObservableCollection<ShimmerDevice> AvailableDevices { get; } = new();
+
+    // Command to connect to selected Shimmer devices
     public IRelayCommand<INavigation> ConnectCommand { get; }
+
+    // Command to refresh the list of available devices.
     public IRelayCommand RefreshDevicesCommand { get; }
 
-    // Lista per tenere traccia degli Shimmer connessi
+    // Internal list to keep track of connected Shimmer instances
     private List<(XR2Learn_ShimmerIMU shimmer, ShimmerDevice device)> connectedShimmers = new();
 
 
-    // Costruttore: inizializza i comandi e carica i dispositivi disponibili
+    /// <summary>
+    /// Constructor: initializes commands and loads devices on startup.
+    /// </summary>
     public MainPageViewModel()
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
@@ -30,7 +42,9 @@ public partial class MainPageViewModel : ObservableObject
         LoadDevices();
     }
 
-    // Classe per rappresentare un dispositivo Shimmer Bluetooth scoperto
+    /// <summary>
+    /// Represents a discovered Shimmer device with metadata.
+    /// </summary>
     public class DiscoveredShimmerDevice
     {
         public string ComPort { get; set; }
@@ -39,22 +53,30 @@ public partial class MainPageViewModel : ObservableObject
         public string BluetoothAddress { get; set; }
     }
 
-    // Carica i dispositivi Shimmer disponibili via Bluetooth
+    /// <summary>
+    /// Scans available serial ports, extracts Shimmer names via WMI (if available),
+    /// and groups COM ports in pairs to represent Shimmer devices.
+    /// </summary>
     private void LoadDevices()
     {
+
+        // Cleans the list of any previously detected devices (avoids duplicates)
         AvailableDevices.Clear();
 
+        // Gets the list of available serial ports, sorts them alphabetically and saves them in ports
         var ports = XR2Learn_SerialPortsManager
             .GetAvailableSerialPortsNames()
             .OrderBy(p => p)
             .ToList();
 
+        // Calls a method that tries to retrieve the Shimmer name and Bluetooth address via WMI (Windows only).
         var shimmerDevices = GetShimmerBluetoothDevices();
 
         var deviceMap = shimmerDevices
             .GroupBy(d => d.ComPort)
             .ToDictionary(g => g.Key, g => g.First());
 
+        // Group COM ports in pairs
         for (int i = 0; i < ports.Count - 1; i += 2)
         {
             var port1 = ports[i];
@@ -76,7 +98,8 @@ public partial class MainPageViewModel : ObservableObject
             else
                 shimmerName = "Unknown";
 
-            string displayName = $"Shimmer {shimmerName} ({port1} + {port2})";
+            string displayName = $"Shimmer {shimmerName}";
+
 
             string btAddress = deviceMap.ContainsKey(port1) ? deviceMap[port1].BluetoothAddress :
                                deviceMap.ContainsKey(port2) ? deviceMap[port2].BluetoothAddress : null;
@@ -100,7 +123,8 @@ public partial class MainPageViewModel : ObservableObject
             var name = deviceMap.ContainsKey(lastPort) ? deviceMap[lastPort].ShimmerName : "Unknown";
             var bt = deviceMap.ContainsKey(lastPort) ? deviceMap[lastPort].BluetoothAddress : null;
 
-            string displayName = $"Shimmer {name} ({lastPort})";
+            string displayName = $"Shimmer {name}";
+
 
             AvailableDevices.Add(new ShimmerDevice
             {
@@ -373,13 +397,6 @@ public partial class MainPageViewModel : ObservableObject
         }
     }
 
-    // Crea una TabbedPage in cui ogni scheda rappresenta un dispositivo Shimmer connesso
-    // Crea una nuova interfaccia a schede (TabbedPage) dove ogni tab rappresenta un dispositivo Shimmer connesso.
-    // Per ciascun dispositivo:
-    // - Trova la configurazione selezionata dall'utente (accelerometro, GSR, PPG)
-    // - Crea una pagina DataPage per visualizzare i dati del sensore
-    // - Imposta un titolo personalizzato basato sul nome Shimmer se disponibile
-    // Infine, imposta la TabbedPage come nuova MainPage per mostrare subito i grafici live.
 
     private void CreateTabbedPage()
     {

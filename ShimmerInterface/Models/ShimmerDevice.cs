@@ -1,57 +1,83 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ShimmerInterface.Models
 {
+
+    /// <summary>
+    /// Represents a Shimmer device with configuration options for each available sensor.
+    /// Used for UI binding and runtime control of sensor activation and metadata.
+    /// </summary>
     public partial class ShimmerDevice : ObservableObject
     {
+
+        // Display name shown in the UI (e.g., "Shimmer E123")
         [ObservableProperty]
         private string displayName;
 
-        [ObservableProperty]
-        private string port1;
-
-        [ObservableProperty]
-        private string port2;
-
-        [ObservableProperty]
-        private bool isSelected;
-
-        [ObservableProperty]
-        private bool enableLowNoiseAccelerometer = true;
-
-        [ObservableProperty]
-        private bool enableWideRangeAccelerometer = true;
-
-        [ObservableProperty]
-        private bool enableGyroscope = true;
-
-        [ObservableProperty]
-        private bool enableMagnetometer = true;
-
-        [ObservableProperty]
-        private bool enableBattery = true;
-
-        [ObservableProperty]
-        private bool enableExtA6 = true;
-
-        [ObservableProperty]
-        private bool enableExtA7 = true;
-
-        [ObservableProperty]
-        private bool enableExtA15 = true;
-
-        [ObservableProperty] 
-        private bool enablePressureTemperature = true;
-
-
-        // Nuove proprietà per il nome Shimmer e l'indirizzo Bluetooth
+        // Internal Shimmer identifier (e.g., "E123")
         [ObservableProperty]
         private string shimmerName;
 
+        // First serial port
+        [ObservableProperty]
+        private string port1;
+
+        // Second serial port
+        [ObservableProperty]
+        private string port2;
+
+        // Whether this device is selected for connection (checkbox)
+        [ObservableProperty]
+        private bool isSelected;
+
+        // Enable low-noise accelerometer (default: true)
+        [ObservableProperty]
+        private bool enableLowNoiseAccelerometer = true;
+
+        // Enable wide-range accelerometer (default: true)
+        [ObservableProperty]
+        private bool enableWideRangeAccelerometer = true;
+
+        // Enable gyroscope (default: true)
+        [ObservableProperty]
+        private bool enableGyroscope = true;
+
+        // Enable magnetometer (default: true)
+        [ObservableProperty]
+        private bool enableMagnetometer = true;
+
+        // Enable pressure and temperature sensor (default: true)
+        [ObservableProperty]
+        private bool enablePressureTemperature = true;
+
+        // Enable battery voltage monitoring (default: true)
+        [ObservableProperty]
+        private bool enableBattery = true;
+
+        // Enable external ADC channel A6 (default: true)
+        [ObservableProperty]
+        private bool enableExtA6 = true;
+
+        // Enable external ADC channel A7 (default: true)
+        [ObservableProperty]
+        private bool enableExtA7 = true;
+
+        // Enable external ADC channel A15 (default: true)
+        [ObservableProperty]
+        private bool enableExtA15 = true;
+
+
+
+
+
+
+
+        // Bluetooth MAC address (e.g., "00:1A:7D:DA:71:13")
         [ObservableProperty]
         private string bluetoothAddress;
 
-
+        // Sampling rate used for data acquisition (default: 51.2 Hz)
         [ObservableProperty]
         private double samplingRate = 51.2;
     }

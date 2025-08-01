@@ -1,4 +1,9 @@
-﻿<!-- Pagina principale dell'applicazione che mostra i dispositivi Shimmer disponibili -->
+﻿<!-- 
+MainPage.xaml
+Main user interface page for displaying and configuring available Shimmer devices.
+Includes device selection, sensor options toggles, and a button to initiate connection.
+-->
+    
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:ShimmerInterface.ViewModels"
@@ -7,39 +12,42 @@
              x:Name="MainPageRoot"
              BackgroundColor="{StaticResource PageBackground}">
 
-    <!-- Imposta il ViewModel come contesto dati per la pagina -->
+    <!-- Set the data context to the corresponding ViewModel -->
     <ContentPage.BindingContext>
         <viewmodels:MainPageViewModel />
     </ContentPage.BindingContext>
 
+    <!-- Enables vertical scrolling to ensure all device panels and controls are accessible, even on small or low-resolution displays -->
     <ScrollView>
-        <!-- Layout verticale che contiene il titolo, la lista dei dispositivi e il pulsante di connessione -->
+        
+        <!-- Main vertical layout container -->
         <VerticalStackLayout Padding="20" Spacing="18" HorizontalOptions="Center" WidthRequest="380">
-            <!-- Titolo della pagina -->
+
+            <!-- Page title -->
             <Label Text="Select Shimmer Device" Style="{StaticResource TitleLabel}" />
 
-            <!-- Mostra l'elenco dei dispositivi disponibili usando una CollectionView -->
+            <!-- Dynamic list of available Shimmer devices -->
             <CollectionView ItemsSource="{Binding AvailableDevices}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <!-- Riquadro per ogni dispositivo con info e opzioni -->
+                        <!-- Individual device card -->
                         <Frame Padding="10" Margin="5" BorderColor="Gray" BackgroundColor="White">
                             <VerticalStackLayout Spacing="8">
 
-                                <!-- Nome del dispositivo (es. "Shimmer Device 1") -->
+                                <!-- Device display name -->
                                 <Label Text="{Binding DisplayName}" FontAttributes="Bold" />
 
-                                <!-- Porte seriali associate al dispositivo -->
+                                <!-- Serial ports associated with the device -->
                                 <Label Text="{Binding Port1, StringFormat='Port 1: {0}'}" FontSize="12" />
                                 <Label Text="{Binding Port2, StringFormat='Port 2: {0}'}" FontSize="12" />
 
-                                <!-- Checkbox per selezionare il dispositivo da connettere -->
+                                <!-- Checkbox to select the device to connect -->
                                 <HorizontalStackLayout>
                                     <CheckBox IsChecked="{Binding IsSelected}" />
                                     <Label Text="Select" VerticalOptions="Center" FontSize="12" />
                                 </HorizontalStackLayout>
 
-                                <!-- Opzioni per abilitare/disabilitare i sensori -->
+                                <!-- Toggle switches for enabling/disabling specific sensors -->
                                 <Label Text="Low-Noise Accelerometer" />
                                 <Switch IsToggled="{Binding EnableLowNoiseAccelerometer}" />
                                 <Label Text="Wide-Range Accelerometer" />
@@ -48,15 +56,15 @@
                                 <Switch IsToggled="{Binding EnableGyroscope}" />
                                 <Label Text="Magnetometer" />
                                 <Switch IsToggled="{Binding EnableMagnetometer}" />
-                                <Label Text="Battery Voltage" />
-                                <Switch IsToggled="{Binding EnableBattery}" />
                                 <Label Text="Pressure &amp; Temperature" />
                                 <Switch IsToggled="{Binding EnablePressureTemperature}" />
-                                <Label Text="External ADC A6 (Ext A6)" />
+                                <Label Text="Battery Voltage" />
+                                <Switch IsToggled="{Binding EnableBattery}" />
+                                <Label Text="External ADC A6" />
                                 <Switch IsToggled="{Binding EnableExtA6}" />
-                                <Label Text="External ADC A7 (Ext A7)" />
+                                <Label Text="External ADC A7" />
                                 <Switch IsToggled="{Binding EnableExtA7}" />
-                                <Label Text="External ADC A15 (Ext A15)" />
+                                <Label Text="External ADC A15" />
                                 <Switch IsToggled="{Binding EnableExtA15}" />
                             </VerticalStackLayout>
                         </Frame>
@@ -64,7 +72,7 @@
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <!-- Pulsante per avviare la connessione ai dispositivi selezionati -->
+            <!-- Button to initiate connection to selected devices -->
             <Button Text="Connect"
                     Style="{StaticResource PrimaryButton}"
                     Command="{Binding ConnectCommand}"

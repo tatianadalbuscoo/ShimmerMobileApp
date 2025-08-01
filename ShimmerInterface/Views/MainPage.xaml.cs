@@ -1,14 +1,20 @@
-﻿namespace ShimmerInterface.Views;
+﻿
+namespace ShimmerInterface.Views;
 
-// Definisce la pagina principale dell'applicazione.
-// Questa classe è collegata al file MainPage.xaml che descrive l'interfaccia utente.
+/// <summary>
+/// Code-behind for the MainPage XAML view.
+/// Handles page-level initialization.
+/// </summary>
 public partial class MainPage : ContentPage
 {
-    // Costruttore della pagina.
+
+    /// <summary>
+    /// Constructor of the MainPage.
+    /// The BindingContext (which connects the UI to the ViewModel)
+    /// is already defined in the XAML, so nothing needs to be set here.
+    /// </summary>
     public MainPage()
     {
-        // Inizializza i componenti dell'interfaccia definiti nel file XAML (MainPage.xaml).
-        // Questo metodo è generato automaticamente dal compilatore e collega UI e codice.
         InitializeComponent();
     }
 }
