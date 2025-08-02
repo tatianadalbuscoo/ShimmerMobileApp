@@ -1,17 +1,14 @@
-﻿
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace ShimmerInterface.Models
 {
-
     /// <summary>
     /// Represents a Shimmer device with configuration options for each available sensor.
     /// Used for UI binding and runtime control of sensor activation and metadata.
     /// </summary>
     public partial class ShimmerDevice : ObservableObject
     {
-
-        // Display name shown in the UI (e.g., "Shimmer E123")
+        // Display name shown in the UI (e.g., "Shimmer E123 (COM4)")
         [ObservableProperty]
         private string displayName;
 
@@ -19,13 +16,9 @@ namespace ShimmerInterface.Models
         [ObservableProperty]
         private string shimmerName;
 
-        // First serial port
+        // Serial port used for communication
         [ObservableProperty]
         private string port1;
-
-        // Second serial port
-        [ObservableProperty]
-        private string port2;
 
         // Whether this device is selected for connection (checkbox)
         [ObservableProperty]
@@ -66,19 +59,5 @@ namespace ShimmerInterface.Models
         // Enable external ADC channel A15 (default: true)
         [ObservableProperty]
         private bool enableExtA15 = true;
-
-
-
-
-
-
-
-        // Bluetooth MAC address (e.g., "00:1A:7D:DA:71:13")
-        [ObservableProperty]
-        private string bluetoothAddress;
-
-        // Sampling rate used for data acquisition (default: 51.2 Hz)
-        [ObservableProperty]
-        private double samplingRate = 51.2;
     }
 }

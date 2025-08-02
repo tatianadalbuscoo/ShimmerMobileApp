@@ -34,12 +34,12 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         InitializeComponent();
         this.device = device;
         _completion = completion;
-        ConnectingMessage = $"Connecting to {device.Port1} / {device.Port2}...";
+        ConnectingMessage = $"Connecting to {device.ShimmerName} on {device.Port1}...";
         BindingContext = this;
     }
 
     // Metodo chiamato automaticamente quando la pagina diventa visibile.
-    // Tenta di connettersi al dispositivo Shimmer su una delle due porte (Port1 o Port2).
+    // Tenta di connettersi al dispositivo Shimmer sulla porta Port1.
     // Se la connessione ha successo, avvia lo streaming e restituisce il dispositivo connesso.
     // In ogni caso, mostra un messaggio di successo o errore all'utente.
     protected override async void OnAppearing()
@@ -51,26 +51,23 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         connectionInProgress = true;
 
         XR2Learn_ShimmerIMU? connectedShimmer = null;
-        string? usedPort = null;
 
-        foreach (var port in new[] { device.Port1, device.Port2 })
+        try
         {
-            try
+            var shimmer = new XR2Learn_ShimmerIMU
             {
-                var shimmer = new XR2Learn_ShimmerIMU
-                {
-                    EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
-                    EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
-                    EnableGyroscope = device.EnableGyroscope,
-                    EnableMagnetometer = device.EnableMagnetometer,
-                    EnablePressureTemperature = device.EnablePressureTemperature,
-                    EnableBattery = device.EnableBattery,
-                    EnableExtA6 = device.EnableExtA6,
-                    EnableExtA7 = device.EnableExtA7,
-                    EnableExtA15 = device.EnableExtA15
-                };
+                EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
+                EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
+                EnableGyroscope = device.EnableGyroscope,
+                EnableMagnetometer = device.EnableMagnetometer,
+                EnablePressureTemperature = device.EnablePressureTemperature,
+                EnableBattery = device.EnableBattery,
+                EnableExtA6 = device.EnableExtA6,
+                EnableExtA7 = device.EnableExtA7,
+                EnableExtA15 = device.EnableExtA15
+            };
 
-                shimmer.Configure("Shimmer", port,
+            shimmer.Configure("Shimmer", device.Port1,
                 device.EnableLowNoiseAccelerometer,
                 device.EnableWideRangeAccelerometer,
                 device.EnableGyroscope,
@@ -81,25 +78,22 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
                 device.EnableExtA7,
                 device.EnableExtA15);
 
-                shimmer.Connect();
+            shimmer.Connect();
 
-                if (shimmer.IsConnected())
-                {
-                    shimmer.StartStreaming();
-                    connectedShimmer = shimmer;
-                    usedPort = port;
-                    break;
-                }
-            }
-            catch (Exception ex)
+            if (shimmer.IsConnected())
             {
-                Console.WriteLine($"[SHIMMER ERROR] on {port}: {ex.Message}");
+                shimmer.StartStreaming();
+                connectedShimmer = shimmer;
             }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[SHIMMER ERROR] on {device.Port1}: {ex.Message}");
         }
 
         await DisplayAlert(
             connectedShimmer != null ? "Success" : "Connection Failed",
-            connectedShimmer != null ? $"{device.DisplayName} connected on {usedPort}"
+            connectedShimmer != null ? $"{device.DisplayName} connected on {device.Port1}"
                       : $"Could not connect to {device.DisplayName}.",
             "OK");
 

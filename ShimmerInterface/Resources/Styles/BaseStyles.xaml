@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
-
     <!-- Main Colors -->
     <Color x:Key="PageBackground">#FFF4E6</Color>
     <Color x:Key="FrameBackground">#FFF8EF</Color>
@@ -41,4 +40,15 @@
         <Setter Property="WidthRequest" Value="200" />
     </Style>
 
+    <!-- Secondary Button -->
+    <Style x:Key="SecondaryButton" TargetType="Button">
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="BackgroundColor" Value="Transparent" />
+        <Setter Property="TextColor" Value="{StaticResource ButtonColor}" />
+        <Setter Property="BorderColor" Value="{StaticResource ButtonColor}" />
+        <Setter Property="BorderWidth" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="WidthRequest" Value="150" />
+    </Style>
 </ResourceDictionary>
