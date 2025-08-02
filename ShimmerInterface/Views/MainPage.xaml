@@ -1,7 +1,7 @@
 ﻿<!-- 
 MainPage.xaml
 Main user interface page for displaying and configuring available Shimmer devices.
-Includes device selection, sensor options toggles, and a button to initiate connection.
+Includes device selection, sensor options toggles, and a button to initiate connection and refresh.
 -->
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
@@ -35,6 +35,7 @@ Includes device selection, sensor options toggles, and a button to initiate conn
             <CollectionView ItemsSource="{Binding AvailableDevices}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
+                        
                         <!-- Individual device card -->
                         <Frame Padding="15" Margin="5" BorderColor="Gray" BackgroundColor="White" CornerRadius="8">
                             <VerticalStackLayout Spacing="10">

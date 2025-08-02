@@ -26,9 +26,6 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         }
     }
 
-    // Costruttore della pagina di caricamento.
-    // Riceve il dispositivo selezionato e un oggetto TaskCompletionSource per restituire il risultato della connessione.
-    // Imposta il messaggio di connessione e il BindingContext per il data binding.
     public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU> completion)
     {
         InitializeComponent();
@@ -38,10 +35,6 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         BindingContext = this;
     }
 
-    // Metodo chiamato automaticamente quando la pagina diventa visibile.
-    // Tenta di connettersi al dispositivo Shimmer sulla porta Port1.
-    // Se la connessione ha successo, avvia lo streaming e restituisce il dispositivo connesso.
-    // In ogni caso, mostra un messaggio di successo o errore all'utente.
     protected override async void OnAppearing()
     {
         base.OnAppearing();
@@ -91,16 +84,18 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
             Console.WriteLine($"[SHIMMER ERROR] on {device.Port1}: {ex.Message}");
         }
 
+        // Mostra prima il popup e ATTENDI che venga chiuso dall'utente
         await DisplayAlert(
             connectedShimmer != null ? "Success" : "Connection Failed",
             connectedShimmer != null ? $"{device.DisplayName} connected on {device.Port1}"
-                      : $"Could not connect to {device.DisplayName}.",
+                                     : $"Could not connect to {device.DisplayName}.",
             "OK");
 
+        // Solo dopo che il popup è stato chiuso dall'utente, chiudi la LoadingPage
         _completion.SetResult(connectedShimmer);
     }
 
-    // Evento di notifica delle modifiche alle proprietà, richiesto per aggiornare l'interfaccia utente durante il binding.
+
     public new event PropertyChangedEventHandler PropertyChanged;
     protected new void OnPropertyChanged([CallerMemberName] string propertyName = null)
         => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

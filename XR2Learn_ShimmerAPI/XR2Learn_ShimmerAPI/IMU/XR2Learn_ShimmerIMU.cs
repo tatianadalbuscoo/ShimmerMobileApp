@@ -1,5 +1,4 @@
-﻿
-using ShimmerAPI;
+﻿using ShimmerAPI;
 using System;
 using System.Threading;
 

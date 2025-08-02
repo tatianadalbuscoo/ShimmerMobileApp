@@ -1,5 +1,4 @@
-﻿
-using ShimmerAPI;
+﻿using ShimmerAPI;
 
 namespace XR2Learn_ShimmerAPI.IMU
 {
@@ -88,7 +87,6 @@ namespace XR2Learn_ShimmerAPI.IMU
             ExtADC_A6 = extADC_A6;
             ExtADC_A7 = extADC_A7;
             ExtADC_A15 = extADC_A15;
-
         }
     }
 }

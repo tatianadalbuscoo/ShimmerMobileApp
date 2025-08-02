@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using System.Threading;
 using XR2Learn_ShimmerAPI.IMU;
 
@@ -158,7 +157,6 @@ namespace XR2Learn_ShimmerAPI
             Console.WriteLine("Disconnecting");
             api.Disconnect();
             Console.WriteLine("Device disconnected");
-
         }
     }
 }
