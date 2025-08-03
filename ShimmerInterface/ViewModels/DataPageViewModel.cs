@@ -27,7 +27,7 @@ public enum ChartDisplayMode
     Multi
 }
 
-public partial class DataPageViewModel : ObservableObject
+public partial class DataPageViewModel : ObservableObject, IDisposable
 {
     // Device reference from the Shimmer API
     private readonly XR2Learn_ShimmerIMU shimmer;
@@ -35,6 +35,7 @@ public partial class DataPageViewModel : ObservableObject
     // Timer that triggers data updates every second
     private System.Timers.Timer? timer;
 
+    private bool _disposed = false;
 
     // Dizionario che memorizza i dati delle serie temporali per ciascun parametro (X/Y/Z, GSR, PPG...)
     private readonly Dictionary<string, List<float>> dataPointsCollections = new();
@@ -56,6 +57,7 @@ public partial class DataPageViewModel : ObservableObject
     private bool enableExtA6;
     private bool enableExtA7;
     private bool enableExtA15;
+
 
 
     // Valori di backup per il ripristino in caso di input non validi
@@ -195,7 +197,26 @@ public partial class DataPageViewModel : ObservableObject
         }
     }
 
-    public ObservableCollection<string> AvailableParameters { get; } = new();
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!_disposed && disposing)
+        {
+            StopTimer();
+            ChartUpdateRequested = null; // Pulisci gli event handlers
+            ClearAllDataCollections();
+        }
+        _disposed = true;
+    }
+
+
+
+public ObservableCollection<string> AvailableParameters { get; } = new();
 
     public event EventHandler? ChartUpdateRequested;
 
@@ -1057,6 +1078,7 @@ public partial class DataPageViewModel : ObservableObject
     private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
     {
         var values = new Dictionary<string, float>();
+
 
         try
         {

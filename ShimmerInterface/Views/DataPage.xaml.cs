@@ -57,6 +57,7 @@ public partial class DataPage : ContentPage
     {
         viewModel.StopTimer();
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
+        viewModel?.Dispose();
         base.OnDisappearing();
     }
 
