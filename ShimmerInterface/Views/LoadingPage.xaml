@@ -15,8 +15,8 @@ Shows an activity spinner and a dynamic connection message with the COM port nam
                          VerticalOptions="Center">
 
         <!-- Loading spinner -->
-        <ActivityIndicator IsRunning="True"
-                           IsVisible="True"
+        <ActivityIndicator IsRunning="{Binding IsConnecting}"
+                           IsVisible="{Binding IsConnecting}"
                            WidthRequest="40"
                            HeightRequest="40"
                            Color="{StaticResource Primary}" />
@@ -26,5 +26,7 @@ Shows an activity spinner and a dynamic connection message with the COM port nam
                FontSize="18"
                TextColor="{StaticResource TextPrimary}"
                HorizontalOptions="Center" />
+                    
     </VerticalStackLayout>
+        
 </ContentPage>

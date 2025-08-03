@@ -1,130 +1,88 @@
-﻿using System.ComponentModel;
-using System.Runtime.CompilerServices;
-using ShimmerInterface.Models;
+﻿using ShimmerInterface.Models;
 using XR2Learn_ShimmerAPI.IMU;
+using ShimmerInterface.ViewModels;
 
 namespace ShimmerInterface.Views;
 
 /// <summary>
-/// LoadingPage handles the connection process to a Shimmer device.
-/// Displays a loading spinner and updates the UI while attempting the connection.
+/// Code-behind for the LoadingPage XAML view.
+/// This page is responsible for initiating the connection process to a Shimmer device.
 /// </summary>
-public partial class LoadingPage : ContentPage, INotifyPropertyChanged
+public partial class LoadingPage : ContentPage
 {
 
-    // Device configuration info
-    private readonly ShimmerDevice device;
+    /// <summary>
+    /// Reference to the ViewModel associated with this view.
+    /// The ViewModel encapsulates all logic related to device connection,
+    /// user feedback, and interaction state.
+    /// </summary>
+    private readonly LoadingPageViewModel viewModel;
 
-    // Flag to prevent multiple connection attempts
-    private bool connectionInProgress;
-
-    // Message shown while connecting
-    private string connectingMessage;
-
-    // For async result handling
-    private readonly TaskCompletionSource<XR2Learn_ShimmerIMU> _completion;
 
     /// <summary>
-    /// Property bound to the UI that displays the connection status.
+    /// Initializes the LoadingPage and establishes the data binding context with the associated ViewModel.
+    /// Also subscribes to property change notifications to reactively respond to state transitions such as alerts.
     /// </summary>
-    public string ConnectingMessage
-    {
-        get => connectingMessage;
-        set
-        {
-            if (connectingMessage != value)
-            {
-                connectingMessage = value;
-                OnPropertyChanged();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Constructor that initializes the page and starts the connection message.
-    /// </summary>
-    /// <param name="device">The Shimmer device selected by the user.</param>
-    /// <param name="completion">A task completion source used to return the result to the caller.</param>
+    /// <param name="device">The Shimmer device selected by the user for connection.</param>
+    /// <param name="completion">A TaskCompletionSource used to return the connected device instance asynchronously to the caller.</param>
     public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU> completion)
     {
         InitializeComponent();
-        this.device = device;
-        _completion = completion;
 
-        // Set dynamic message with COM port info
-        ConnectingMessage = $"Connecting to {device.ShimmerName} on {device.Port1}...";
-        BindingContext = this;
+        // Instantiate and bind the ViewModel to this page
+        viewModel = new LoadingPageViewModel(device, completion);
+        BindingContext = viewModel;
+
+        // Subscribe to ViewModel property changes to react to state changes 
+        viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
 
+
     /// <summary>
-    /// Called when the page becomes visible. Attempts to connect to the Shimmer device.
-    /// Displays a success or failure popup, then closes the page.
+    /// Called automatically by the framework when the page becomes visible.
+    /// Triggers the asynchronous connection process by executing the command exposed by the ViewModel.
     /// </summary>
     protected override async void OnAppearing()
     {
         base.OnAppearing();
 
-        // Small delay to ensure UI renders before connection starts
-        await Task.Delay(500);
-
-        if (connectionInProgress) return;
-        connectionInProgress = true;
-
-        XR2Learn_ShimmerIMU? connectedShimmer = null;
-
-        try
-        {
-            // Create and configure Shimmer object with selected sensor flags
-            var shimmer = new XR2Learn_ShimmerIMU
-            {
-                EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
-                EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
-                EnableGyroscope = device.EnableGyroscope,
-                EnableMagnetometer = device.EnableMagnetometer,
-                EnablePressureTemperature = device.EnablePressureTemperature,
-                EnableBattery = device.EnableBattery,
-                EnableExtA6 = device.EnableExtA6,
-                EnableExtA7 = device.EnableExtA7,
-                EnableExtA15 = device.EnableExtA15
-            };
-
-            shimmer.Configure("Shimmer", device.Port1,
-                device.EnableLowNoiseAccelerometer,
-                device.EnableWideRangeAccelerometer,
-                device.EnableGyroscope,
-                device.EnableMagnetometer,
-                device.EnablePressureTemperature,
-                device.EnableBattery,
-                device.EnableExtA6,
-                device.EnableExtA7,
-                device.EnableExtA15);
-
-            shimmer.Connect();
-
-            if (shimmer.IsConnected())
-            {
-                shimmer.StartStreaming();
-                connectedShimmer = shimmer;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[SHIMMER ERROR] on {device.Port1}: {ex.Message}");
-        }
-
-        // Mostra prima il popup e ATTENDI che venga chiuso dall'utente
-        await DisplayAlert(
-            connectedShimmer != null ? "Success" : "Connection Failed",
-            connectedShimmer != null ? $"{device.DisplayName} connected on {device.Port1}"
-                                     : $"Could not connect to {device.DisplayName}.",
-            "OK");
-
-        // Solo dopo che il popup è stato chiuso dall'utente, chiudi la LoadingPage
-        _completion.SetResult(connectedShimmer);
+        // Initiate device connection via the ViewModel command
+        await viewModel.StartConnectionCommand.ExecuteAsync(null);
     }
 
 
-    public new event PropertyChangedEventHandler PropertyChanged;
-    protected new void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    /// <summary>
+    /// Reacts to property changes signaled by the ViewModel.
+    /// Specifically handles the case where an alert needs to be shown to the user upon connection success or failure.
+    /// The logic of when and what to show is controlled entirely by the ViewModel.
+    /// </summary>
+    private async void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(viewModel.ShowAlert) && viewModel.ShowAlert)
+        {
+
+            // Display the alert as configured by the ViewModel
+            await DisplayAlert(viewModel.AlertTitle, viewModel.AlertMessage, "OK");
+
+            // Notify the ViewModel that the user has dismissed the alert
+            viewModel.DismissAlertCommand.Execute(null);
+        }
+    }
+
+
+    /// <summary>
+    /// Called automatically when the page is about to disappear from view.
+    /// Responsible for detaching event subscriptions to prevent memory leaks and ensure clean navigation transitions.
+    /// </summary>
+    protected override void OnDisappearing()
+    {
+        base.OnDisappearing();
+
+        if (viewModel != null)
+        {
+
+            // Cleanly unsubscribe from the ViewModel to avoid dangling references
+            viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        }
+    }
 }

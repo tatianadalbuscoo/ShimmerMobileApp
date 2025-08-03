@@ -13,6 +13,7 @@ using System.Management;
 
 namespace ShimmerInterface.ViewModels;
 
+
 /// <summary>
 /// ViewModel for the main page. Handles Shimmer device selection and connection.
 /// </summary>
@@ -158,7 +159,8 @@ public partial class MainPageViewModel : ObservableObject
         // Loop through all connected Shimmer devices
         foreach (var (shimmer, device) in connectedShimmers)
         {
-            
+
+            // Create a new DataPage to display sensor data from the connected Shimmer device
             var dataPage = new DataPage(shimmer, device);
 
             // Set the title of the tab: use Shimmer ID if known, otherwise use index number
