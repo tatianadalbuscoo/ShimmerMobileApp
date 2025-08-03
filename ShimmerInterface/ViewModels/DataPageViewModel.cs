@@ -4,9 +4,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using XR2Learn_ShimmerAPI;
 using XR2Learn_ShimmerAPI.IMU;
-using SkiaSharp;
-using SkiaSharp.Views.Maui;
-using SkiaSharp.Views.Maui.Controls;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using ShimmerInterface.Models;
@@ -131,6 +128,27 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private ChartDisplayMode chartDisplayMode = ChartDisplayMode.Single;
+
+
+    /// <summary>
+    /// Tempo corrente in secondi dall'inizio della raccolta dati
+    /// </summary>
+    public double CurrentTimeInSeconds => sampleCounter / shimmer.SamplingRate;
+
+    /// <summary>
+    /// Ora di inizio della raccolta dati per i calcoli temporali
+    /// </summary>
+    public DateTime StartTime => startTime;
+
+    /// <summary>
+    /// Contatore dei campioni raccolti
+    /// </summary>
+    public int SampleCounter => sampleCounter;
+
+    /// <summary>
+    /// Secondi trascorsi dall'inizio della raccolta
+    /// </summary>
+    public int SecondsElapsed => secondsElapsed;
 
 
     private string _samplingRateText = "51.2";
@@ -897,7 +915,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         }
     }
 
-    private string CleanParameterName(string displayName)
+    public string CleanParameterName(string displayName)
     {
         if (displayName.StartsWith("    → "))
         {
@@ -929,7 +947,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
 
-    private List<string> GetSubParameters(string groupParameter)
+    public List<string> GetSubParameters(string groupParameter)
     {
         // Pulisce il nome del parametro prima di verificare
         string cleanName = CleanParameterName(groupParameter);
@@ -942,6 +960,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             _ => new List<string>()
         };
     }
+
 
 
 
@@ -1271,57 +1290,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
 
-    private void DrawOscilloscopeGrid(SKCanvas canvas, float leftMargin, float topMargin, float graphWidth, float graphHeight)
-    {
-        if (!ShowGrid) return;
-
-        float right = leftMargin + graphWidth;
-        float bottom = topMargin + graphHeight;
-
-        int horizontalDivisions = 4;
-        int verticalDivisions = TimeWindowSeconds; // Una divisione ogni secondo
-
-        using var majorGridPaint = new SKPaint
-        {
-            Color = SKColors.LightSlateGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 1,
-            PathEffect = SKPathEffect.CreateDash(new float[] { 4, 4 }, 0)
-        };
-
-        using var minorGridPaint = new SKPaint
-        {
-            Color = SKColors.LightGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 0.5f,
-            PathEffect = SKPathEffect.CreateDash(new float[] { 2, 2 }, 0)
-        };
-
-        using var labelPaint = new SKPaint
-        {
-            Color = SKColors.Gray,
-            TextSize = 12,
-            IsAntialias = true
-        };
-
-        // Griglia orizzontale (asse Y)
-        for (int i = 0; i <= horizontalDivisions; i++)
-        {
-            float y = bottom - (i * graphHeight / horizontalDivisions);
-            canvas.DrawLine(leftMargin, y, right, y, majorGridPaint);
-
-
-        }
-
-        // Griglia verticale (asse X) 
-        for (int i = 0; i <= verticalDivisions; i++)
-        {
-            float x = leftMargin + (i * graphWidth / verticalDivisions);
-            canvas.DrawLine(x, topMargin, x, bottom, majorGridPaint);
-
-
-        }
-    }
+   
 
     private void UpdateSensorTextDisplay(dynamic sample)
     {
@@ -1395,14 +1364,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         return samples;
     }
 
-    private string FormatTimeLabel(int timeValue)
-    {
-        return TimeDisplayMode switch
-        {
-            TimeDisplayMode.Clock => startTime.AddSeconds(timeValue).ToString("HH:mm:ss"),
-            _ => timeValue.ToString() + "s"
-        };
-    }
+  
 
     // Aggiungi questo metodo per calcolare i valori mediati:
     // Replace the existing CalculateAveragedData method with this fixed version:
@@ -1797,270 +1759,14 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
     // Disegna il grafico dei dati sul canvas SkiaSharp.
-    public void OnCanvasViewPaintSurface(SKCanvas canvas, SKImageInfo info)
-    {
-        canvas.Clear(SKColors.White);
+    
 
-        // First check: Verify if sensor is disabled
-        if (!IsSensorEnabled(SelectedParameter))
-        {
-            DrawDisabledSensorMessage(canvas, info);
-            return;
-        }
-
-        // Second check: Verify if parameter is available
-        if (!AvailableParameters.Contains(SelectedParameter))
-        {
-            DrawDisabledSensorMessage(canvas, info);
-            return;
-        }
-
-        var margin = 40f;
-        var bottomMargin = 65f;
-        var leftMargin = 65f;
-        var graphWidth = info.Width - leftMargin - margin;
-        var graphHeight = info.Height - margin - bottomMargin;
-
-        using var borderPaint = new SKPaint
-        {
-            Color = SKColors.LightGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 2
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
-
-        DrawOscilloscopeGrid(canvas, leftMargin, margin, graphWidth, graphHeight);
-
-        var yRange = YAxisMax - YAxisMin;
-        var bottomY = margin + graphHeight;
-        var topY = margin;
-
-        // Calculate time range for X-axis mapping
-        double currentTime = sampleCounter / shimmer.SamplingRate;
-        double timeStart = Math.Max(0, currentTime - TimeWindowSeconds);
-        double timeRange = TimeWindowSeconds;
-
-        // Check if we're in multi-chart mode
-        if (ChartDisplayMode == ChartDisplayMode.Multi)
-        {
-            DrawMultipleParameters(canvas, leftMargin, margin, graphWidth, graphHeight,
-                                  yRange, bottomY, topY, timeStart, timeRange);
-        }
-        else
-        {
-            DrawSingleParameter(canvas, leftMargin, margin, graphWidth, graphHeight,
-                               yRange, bottomY, topY, timeStart, timeRange);
-        }
-
-        // Draw axes labels and title (common for both modes)
-        DrawAxesAndTitle(canvas, info, leftMargin, margin, graphWidth, graphHeight,
-                        yRange, bottomY, timeStart);
-    }
-
-    private void DrawSingleParameter(SKCanvas canvas, float leftMargin, float margin,
-                                float graphWidth, float graphHeight, double yRange,
-                                float bottomY, float topY, double timeStart, double timeRange)
-    {
-        // Pulisce il nome del parametro per accedere ai dati
-        string cleanParameterName = CleanParameterName(SelectedParameter);
-
-        if (!dataPointsCollections.ContainsKey(cleanParameterName) ||
-            !timeStampsCollections.ContainsKey(cleanParameterName))
-        {
-            DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + margin),
-                                                     (int)(margin + graphHeight + 65)));
-            return;
-        }
-
-        var currentDataPoints = dataPointsCollections[CleanParameterName(SelectedParameter)];
-
-        var currentTimeStamps = timeStampsCollections[cleanParameterName];
-
-        // No data or all invalid values
-        if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
-        {
-            DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + margin),
-                                                     (int)(margin + graphHeight + 65)));
-            return;
-        }
-
-        using var linePaint = new SKPaint
-        {
-            Color = SKColors.Blue,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 2,
-            IsAntialias = true
-        };
-
-        using var path = new SKPath();
-
-        for (int i = 0; i < currentDataPoints.Count; i++)
-        {
-            double sampleTime = currentTimeStamps[i] / 1000.0;
-            double normalizedX = (sampleTime - timeStart) / timeRange;
-            var x = leftMargin + (float)(normalizedX * graphWidth);
-
-            var normalizedValue = (currentDataPoints[i] - YAxisMin) / yRange;
-            var y = bottomY - (float)(normalizedValue * graphHeight);
-            y = Math.Clamp(y, topY, bottomY);
-
-            if (i == 0)
-                path.MoveTo(x, y);
-            else
-                path.LineTo(x, y);
-        }
-
-        canvas.DrawPath(path, linePaint);
-    }
-
-    private void DrawMultipleParameters(SKCanvas canvas, float leftMargin, float margin,
-                                    float graphWidth, float graphHeight, double yRange,
-                                    float bottomY, float topY, double timeStart, double timeRange)
-    {
-        var subParameters = GetCurrentSubParameters();
-        // Pulisce il nome del parametro per ottenere i colori corretti
-        var colors = GetParameterColors(CleanParameterName(SelectedParameter));
-
-        bool hasData = false;
-
-        for (int paramIndex = 0; paramIndex < subParameters.Count; paramIndex++)
-        {
-            var parameter = subParameters[paramIndex];
-
-            if (!dataPointsCollections.ContainsKey(parameter) ||
-                dataPointsCollections[parameter].Count == 0)
-                continue;
-
-            var currentDataPoints = dataPointsCollections[parameter];
-            var currentTimeStamps = timeStampsCollections[parameter];
-
-            // Skip if all values are invalid
-            if (currentDataPoints.All(v => v == -1 || v == 0))
-                continue;
-
-            hasData = true;
-
-            using var linePaint = new SKPaint
-            {
-                Color = colors[paramIndex % colors.Length], // Protezione da overflow
-                Style = SKPaintStyle.Stroke,
-                StrokeWidth = 2,
-                IsAntialias = true
-            };
-
-            using var path = new SKPath();
-
-            for (int i = 0; i < currentDataPoints.Count; i++)
-            {
-                double sampleTime = currentTimeStamps[i] / 1000.0;
-                double normalizedX = (sampleTime - timeStart) / timeRange;
-                var x = leftMargin + (float)(normalizedX * graphWidth);
-
-                var normalizedValue = (currentDataPoints[i] - YAxisMin) / yRange;
-                var y = bottomY - (float)(normalizedValue * graphHeight);
-                y = Math.Clamp(y, topY, bottomY);
-
-                if (i == 0)
-                    path.MoveTo(x, y);
-                else
-                    path.LineTo(x, y);
-            }
-
-            canvas.DrawPath(path, linePaint);
-        }
-
-        // If no data for any parameter, show no data message
-        if (!hasData)
-        {
-            DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + margin),
-                                                     (int)(margin + graphHeight + 65)));
-        }
-    }
+   
 
 
-    private SKColor[] GetParameterColors(string groupParameter)
-    {
-        // Ora riceve già il nome pulito, non serve pulirlo di nuovo
-        return groupParameter switch
-        {
-            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
-            "Gyroscope" or "Magnetometer" => new[] { SKColors.Red, SKColors.Green, SKColors.Blue },
-            _ => new[] { SKColors.Blue }
-        };
-    }
+    
 
-
-    private void DrawAxesAndTitle(SKCanvas canvas, SKImageInfo info, float leftMargin,
-                                 float margin, float graphWidth, float graphHeight,
-                                 double yRange, float bottomY, double timeStart)
-    {
-        using var textPaint = new SKPaint
-        {
-            Color = SKColors.Black,
-            TextSize = 18,
-            IsAntialias = true
-        };
-
-        // X-axis labels synchronized with grid and real timestamps
-        int numDivisions = TimeWindowSeconds;
-        int labelInterval = IsXAxisLabelIntervalEnabled ? XAxisLabelInterval : 1;
-
-        for (int i = 0; i <= numDivisions; i++)
-        {
-            double actualTime = timeStart + (i * TimeWindowSeconds / (double)numDivisions);
-            int timeValueForLabel = (int)Math.Floor(actualTime);
-
-            if (timeValueForLabel < 0 || (timeValueForLabel % labelInterval != 0)) continue;
-
-            float x = leftMargin + (i * graphWidth / numDivisions);
-
-            string label = FormatTimeLabel((int)actualTime);
-            var textWidth = textPaint.MeasureText(label);
-            canvas.DrawText(label, x - textWidth / 2, bottomY + 20, textPaint);
-        }
-
-        // Y-axis labels
-        for (int i = 0; i <= 4; i++)
-        {
-            var value = YAxisMin + (yRange * i / 4);
-            var y = bottomY - (float)((value - YAxisMin) / yRange * graphHeight);
-            var label = value.ToString("F1");
-            canvas.DrawText(label, leftMargin - 45, y + 6, textPaint);
-        }
-
-        // Axis labels
-        using var axisLabelPaint = new SKPaint
-        {
-            Color = SKColors.Black,
-            TextSize = 14,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-
-        string xAxisLabel = "Time [s]";
-        var labelX = (info.Width - axisLabelPaint.MeasureText(xAxisLabel)) / 2;
-        var labelY = info.Height - 8;
-        canvas.DrawText(xAxisLabel, labelX, labelY, axisLabelPaint);
-
-        var yAxisLabelText = $"{YAxisLabel} [{YAxisUnit}]";
-        canvas.Save();
-        canvas.Translate(15, (info.Height + axisLabelPaint.MeasureText(yAxisLabelText)) / 2);
-        canvas.RotateDegrees(-90);
-        canvas.DrawText(yAxisLabelText, 0, 0, axisLabelPaint);
-        canvas.Restore();
-
-        // Title
-        using var titlePaint = new SKPaint
-        {
-            Color = SKColors.Black,
-            TextSize = 20,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-
-        var titleWidth = titlePaint.MeasureText(ChartTitle);
-        canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
-    }
+   
 
     public void Cleanup()
     {
@@ -2156,195 +1862,14 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
     // Disegna un messaggio che segnala che il sensore è disattivato.
-    private void DrawDisabledSensorMessage(SKCanvas canvas, SKImageInfo info)
-    {
-        var margin = 40f;
-        var bottomMargin = 65f;
-        var leftMargin = 65f;
-        var graphWidth = info.Width - leftMargin - margin;
-        var graphHeight = info.Height - margin - bottomMargin;
-
-        using var borderPaint = new SKPaint
-        {
-            Color = SKColors.LightGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 2
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
-
-        using var backgroundPaint = new SKPaint
-        {
-            Color = SKColors.LightGray.WithAlpha(100),
-            Style = SKPaintStyle.Fill
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, backgroundPaint);
-
-        using var messagePaint = new SKPaint
-        {
-            Color = SKColors.Red,
-            TextSize = 24,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-
-        // Pulisce il nome del parametro per determinare il sensore
-        string cleanParameterName = CleanParameterName(SelectedParameter);
-
-        string sensorName = cleanParameterName switch
-        {
-            "Low-Noise Accelerometer" or "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => "Low-Noise Accelerometer",
-            "Wide-Range Accelerometer" or "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
-            "Gyroscope" or "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
-            "Magnetometer" or "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
-            "Temperature_BMP180" => "Temperature (BMP180)",
-            "Pressure_BMP180" => "Pressure (BMP180)",
-            "BatteryVoltage" or "BatteryPercent" => "Battery",
-            "ExtADC_A6" => "External ADC A6",
-            "ExtADC_A7" => "External ADC A7",
-            "ExtADC_A15" => "External ADC A15",
-            _ => "Sensor"
-        };
-
-        var disabledMessage = $"{sensorName} Disabled";
-        var messageWidth = messagePaint.MeasureText(disabledMessage);
-        var centerX = leftMargin + graphWidth / 2;
-        var centerY = margin + graphHeight / 2;
-
-        canvas.DrawText(disabledMessage, centerX - messageWidth / 2, centerY, messagePaint);
-
-        using var subtitlePaint = new SKPaint
-        {
-            Color = SKColors.Gray,
-            TextSize = 16,
-            IsAntialias = true
-        };
-
-        var subtitleMessage = "Enable this sensor to view data";
-        var subtitleWidth = subtitlePaint.MeasureText(subtitleMessage);
-        canvas.DrawText(subtitleMessage, centerX - subtitleWidth / 2, centerY + 35, subtitlePaint);
-
-        using var titlePaint = new SKPaint
-        {
-            Color = SKColors.Black,
-            TextSize = 20,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-        var titleWidth = titlePaint.MeasureText(ChartTitle);
-        canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
-    }
+    
 
 
     // Disegna un messaggio quando non ci sono dati validi da mostrare.
-    private void DrawNoDataMessage(SKCanvas canvas, SKImageInfo info)
-    {
-        var margin = 40f;
-        var bottomMargin = 65f;
-        var leftMargin = 65f;
-        var graphWidth = info.Width - leftMargin - margin;
-        var graphHeight = info.Height - margin - bottomMargin;
-
-        using var borderPaint = new SKPaint
-        {
-            Color = SKColors.LightGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 2
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
-
-        using var backgroundPaint = new SKPaint
-        {
-            Color = SKColors.LightGray.WithAlpha(100),
-            Style = SKPaintStyle.Fill
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, backgroundPaint);
-
-        using var messagePaint = new SKPaint
-        {
-            Color = SKColors.OrangeRed,
-            TextSize = 24,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-
-        var message = "No valid data available";
-        var messageWidth = messagePaint.MeasureText(message);
-        var centerX = leftMargin + graphWidth / 2;
-        var centerY = margin + graphHeight / 2;
-
-        canvas.DrawText(message, centerX - messageWidth / 2, centerY, messagePaint);
-
-        using var titlePaint = new SKPaint
-        {
-            Color = SKColors.Black,
-            TextSize = 20,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-        var titleWidth = titlePaint.MeasureText(ChartTitle);
-        canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
-    }
+   
 
     // Disegna un messaggio che indica che il sensore è in fase di calibrazione.
-    private void DrawCalibratingMessage(SKCanvas canvas, SKImageInfo info)
-    {
-        var margin = 40f;
-        var bottomMargin = 65f;
-        var leftMargin = 65f;
-        var graphWidth = info.Width - leftMargin - margin;
-        var graphHeight = info.Height - margin - bottomMargin;
-
-        using var borderPaint = new SKPaint
-        {
-            Color = SKColors.LightGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 2
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
-
-        using var backgroundPaint = new SKPaint
-        {
-            Color = SKColors.LightYellow,
-            Style = SKPaintStyle.Fill
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, backgroundPaint);
-
-        using var messagePaint = new SKPaint
-        {
-            Color = SKColors.DarkOrange,
-            TextSize = 24,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-
-        var message = "Calibrating...";
-        var messageWidth = messagePaint.MeasureText(message);
-        var centerX = leftMargin + graphWidth / 2;
-        var centerY = margin + graphHeight / 2;
-
-        canvas.DrawText(message, centerX - messageWidth / 2, centerY - 15, messagePaint);
-
-        using var subtitlePaint = new SKPaint
-        {
-            Color = SKColors.Gray,
-            TextSize = 16,
-            IsAntialias = true
-        };
-
-        var subtitleMessage = "Please wait a few seconds";
-        var subtitleWidth = subtitlePaint.MeasureText(subtitleMessage);
-        canvas.DrawText(subtitleMessage, centerX - subtitleWidth / 2, centerY + 15, subtitlePaint);
-
-        using var titlePaint = new SKPaint
-        {
-            Color = SKColors.Black,
-            TextSize = 20,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-        var titleWidth = titlePaint.MeasureText(ChartTitle);
-        canvas.DrawText(ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
-    }
+    
 
     // Aggiorna la configurazione dei sensori attivi e rigenera la lista dei parametri.
     public void UpdateSensorConfiguration(
