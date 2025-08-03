@@ -1,18 +1,32 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using ShimmerInterface.Models;
-using XR2Learn_ShimmerAPI;
 using XR2Learn_ShimmerAPI.IMU;
 
 namespace ShimmerInterface.Views;
 
+/// <summary>
+/// LoadingPage handles the connection process to a Shimmer device.
+/// Displays a loading spinner and updates the UI while attempting the connection.
+/// </summary>
 public partial class LoadingPage : ContentPage, INotifyPropertyChanged
 {
+
+    // Device configuration info
     private readonly ShimmerDevice device;
+
+    // Flag to prevent multiple connection attempts
     private bool connectionInProgress;
+
+    // Message shown while connecting
     private string connectingMessage;
+
+    // For async result handling
     private readonly TaskCompletionSource<XR2Learn_ShimmerIMU> _completion;
 
+    /// <summary>
+    /// Property bound to the UI that displays the connection status.
+    /// </summary>
     public string ConnectingMessage
     {
         get => connectingMessage;
@@ -26,18 +40,31 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Constructor that initializes the page and starts the connection message.
+    /// </summary>
+    /// <param name="device">The Shimmer device selected by the user.</param>
+    /// <param name="completion">A task completion source used to return the result to the caller.</param>
     public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU> completion)
     {
         InitializeComponent();
         this.device = device;
         _completion = completion;
+
+        // Set dynamic message with COM port info
         ConnectingMessage = $"Connecting to {device.ShimmerName} on {device.Port1}...";
         BindingContext = this;
     }
 
+    /// <summary>
+    /// Called when the page becomes visible. Attempts to connect to the Shimmer device.
+    /// Displays a success or failure popup, then closes the page.
+    /// </summary>
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // Small delay to ensure UI renders before connection starts
         await Task.Delay(500);
 
         if (connectionInProgress) return;
@@ -47,6 +74,7 @@ public partial class LoadingPage : ContentPage, INotifyPropertyChanged
 
         try
         {
+            // Create and configure Shimmer object with selected sensor flags
             var shimmer = new XR2Learn_ShimmerIMU
             {
                 EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,

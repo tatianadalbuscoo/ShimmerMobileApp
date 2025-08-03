@@ -199,7 +199,7 @@ public partial class DataPageViewModel : ObservableObject
 
     public event EventHandler? ChartUpdateRequested;
 
-    public DataPageViewModel(XR2Learn_ShimmerIMU shimmerDevice, SensorConfiguration config)
+    public DataPageViewModel(XR2Learn_ShimmerIMU shimmerDevice, ShimmerDevice config)
     {
         shimmer = shimmerDevice;
         enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
@@ -2379,9 +2379,9 @@ public partial class DataPageViewModel : ObservableObject
 
     // Metodo per ottenere la configurazione corrente
     // Restituisce un oggetto che rappresenta la configurazione attuale dei sensori.
-    public SensorConfiguration GetCurrentSensorConfiguration()
+    public ShimmerDevice GetCurrentSensorConfiguration()
     {
-        return new SensorConfiguration
+        return new ShimmerDevice
         {
             EnableLowNoiseAccelerometer = enableLowNoiseAccelerometer,
             EnableWideRangeAccelerometer = enableWideRangeAccelerometer,

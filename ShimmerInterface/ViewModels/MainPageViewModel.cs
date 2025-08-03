@@ -158,24 +158,8 @@ public partial class MainPageViewModel : ObservableObject
         // Loop through all connected Shimmer devices
         foreach (var (shimmer, device) in connectedShimmers)
         {
-
-            // Create a sensor configuration object based on the device's enabled options.
-            // Use null-conditional access with default 'true' to ensure safe fallback.
-            var sensorConfig = new SensorConfiguration
-            {
-                EnableLowNoiseAccelerometer = device?.EnableLowNoiseAccelerometer ?? true,
-                EnableWideRangeAccelerometer = device?.EnableWideRangeAccelerometer ?? true,
-                EnableGyroscope = device?.EnableGyroscope ?? true,
-                EnableMagnetometer = device?.EnableMagnetometer ?? true,
-                EnableBattery = device?.EnableBattery ?? true,
-                EnablePressureTemperature = device?.EnablePressureTemperature ?? true,
-                EnableExtA6 = device?.EnableExtA6 ?? true,
-                EnableExtA7 = device?.EnableExtA7 ?? true,
-                EnableExtA15 = device?.EnableExtA15 ?? true
-            };
-
-            // Create the data visualization page for this Shimmer device
-            var dataPage = new DataPage(shimmer, sensorConfig);
+            
+            var dataPage = new DataPage(shimmer, device);
 
             // Set the title of the tab: use Shimmer ID if known, otherwise use index number
             string tabTitle = !string.IsNullOrEmpty(device?.ShimmerName) && device.ShimmerName != "Unknown"

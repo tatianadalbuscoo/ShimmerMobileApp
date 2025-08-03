@@ -1,20 +1,27 @@
-﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+﻿<!-- 
+LoadingPage.xaml
+Loading screen displayed while establishing a connection with a Shimmer device.
+Shows an activity spinner and a dynamic connection message with the COM port name.
+-->
+    
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="ShimmerInterface.Views.LoadingPage"
              BackgroundColor="{StaticResource PageBackground}">
 
+    <!-- Centered layout -->
     <VerticalStackLayout Padding="30" Spacing="20"
                          HorizontalOptions="Center"
                          VerticalOptions="Center">
 
-        <!-- Spinner -->
+        <!-- Loading spinner -->
         <ActivityIndicator IsRunning="True"
                            IsVisible="True"
                            WidthRequest="40"
                            HeightRequest="40"
                            Color="{StaticResource Primary}" />
 
-        <!-- Messaggio dinamico con COM -->
+        <!-- COM port message -->
         <Label Text="{Binding ConnectingMessage}"
                FontSize="18"
                TextColor="{StaticResource TextPrimary}"

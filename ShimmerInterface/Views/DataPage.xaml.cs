@@ -14,7 +14,7 @@ public partial class DataPage : ContentPage
 
     // Costruttore della pagina. Inizializza il ViewModel con il dispositivo Shimmer e la configurazione selezionata,
     // imposta il BindingContext e si registra per aggiornare il grafico quando necessario.
-    public DataPage(XR2Learn_ShimmerIMU shimmer, SensorConfiguration sensorConfig)
+    public DataPage(XR2Learn_ShimmerIMU shimmer, ShimmerDevice sensorConfig)
     {
         InitializeComponent();
         NavigationPage.SetHasBackButton(this, false);
