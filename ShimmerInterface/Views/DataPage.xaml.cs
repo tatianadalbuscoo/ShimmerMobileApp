@@ -6,6 +6,7 @@ using ShimmerInterface.Models;
 
 namespace ShimmerInterface.Views;
 
+
 /// <summary>
 /// Code-behind for the DataPage view, responsible for real-time rendering of sensor data using SkiaSharp.
 /// Handles layout, axis drawing, sensor enablement checks, and visualization of both single and multiple parameters.
@@ -18,9 +19,8 @@ public partial class DataPage : ContentPage
 
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="DataPage"/> class.
-    /// Sets up the UI, disables the navigation back button, binds the ViewModel,
-    /// and subscribes to chart update events triggered by the ViewModel.
+    /// Initializes the DataPage, sets up the UI, binds the ViewModel,
+    /// and subscribes to chart update events.
     /// </summary>
     /// <param name="shimmer">An instance of <see cref="XR2Learn_ShimmerIMU"/> representing the connected sensor device.</param>
     /// <param name="sensorConfig">A <see cref="ShimmerDevice"/> object containing the current sensor configuration flags.</param>
@@ -180,27 +180,30 @@ public partial class DataPage : ContentPage
 
 
     /// <summary>
-    /// Draws a single data parameter (e.g., AccelerometerX) as a line chart on the canvas.
-    /// Converts each data point into screen coordinates based on time and value range,
-    /// and plots them as a continuous path.
+    /// Draws a single sensor parameter (e.g., AccelerometerX) as a line chart.
+    /// Each data point is mapped to screen coordinates according to time and Y value,
+    /// and the full set is rendered as a continuous line.
     /// </summary>
-    /// <param name="canvas">The SkiaSharp canvas to draw on.</param>
-    /// <param name="leftMargin">Left margin in pixels for chart alignment.</param>
-    /// <param name="margin">Top margin in pixels.</param>
-    /// <param name="graphWidth">Width of the drawable graph area.</param>
-    /// <param name="graphHeight">Height of the drawable graph area.</param>
-    /// <param name="yRange">Value range on the Y-axis (max - min).</param>
-    /// <param name="bottomY">Bottom Y position for plotting (pixel coordinate).</param>
-    /// <param name="topY">Top Y position for plotting (pixel coordinate).</param>
-    /// <param name="timeStart">Start time for the X-axis window (in seconds).</param>
-    /// <param name="timeRange">Total time span displayed on the X-axis (in seconds).</param>
+    /// <param name="canvas">The canvas to draw the chart on.</param>
+    /// <param name="leftMargin">Left margin (pixels) for chart area.</param>
+    /// <param name="margin">Top margin (pixels).</param>
+    /// <param name="graphWidth">Width of the graph area (pixels).</param>
+    /// <param name="graphHeight">Height of the graph area (pixels).</param>
+    /// <param name="yRange">Y-axis range (max - min).</param>
+    /// <param name="bottomY">Bottom Y coordinate of the chart area.</param>
+    /// <param name="topY">Top Y coordinate of the chart area.</param>
+    /// <param name="timeStart">X-axis start time (seconds).</param>
+    /// <param name="timeRange">Visible time window (seconds).</param>
     private void DrawSingleParameter(SKCanvas canvas, float leftMargin, float margin,
     float graphWidth, float graphHeight, double yRange,
     float bottomY, float topY, double timeStart, double timeRange)
     {
+
+        // Get the parameter name to display
         string cleanParameterName = CleanParameterName(viewModel.SelectedParameter);
         var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(cleanParameterName);
 
+        // If no valid data, display a placeholder message and exit
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
         {
             DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
@@ -208,10 +211,11 @@ public partial class DataPage : ContentPage
             return;
         }
 
-        // TROVA IL MINIMO tra i timestamp (in secondi)
+        // Find the earliest timestamp in seconds, for proper X normalization
         var allTimes = currentTimeStamps.Select(t => t / 1000.0).ToList();
         double minSampleTime = allTimes.Count > 0 ? allTimes.Min() : 0;
 
+        // Prepare the line paint for the curve
         using var linePaint = new SKPaint
         {
             Color = SKColors.Blue,
@@ -221,42 +225,46 @@ public partial class DataPage : ContentPage
         };
         using var path = new SKPath();
 
+        // Iterate through all data points and build the curve path
         for (int i = 0; i < currentDataPoints.Count; i++)
         {
+
+            // Convert timestamp from ms to seconds, then normalize to visible time window
             double sampleTime = currentTimeStamps[i] / 1000.0;
-            double normalizedX = (sampleTime - minSampleTime) / timeRange; // SLITTA A SINISTRA!
+            double normalizedX = (sampleTime - minSampleTime) / timeRange;
             var x = leftMargin + (float)(normalizedX * graphWidth);
 
+            // Normalize data value to chart Y coordinate
             var normalizedValue = (currentDataPoints[i] - viewModel.YAxisMin) / yRange;
             var y = bottomY - (float)(normalizedValue * graphHeight);
             y = Math.Clamp(y, topY, bottomY);
 
+            // Move to first point or draw line to next
             if (i == 0)
                 path.MoveTo(x, y);
             else
                 path.LineTo(x, y);
         }
 
+        // Draw the complete path on the canvas
         canvas.DrawPath(path, linePaint);
     }
 
 
-
     /// <summary>
-    /// Draws multiple sub-parameters (e.g., X, Y, Z components of a sensor)
-    /// as separate colored lines on the same chart.
-    /// Each parameter is plotted using its own color for visual distinction.
+    /// Draws multiple sub-parameters (e.g., X, Y, Z components of a sensor) as colored line charts on the same canvas.
+    /// Each sub-parameter (such as each axis) is rendered with a distinct color for visual clarity.
     /// </summary>
-    /// <param name="canvas">The SkiaSharp canvas to draw on.</param>
-    /// <param name="leftMargin">Left margin of the chart area.</param>
-    /// <param name="margin">Top margin of the chart area.</param>
-    /// <param name="graphWidth">Width of the drawable graph area.</param>
-    /// <param name="graphHeight">Height of the drawable graph area.</param>
-    /// <param name="yRange">Range of Y-axis values (max - min).</param>
-    /// <param name="bottomY">Bottom pixel coordinate of the chart area.</param>
-    /// <param name="topY">Top pixel coordinate of the chart area.</param>
-    /// <param name="timeStart">Start of the visible time window (in seconds).</param>
-    /// <param name="timeRange">Total duration of the visible time window (in seconds).</param>
+    /// <param name="canvas">The canvas to draw on.</param>
+    /// <param name="leftMargin">Left margin (pixels) for chart area.</param>
+    /// <param name="margin">Top margin (pixels).</param>
+    /// <param name="graphWidth">Width of the graph area (pixels).</param>
+    /// <param name="graphHeight">Height of the graph area (pixels).</param>
+    /// <param name="yRange">Y-axis value range (max - min).</param>
+    /// <param name="bottomY">Bottom Y coordinate of the chart area.</param>
+    /// <param name="topY">Top Y coordinate of the chart area.</param>
+    /// <param name="timeStart">Start time for X-axis window (seconds).</param>
+    /// <param name="timeRange">Visible time window (seconds).</param>
     private void DrawMultipleParameters(
     SKCanvas canvas,
     float leftMargin, float margin,
@@ -265,11 +273,11 @@ public partial class DataPage : ContentPage
     float bottomY, float topY,
     double timeStart, double timeRange)
     {
-        // Ottieni tutti i sub-parametri da visualizzare (es: X,Y,Z)
+        // Get all sub-parameters to display (e.g., X, Y, Z axes)
         var subParameters = viewModel.GetCurrentSubParameters();
 
-        // === TROVA IL MINIMO ASSOLUTO DI TEMPO TRA TUTTI I SUB-PARAMETER ===
-        // In modo che tutte le linee partano dalla stessa X=0
+        // Find the earliest timestamp among all sub-parameters
+        // This ensures all lines start aligned on the X axis
         double minSampleTime = subParameters
             .Select(p => viewModel.GetSeriesSnapshot(p).time)
             .Where(t => t.Count > 0)
@@ -277,22 +285,23 @@ public partial class DataPage : ContentPage
             .DefaultIfEmpty(0)
             .Min();
 
-        // Colori per ogni curva
+        // Assign a color for each curve (red, green, blue by default)
         var colors = GetParameterColors(CleanParameterName(viewModel.SelectedParameter));
         bool hasData = false;
 
-        // Ciclo su tutti i sub-parametri (X, Y, Z ecc.)
+        // Loop through each sub-parameter (e.g., X, Y, Z)
         for (int paramIndex = 0; paramIndex < subParameters.Count; paramIndex++)
         {
             var parameter = subParameters[paramIndex];
             var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(parameter);
 
-            // Salta se non ci sono dati validi
+            // Skip if no valid data points
             if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
                 continue;
 
             hasData = true;
 
+            // Set up paint for this sub-parameter line
             using var linePaint = new SKPaint
             {
                 Color = colors[paramIndex % colors.Length],
@@ -302,33 +311,38 @@ public partial class DataPage : ContentPage
             };
             using var path = new SKPath();
 
+            // Build the line path for this sub-parameter
             for (int i = 0; i < currentDataPoints.Count; i++)
             {
+
+                // Convert timestamp to seconds, normalize for X axis
                 double sampleTime = currentTimeStamps[i] / 1000.0;
-                double normalizedX = (sampleTime - minSampleTime) / timeRange; // SLITTAMENTO!
+                double normalizedX = (sampleTime - minSampleTime) / timeRange;
                 var x = leftMargin + (float)(normalizedX * graphWidth);
 
+                // Normalize value for Y axis
                 var normalizedValue = (currentDataPoints[i] - viewModel.YAxisMin) / yRange;
                 var y = bottomY - (float)(normalizedValue * graphHeight);
                 y = Math.Clamp(y, topY, bottomY);
 
+                // Move to first point, then draw lines to subsequent points
                 if (i == 0)
                     path.MoveTo(x, y);
                 else
                     path.LineTo(x, y);
             }
 
+            // Draw the current sub-parameter's line on the canvas
             canvas.DrawPath(path, linePaint);
         }
 
-        // Nessun dato valido: mostra messaggio di errore
+        // If no valid data found for any sub-parameter, show "No data" message
         if (!hasData)
         {
             DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
                 (int)(margin + graphHeight + 65)));
         }
     }
-
 
 
     /// <summary>
@@ -620,41 +634,34 @@ public partial class DataPage : ContentPage
 
 
     /// <summary>
-    /// Called when the page becomes visible. Initializes timing and subscribes to
-    /// chart update events to enable real-time rendering of sensor data.
+    /// Invoked when the page appears. Starts real-time chart updates and subscribes to update events.
     /// </summary>
     protected override void OnAppearing()
     {
         base.OnAppearing();
 
-        // Reset the time reference used for the X-axis
-        //viewModel.ResetStartTime();
-
-        // Start the internal timer that triggers chart updates
+        // Start the timer for real-time chart updates
         viewModel.StartTimer();
 
-        // Subscribe to chart update requests
+        // Subscribe to chart update notifications
         viewModel.ChartUpdateRequested += OnChartUpdateRequested;
     }
 
 
     /// <summary>
-    /// Called when the page is about to disappear. Stops timers,
-    /// unsubscribes from events, and disposes resources to prevent leaks.
+    /// Invoked when the page is about to disappear. Stops chart updates and unsubscribes from events.
     /// </summary>
     protected override void OnDisappearing()
     {
 
-        // Stop the chart update timer
+        // Stop the timer for chart updates
         viewModel.StopTimer();
 
-        // Unsubscribe from chart update events to prevent memory leaks
+        // Unsubscribe from update notifications to prevent memory leaks
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
 
-        // Dispose of the ViewModel if it holds unmanaged resources or background tasks
-        //viewModel?.Dispose();
-
         base.OnDisappearing();
+
     }
 
 }

@@ -213,12 +213,14 @@ It includes configuration controls, parameter selection, and a dynamically updat
                                    PaintSurface="OnCanvasViewPaintSurface" />
             </Border>
 
+            <!-- Shows the current settings and chart parameters in a compact list -->
             <Frame BackgroundColor="{StaticResource Gray100}" 
-       Padding="15" 
-       Margin="0,10">
+                   Padding="15" 
+                   Margin="0,10">
 
                 <VerticalStackLayout>
-                    <!-- Titolo principale: Current Parameter -->
+
+                    <!-- Current Parameter Title -->
                     <Label FontSize="20" FontAttributes="Bold" Margin="0,0,0,6">
                         <Label.FormattedText>
                             <FormattedString>
@@ -228,7 +230,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                         </Label.FormattedText>
                     </Label>
 
-                    <!-- Righe con titolino Primary + valore nero -->
+                    <!-- Display mode (Single/Multi) -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -237,6 +239,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
+
+                    <!-- Measuring parameter (e.g. Accelerometer) -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -245,6 +249,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
+
+                    <!-- Display unit (e.g. m/s², V, deg/s) -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -253,6 +259,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
+
+                    <!-- Current Y axis range (min-max) -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -263,6 +271,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
+
+                    <!-- Current time window for chart data (seconds) -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -271,6 +281,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
+
+                    <!-- Current interval between X axis labels (seconds) -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -279,6 +291,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
+
+                    <!-- Current sampling rate in Hz -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -287,6 +301,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </FormattedString>
                         </Label.FormattedText>
                     </Label>
+
+                    <!-- Whether the chart grid is shown -->
                     <Label FontSize="16" Margin="0,0,0,2">
                         <Label.FormattedText>
                             <FormattedString>
@@ -297,10 +313,6 @@ It includes configuration controls, parameter selection, and a dynamically updat
                     </Label>
                 </VerticalStackLayout>
             </Frame>
-
-
-
-
         </VerticalStackLayout>
     </ScrollView>
 </ContentPage>
