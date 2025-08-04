@@ -432,6 +432,11 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 _autoYAxisMax = max + margin;
             }
         }
+
+        // Alla fine del metodo, PRIMA di uscire dalla funzione:
+        _autoYAxisMin = Math.Round(_autoYAxisMin, 3);
+        _autoYAxisMax = Math.Round(_autoYAxisMax, 3);
+
     }
 
 
@@ -646,57 +651,52 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
 
     // Valida e aggiorna la finestra temporale in secondi.
-   private void ValidateAndUpdateTimeWindow(string value)
-{
-    if (string.IsNullOrWhiteSpace(value))
+    private void ValidateAndUpdateTimeWindow(string value)
     {
-        const int defaultTimeWindow = 20;
-        ValidationMessage = "";
-        TimeWindowSeconds = defaultTimeWindow;
-        _lastValidTimeWindowSeconds = defaultTimeWindow;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            const int defaultTimeWindow = 20;
+            ValidationMessage = "";
+            TimeWindowSeconds = defaultTimeWindow;
+            _lastValidTimeWindowSeconds = defaultTimeWindow;
 
-        // Taglia tutte le collezioni alla nuova dimensione usando le chiavi delle collezioni
-        var maxPoints = (int)(defaultTimeWindow * shimmer.SamplingRate);
-            foreach (var parameter in dataPointsCollections.Keys.ToList())
-            {
-                TrimCollection(parameter, maxPoints);
-            }
+            ClearAllDataCollections(); // <--- AGGIUNGI QUI
+
+            ResetAllTimestamps();
+            ResetAllCounters();
 
             UpdateChart();
-        return;
-    }
-
-    if (TryParseInt(value, out int result))
-    {
-        if (result <= 0)
-        {
-            ValidationMessage = "Time Window must be greater than 0 seconds.";
-            ResetTimeWindowText();
             return;
         }
 
-        ValidationMessage = "";
-        TimeWindowSeconds = result;
-        _lastValidTimeWindowSeconds = result;
-
-        // Taglia tutte le collezioni alla nuova dimensione basata sul sampling rate
-        var maxPoints = (int)(result * shimmer.SamplingRate);
-        foreach (var parameter in dataPointsCollections.Keys.ToList())
+        if (TryParseInt(value, out int result))
         {
-            while (dataPointsCollections[parameter].Count > maxPoints)
+            if (result <= 0)
             {
-                dataPointsCollections[parameter].RemoveAt(0);
-                timeStampsCollections[parameter].RemoveAt(0);
+                ValidationMessage = "Time Window must be greater than 0 seconds.";
+                ResetTimeWindowText();
+                return;
             }
+
+            ValidationMessage = "";
+            TimeWindowSeconds = result;
+            _lastValidTimeWindowSeconds = result;
+
+            ClearAllDataCollections(); // <--- AGGIUNGI QUI
+
+            ResetAllTimestamps();
+            ResetAllCounters();
+
+            UpdateChart();
         }
-        UpdateChart();
+        else
+        {
+            ValidationMessage = "Time Window must be a valid positive number.";
+            ResetTimeWindowText();
+        }
     }
-    else
-    {
-        ValidationMessage = "Time Window must be a valid positive number.";
-        ResetTimeWindowText();
-    }
-}
+
+
 
     // Valida e aggiorna l’intervallo tra le etichette sull’asse X.
     private void ValidateAndUpdateXAxisInterval(string value)
@@ -742,34 +742,48 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     {
         return parameter switch
         {
-            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => -5,
-            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => -20,
-            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => -250,
-            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => -2,
-            "Temperature_BMP180" => 20,         
-            "Pressure_BMP180" => 80,
-            "Battery Voltage" => 3300,
-            "Battery Percent" => 0,
+            "Low-Noise AccelerometerX" => -5,
+            "Low-Noise AccelerometerY" => -5,
+            "Low-Noise AccelerometerZ" => -15,
+            "Wide-Range AccelerometerX" => -5,
+            "Wide-Range AccelerometerY" => -5,
+            "Wide-Range AccelerometerZ" => -15,
+            "GyroscopeX" => -250,
+            "GyroscopeY" => -250,
+            "GyroscopeZ" => -250,
+            "MagnetometerX" => -5,
+            "MagnetometerY" => -5,
+            "MagnetometerZ" => -5,
+            "Temperature_BMP180" => 15,
+            "Pressure_BMP180" => 90,
+            "BatteryVoltage" => 3.3,
+            "BatteryPercent" => 0,
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
             _ => 0
         };
     }
 
-
-    // Restituisce il valore massimo di default per l’asse Y in base al parametro selezionato.
     private double GetDefaultYAxisMax(string parameter)
     {
         return parameter switch
         {
-            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => 5,
-            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => 20,
-            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => 250,
-            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => 2,
-            "Temperature_BMP180" => 50,
+            "Low-Noise AccelerometerX" => 5,
+            "Low-Noise AccelerometerY" => 5,
+            "Low-Noise AccelerometerZ" => 15,
+            "Wide-Range AccelerometerX" => 5,
+            "Wide-Range AccelerometerY" => 5,
+            "Wide-Range AccelerometerZ" => 15,
+            "GyroscopeX" => 250,
+            "GyroscopeY" => 250,
+            "GyroscopeZ" => 250,
+            "MagnetometerX" => 5,
+            "MagnetometerY" => 5,
+            "MagnetometerZ" => 5,
+            "Temperature_BMP180" => 40,
             "Pressure_BMP180" => 110,
-            "Battery Voltage" => 4200,
-            "Battery Percent" => 100,
-            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3000,
+            "BatteryVoltage" => 4.2,
+            "BatteryPercent" => 100,
+            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3.3,
             _ => 1
         };
     }
@@ -1270,8 +1284,8 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 YAxisLabel = "Low-Noise Accelerometer";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Low-Noise Accelerometer (X,Y,Z)";
-                YAxisMin = -5;
-                YAxisMax = 5;
+                YAxisMin = -20;
+                YAxisMax = 20;
                 break;
             case "Wide-Range Accelerometer":
                 YAxisLabel = "Wide-Range Accelerometer";
@@ -1291,8 +1305,8 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 YAxisLabel = "Magnetometer";
                 YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer (X,Y,Z)";
-                YAxisMin = -2;
-                YAxisMax = 2;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
             case "Low-Noise AccelerometerX":
                 YAxisLabel = "Low-Noise Accelerometer X";
@@ -1312,29 +1326,29 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 YAxisLabel = "Low-Noise Accelerometer Z";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Low-Noise Accelerometer Z";
-                YAxisMin = -5;
-                YAxisMax = 5;
+                YAxisMin = -15;
+                YAxisMax = 15;
                 break;
             case "Wide-Range AccelerometerX":
                 YAxisLabel = "Wide-Range Accelerometer X";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Wide-Range Accelerometer X";
-                YAxisMin = -20;
-                YAxisMax = 20;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
             case "Wide-Range AccelerometerY":
                 YAxisLabel = "Wide-Range Accelerometer Y";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Wide-Range Accelerometer Y";
-                YAxisMin = -20;
-                YAxisMax = 20;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
             case "Wide-Range AccelerometerZ":
                 YAxisLabel = "Wide-Range Accelerometer Z";
                 YAxisUnit = "m/s²";
                 ChartTitle = "Real-time Wide-Range Accelerometer Z";
-                YAxisMin = -20;
-                YAxisMax = 20;
+                YAxisMin = -15;
+                YAxisMax = 15;
                 break;
             case "GyroscopeX":
                 YAxisLabel = "Gyroscope X";
@@ -1361,29 +1375,29 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 YAxisLabel = "Magnetometer X";
                 YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer X";
-                YAxisMin = -2;
-                YAxisMax = 2;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
             case "MagnetometerY":
                 YAxisLabel = "Magnetometer Y";
                 YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer Y";
-                YAxisMin = -2;
-                YAxisMax = 2;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
             case "MagnetometerZ":
                 YAxisLabel = "Magnetometer Z";
                 YAxisUnit = "local_flux*";
                 ChartTitle = "Real-time Magnetometer Z";
-                YAxisMin = -2;
-                YAxisMax = 2;
+                YAxisMin = -5;
+                YAxisMax = 5;
                 break;
             case "Temperature_BMP180":
                 YAxisLabel = "Temperature";
                 YAxisUnit = "°C";
                 ChartTitle = "BMP180 Temperature";
-                YAxisMin = 20;
-                YAxisMax = 50;
+                YAxisMin = 15;
+                YAxisMax = 40;
                 break;
             case "Pressure_BMP180":
                 YAxisLabel = "Pressure";
@@ -1534,6 +1548,22 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             EnableExtA15 = enableExtA15
 
         };
+    }
+
+    public void ResetAllTimestamps()
+    {
+        lock (_dataLock)
+        {
+            foreach (var param in timeStampsCollections.Keys.ToList())
+            {
+                int count = timeStampsCollections[param].Count;
+                for (int i = 0; i < count; i++)
+                {
+                    // Timestamp in millisecondi, come in acquisizione regolare
+                    timeStampsCollections[param][i] = (int)(i * (1000.0 / shimmer.SamplingRate));
+                }
+            }
+        }
     }
 
 

@@ -65,7 +65,7 @@ public partial class DataPage : ContentPage
         // Define margins and calculate drawable area
         var margin = 40f;
         var bottomMargin = 65f;
-        var leftMargin = 65f;
+        var leftMargin = 120f;
         var graphWidth = info.Width - leftMargin - margin;
         var graphHeight = info.Height - margin - bottomMargin;
 
@@ -195,24 +195,23 @@ public partial class DataPage : ContentPage
     /// <param name="timeStart">Start time for the X-axis window (in seconds).</param>
     /// <param name="timeRange">Total time span displayed on the X-axis (in seconds).</param>
     private void DrawSingleParameter(SKCanvas canvas, float leftMargin, float margin,
-                                    float graphWidth, float graphHeight, double yRange,
-                                    float bottomY, float topY, double timeStart, double timeRange)
+    float graphWidth, float graphHeight, double yRange,
+    float bottomY, float topY, double timeStart, double timeRange)
     {
-
-        // Get clean parameter name and corresponding data/time series
         string cleanParameterName = CleanParameterName(viewModel.SelectedParameter);
         var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(cleanParameterName);
-        
 
-        // If no valid data is available, show a placeholder message
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
         {
             DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
-                                                     (int)(margin + graphHeight + 65)));
+                (int)(margin + graphHeight + 65)));
             return;
         }
 
-        // Define paint style for the data line
+        // TROVA IL MINIMO tra i timestamp (in secondi)
+        var allTimes = currentTimeStamps.Select(t => t / 1000.0).ToList();
+        double minSampleTime = allTimes.Count > 0 ? allTimes.Min() : 0;
+
         using var linePaint = new SKPaint
         {
             Color = SKColors.Blue,
@@ -220,34 +219,27 @@ public partial class DataPage : ContentPage
             StrokeWidth = 2,
             IsAntialias = true
         };
-
-        // Create the path that will be drawn as the curve
         using var path = new SKPath();
 
-        // Convert each data point into canvas coordinates and build the path
         for (int i = 0; i < currentDataPoints.Count; i++)
         {
-
-            // Convert timestamp from milliseconds to seconds and normalize over X-axis
             double sampleTime = currentTimeStamps[i] / 1000.0;
-            double normalizedX = (sampleTime - timeStart) / timeRange;
+            double normalizedX = (sampleTime - minSampleTime) / timeRange; // SLITTA A SINISTRA!
             var x = leftMargin + (float)(normalizedX * graphWidth);
 
-            // Normalize Y value and invert it for canvas coordinates (origin is top-left)
             var normalizedValue = (currentDataPoints[i] - viewModel.YAxisMin) / yRange;
             var y = bottomY - (float)(normalizedValue * graphHeight);
             y = Math.Clamp(y, topY, bottomY);
 
-            // Build the path (move to first point, line to the rest)
             if (i == 0)
                 path.MoveTo(x, y);
             else
                 path.LineTo(x, y);
         }
 
-        // Draw the full path on the canvas
         canvas.DrawPath(path, linePaint);
     }
+
 
 
     /// <summary>
@@ -265,33 +257,42 @@ public partial class DataPage : ContentPage
     /// <param name="topY">Top pixel coordinate of the chart area.</param>
     /// <param name="timeStart">Start of the visible time window (in seconds).</param>
     /// <param name="timeRange">Total duration of the visible time window (in seconds).</param>
-    private void DrawMultipleParameters(SKCanvas canvas, float leftMargin, float margin,
-                                       float graphWidth, float graphHeight, double yRange,
-                                       float bottomY, float topY, double timeStart, double timeRange)
+    private void DrawMultipleParameters(
+    SKCanvas canvas,
+    float leftMargin, float margin,
+    float graphWidth, float graphHeight,
+    double yRange,
+    float bottomY, float topY,
+    double timeStart, double timeRange)
     {
-
-        // Get all sub-parameters for the selected group (e.g., X/Y/Z)
+        // Ottieni tutti i sub-parametri da visualizzare (es: X,Y,Z)
         var subParameters = viewModel.GetCurrentSubParameters();
 
-        // Assign colors based on parameter type (e.g., RGB for XYZ axes)
-        var colors = GetParameterColors(CleanParameterName(viewModel.SelectedParameter));
+        // === TROVA IL MINIMO ASSOLUTO DI TEMPO TRA TUTTI I SUB-PARAMETER ===
+        // In modo che tutte le linee partano dalla stessa X=0
+        double minSampleTime = subParameters
+            .Select(p => viewModel.GetSeriesSnapshot(p).time)
+            .Where(t => t.Count > 0)
+            .Select(t => t.Min() / 1000.0)
+            .DefaultIfEmpty(0)
+            .Min();
 
+        // Colori per ogni curva
+        var colors = GetParameterColors(CleanParameterName(viewModel.SelectedParameter));
         bool hasData = false;
 
-        // Iterate through each sub-parameter (e.g., X, Y, Z)
+        // Ciclo su tutti i sub-parametri (X, Y, Z ecc.)
         for (int paramIndex = 0; paramIndex < subParameters.Count; paramIndex++)
         {
             var parameter = subParameters[paramIndex];
             var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(parameter);
 
-
-            // Skip empty or invalid datasets
+            // Salta se non ci sono dati validi
             if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
                 continue;
 
             hasData = true;
 
-            // Set paint color and stroke style for this parameter
             using var linePaint = new SKPaint
             {
                 Color = colors[paramIndex % colors.Length],
@@ -299,14 +300,12 @@ public partial class DataPage : ContentPage
                 StrokeWidth = 2,
                 IsAntialias = true
             };
-
             using var path = new SKPath();
 
-            // Convert data points into canvas coordinates and build the path
             for (int i = 0; i < currentDataPoints.Count; i++)
             {
                 double sampleTime = currentTimeStamps[i] / 1000.0;
-                double normalizedX = (sampleTime - timeStart) / timeRange;
+                double normalizedX = (sampleTime - minSampleTime) / timeRange; // SLITTAMENTO!
                 var x = leftMargin + (float)(normalizedX * graphWidth);
 
                 var normalizedValue = (currentDataPoints[i] - viewModel.YAxisMin) / yRange;
@@ -319,17 +318,17 @@ public partial class DataPage : ContentPage
                     path.LineTo(x, y);
             }
 
-            // Draw the current parameter's path
             canvas.DrawPath(path, linePaint);
         }
 
-        // If no valid data was found for any parameter, show "No Data" message
+        // Nessun dato valido: mostra messaggio di errore
         if (!hasData)
         {
             DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
-                                                     (int)(margin + graphHeight + 65)));
+                (int)(margin + graphHeight + 65)));
         }
     }
+
 
 
     /// <summary>
@@ -433,8 +432,8 @@ public partial class DataPage : ContentPage
             // Compute Y value and corresponding canvas coordinate
             var value = viewModel.YAxisMin + (yRange * i / 4);
             var y = bottomY - (float)((value - viewModel.YAxisMin) / yRange * graphHeight);
-            var label = value.ToString("F1");
-            canvas.DrawText(label, leftMargin - 45, y + 6, textPaint);
+            var label = value.ToString("F3");
+            canvas.DrawText(label, leftMargin - 72, y + 6, textPaint);
         }
 
         // === Draw axis labels (X and Y titles) ===
@@ -455,7 +454,7 @@ public partial class DataPage : ContentPage
         // Draw Y-axis label rotated vertically on the left
         var yAxisLabelText = $"{viewModel.YAxisLabel} [{viewModel.YAxisUnit}]";
         canvas.Save();
-        canvas.Translate(15, (info.Height + axisLabelPaint.MeasureText(yAxisLabelText)) / 2);
+        canvas.Translate(30, (info.Height + axisLabelPaint.MeasureText(yAxisLabelText)) / 2);
         canvas.RotateDegrees(-90);
         canvas.DrawText(yAxisLabelText, 0, 0, axisLabelPaint);
         canvas.Restore();
@@ -486,7 +485,7 @@ public partial class DataPage : ContentPage
         // Define graph boundaries and margins
         var margin = 40f;
         var bottomMargin = 65f;
-        var leftMargin = 65f;
+        var leftMargin = 100f;
         var graphWidth = info.Width - leftMargin - margin;
         var graphHeight = info.Height - margin - bottomMargin;
 
@@ -629,7 +628,7 @@ public partial class DataPage : ContentPage
         base.OnAppearing();
 
         // Reset the time reference used for the X-axis
-        viewModel.ResetStartTime();
+        //viewModel.ResetStartTime();
 
         // Start the internal timer that triggers chart updates
         viewModel.StartTimer();
@@ -653,7 +652,7 @@ public partial class DataPage : ContentPage
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
 
         // Dispose of the ViewModel if it holds unmanaged resources or background tasks
-        viewModel?.Dispose();
+        //viewModel?.Dispose();
 
         base.OnDisappearing();
     }
