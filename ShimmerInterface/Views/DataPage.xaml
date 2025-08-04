@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 DataPage.xaml
 This page displays real-time data from a selected Shimmer sensor device.
 It includes configuration controls, parameter selection, and a dynamically updated chart.
@@ -17,13 +17,9 @@ It includes configuration controls, parameter selection, and a dynamically updat
     <ScrollView>
         <VerticalStackLayout Padding="20" Spacing="12">
 
-            <!-- Section title: Sensor data -->
-            <Label Text="Sensor data"
-                   Style="{StaticResource TitleLabel}" />
-            <!-- Textual info of sensor's current status/data -->
-            <Label Text="{Binding SensorText}"
-                   FontSize="14"
-                   TextColor="{StaticResource TextPrimary}" />
+            <!-- Section title -->
+            <Label Text="Live Data from Your Shimmer Sensor"
+                Style="{StaticResource TitleLabel}" />
 
             <!-- Horizontal separator -->
             <BoxView HeightRequest="1"
@@ -217,71 +213,93 @@ It includes configuration controls, parameter selection, and a dynamically updat
                                    PaintSurface="OnCanvasViewPaintSurface" />
             </Border>
 
-            <!-- Summary info box for selected parameter -->
             <Frame BackgroundColor="{StaticResource Gray100}" 
-                   Padding="15" 
-                   Margin="0,10">
-                <StackLayout>
-                    <Label Text="{Binding SelectedParameter, StringFormat='Current Parameter: {0}'}"
-                           FontSize="16"
-                           FontAttributes="Bold"
-                           TextColor="{StaticResource Primary}" />
+       Padding="15" 
+       Margin="0,10">
 
-                    <!-- Chart mode display -->
-                    <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
-                        <Label.Triggers>
-                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Single">
-                                <Setter Property="Text" Value="Display Mode: Single Parameter" />
-                            </DataTrigger>
-                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Multi">
-                                <Setter Property="Text" Value="Display Mode: Multiple Parameters" />
-                            </DataTrigger>
-                        </Label.Triggers>
+                <VerticalStackLayout>
+                    <!-- Titolo principale: Current Parameter -->
+                    <Label FontSize="20" FontAttributes="Bold" Margin="0,0,0,6">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Current Parameter:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding YAxisLabel}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
                     </Label>
 
-                    <!-- Other parameter details -->
-                    <Label Text="{Binding YAxisLabel, StringFormat='Measuring: {0}'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
-                    <Label Text="{Binding YAxisUnit, StringFormat='Unit: {0}'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
-                    <Label FontSize="14"
-                           TextColor="{StaticResource TextSecondary}">
-                        <Label.Text>
-                            <MultiBinding StringFormat="Y Range: {0:F1} - {1:F1}">
-                                <Binding Path="YAxisMin" />
-                                <Binding Path="YAxisMax" />
-                            </MultiBinding>
-                        </Label.Text>
+                    <!-- Righe con titolino Primary + valore nero -->
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Display Mode:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding ChartDisplayMode}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
                     </Label>
-                    <Label Text="{Binding TimeWindowSeconds, StringFormat='Time Window: {0}s'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
-                    <Label Text="{Binding XAxisLabelInterval, StringFormat='X Labels every: {0}s'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}">
-                        <Label.Triggers>
-                            <DataTrigger TargetType="Label" Binding="{Binding IsXAxisLabelIntervalEnabled}" Value="False">
-                                <Setter Property="IsVisible" Value="False" />
-                            </DataTrigger>
-                        </Label.Triggers>
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Measuring:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding YAxisLabel}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
                     </Label>
-                    <Label Text="{Binding SamplingRateDisplay, StringFormat='Sample Rate: {0:F1} Hz'}"
-                           FontSize="14"
-                           TextColor="{StaticResource TextSecondary}" />
-                    <Label FontSize="14" TextColor="{StaticResource TextSecondary}">
-                        <Label.Triggers>
-                            <DataTrigger TargetType="Label" Binding="{Binding ShowGrid}" Value="True">
-                                <Setter Property="Text" Value="Show Grid: On" />
-                            </DataTrigger>
-                            <DataTrigger TargetType="Label" Binding="{Binding ShowGrid}" Value="False">
-                                <Setter Property="Text" Value="Show Grid: Off" />
-                            </DataTrigger>
-                        </Label.Triggers>
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Unit:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding YAxisUnit}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
                     </Label>
-                </StackLayout>
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Y Range: " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding YAxisMin}" TextColor="Black"/>
+                                <Span Text=" - " TextColor="Black"/>
+                                <Span Text="{Binding YAxisMax}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Time Window:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding TimeWindowSeconds, StringFormat='{}{0}s'}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="X Labels every:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding XAxisLabelInterval, StringFormat='{}{0}s'}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Sample Rate:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding SamplingRateDisplay, StringFormat='{}{0:F1} Hz'}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                    <Label FontSize="16" Margin="0,0,0,2">
+                        <Label.FormattedText>
+                            <FormattedString>
+                                <Span Text="Show Grid:  " TextColor="{StaticResource Primary}"/>
+                                <Span Text="{Binding ShowGrid}" TextColor="Black"/>
+                            </FormattedString>
+                        </Label.FormattedText>
+                    </Label>
+                </VerticalStackLayout>
             </Frame>
+
+
+
 
         </VerticalStackLayout>
     </ScrollView>

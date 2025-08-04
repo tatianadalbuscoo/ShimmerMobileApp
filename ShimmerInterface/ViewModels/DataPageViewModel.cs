@@ -68,10 +68,6 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private double _autoYAxisMin = 0;
     private double _autoYAxisMax = 1;
 
-    // Testo mostrato sopra il grafico che riassume i valori dei sensori in tempo reale.
-    // Viene aggiornato ogni secondo con i nuovi dati letti dal dispositivo Shimmer.
-    [ObservableProperty]
-    private string sensorText = "Waiting for data...";
 
     [ObservableProperty]
     private string selectedParameter = "Low-Noise AccelerometerX";
@@ -1024,7 +1020,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             if (samplesPerSecond > 0 && sampleCounter % samplesPerSecond == 0)
             {
                 secondsElapsed = (int)Math.Floor(currentTimeSeconds);
-                UpdateSensorTextDisplay(sample);
             }
 
             // Update data collections with single sample
@@ -1167,72 +1162,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         }
     }
 
-
-
-    private void UpdateSensorTextDisplay(dynamic sample)
-    {
-        // Battery info
-        string batteryText = "";
-        if (enableBattery && sample.BatteryVoltage != null)
-        {
-            float batteryMv = (float)sample.BatteryVoltage.Data;
-            float batteryV = batteryMv / 1000f;
-            float batteryPercent;
-
-            if (batteryV <= 3.3f)
-                batteryPercent = 0;
-            else if (batteryV >= 4.2f)
-                batteryPercent = 100;
-            else if (batteryV <= 4.10f)
-                batteryPercent = (batteryV - 3.3f) / (4.10f - 3.3f) * 97f;
-            else
-                batteryPercent = 97f + (batteryV - 4.10f) / (4.20f - 4.10f) * 3f;
-
-            batteryPercent = Math.Clamp(batteryPercent, 0, 100);
-
-            batteryText = $"\nBattery: {batteryV:F2} V ({batteryPercent:F1}%)";
-
-        }
-
-
-        // External ADC Info
-        string adcText = "";
-        if (enableExtA6)
-            adcText += $"\nExt A6: {(float)sample.ExtADC_A6.Data / 1000f:F3} V";
-        if (enableExtA7)
-            adcText += $"\nExt A7: {(float)sample.ExtADC_A7.Data / 1000f:F3} V";
-        if (enableExtA15)
-            adcText += $"\nExt A15: {(float)sample.ExtADC_A15.Data / 1000f:F3} V";
-
-
-        string pressureText = "";
-        if (enablePressureTemperature)
-        {
-            pressureText = $"\nTemperature: {sample.Temperature_BMP180.Data} [{sample.Temperature_BMP180.Unit}]" +
-                           $"\nPressure: {sample.Pressure_BMP180.Data} [{sample.Pressure_BMP180.Unit}]";
-        }
-
-        // Build complete sensor text
-        SensorText =
-            $"[{sample.TimeStamp.Data}]\n" +
-            $"Low-Noise Accelerometer: {sample.LowNoiseAccelerometerX.Data} [{sample.LowNoiseAccelerometerX.Unit}] | " +
-            $"{sample.LowNoiseAccelerometerY.Data} [{sample.LowNoiseAccelerometerY.Unit}] | " +
-            $"{sample.LowNoiseAccelerometerZ.Data} [{sample.LowNoiseAccelerometerZ.Unit}]\n" +
-            $"Wide-Range Accel: {sample.WideRangeAccelerometerX.Data} [{sample.WideRangeAccelerometerX.Unit}] | " +
-            $"{sample.WideRangeAccelerometerY.Data} [{sample.WideRangeAccelerometerY.Unit}] | " +
-            $"{sample.WideRangeAccelerometerZ.Data} [{sample.WideRangeAccelerometerZ.Unit}]\n" +
-            $"Gyroscope: {sample.GyroscopeX.Data} [{sample.GyroscopeX.Unit}] | " +
-            $"{sample.GyroscopeY.Data} [{sample.GyroscopeY.Unit}] | " +
-            $"{sample.GyroscopeZ.Data} [{sample.GyroscopeZ.Unit}]\n" +
-            $"Magnetometer: {sample.MagnetometerX.Data} [{sample.MagnetometerX.Unit}] | " +
-            $"{sample.MagnetometerY.Data} [{sample.MagnetometerY.Unit}] | " +
-            $"{sample.MagnetometerZ.Data} [{sample.MagnetometerZ.Unit}]" +
-            pressureText +
-            batteryText +
-            adcText;
-
-
-    }
 
 
 
