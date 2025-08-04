@@ -1190,7 +1190,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 /// <summary>
 /// ///////////////////////////////////////////////////////////////////////////////////////
 /// </summary>
-/// <returns></returns>
+/// <returns></returns> 
 
     public List<string> GetCurrentSubParameters()
     {
