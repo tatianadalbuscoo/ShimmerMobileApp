@@ -1,17 +1,29 @@
 ﻿using ShimmerInterface.ViewModels;
-using XR2Learn_ShimmerAPI;
 using XR2Learn_ShimmerAPI.IMU;
-using SkiaSharp.Views.Maui.Controls;
 using SkiaSharp.Views.Maui;
 using SkiaSharp;
 using ShimmerInterface.Models;
 
 namespace ShimmerInterface.Views;
 
+/// <summary>
+/// Code-behind for the DataPage view, responsible for real-time rendering of sensor data using SkiaSharp.
+/// Handles layout, axis drawing, sensor enablement checks, and visualization of both single and multiple parameters.
+/// </summary>
 public partial class DataPage : ContentPage
 {
+
+    // The ViewModel associated with this page
     private readonly DataPageViewModel viewModel;
 
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="DataPage"/> class.
+    /// Sets up the UI, disables the navigation back button, binds the ViewModel,
+    /// and subscribes to chart update events triggered by the ViewModel.
+    /// </summary>
+    /// <param name="shimmer">An instance of <see cref="XR2Learn_ShimmerIMU"/> representing the connected sensor device.</param>
+    /// <param name="sensorConfig">A <see cref="ShimmerDevice"/> object containing the current sensor configuration flags.</param>
     public DataPage(XR2Learn_ShimmerIMU shimmer, ShimmerDevice sensorConfig)
     {
         InitializeComponent();
@@ -23,29 +35,34 @@ public partial class DataPage : ContentPage
         viewModel.ChartUpdateRequested += OnChartUpdateRequested;
     }
 
-    #region Canvas Rendering Logic
 
+    /// <summary>
+    /// Renders the chart surface using SkiaSharp, including background, grid, sensor data,
+    /// axes labels, and chart title. Called automatically when the canvas needs to be redrawn.
+    /// </summary>
+    /// <param name="sender">The source of the paint event.</param>
+    /// <param name="e">Contains the drawing surface and image information for rendering.</param>
     private void OnCanvasViewPaintSurface(object sender, SKPaintSurfaceEventArgs e)
     {
         var canvas = e.Surface.Canvas;
         var info = e.Info;
 
+        // Clear the entire canvas with a white background
         canvas.Clear(SKColors.White);
 
         // Check if sensor is disabled
         if (!IsSensorEnabled())
         {
-            DrawDisabledSensorMessage(canvas, info);
             return;
         }
 
         // Check if parameter is available
         if (!viewModel.AvailableParameters.Contains(viewModel.SelectedParameter))
         {
-            DrawDisabledSensorMessage(canvas, info);
             return;
         }
 
+        // Define margins and calculate drawable area
         var margin = 40f;
         var bottomMargin = 65f;
         var leftMargin = 65f;
@@ -61,22 +78,23 @@ public partial class DataPage : ContentPage
         };
         canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
 
-        // Draw grid if enabled
+        // Draw oscilloscope-style grid if enabled by the user
         if (viewModel.ShowGrid)
         {
             DrawOscilloscopeGrid(canvas, leftMargin, margin, graphWidth, graphHeight);
         }
 
+        // Calculate Y-axis range and vertical drawing bounds
         var yRange = viewModel.YAxisMax - viewModel.YAxisMin;
         var bottomY = margin + graphHeight;
         var topY = margin;
 
-        // Calculate time range for X-axis mapping
+        // Calculate X-axis time window based on current time and configured duration
         double currentTime = GetCurrentTimeInSeconds();
         double timeStart = Math.Max(0, currentTime - viewModel.TimeWindowSeconds);
         double timeRange = viewModel.TimeWindowSeconds;
 
-        // Draw data based on chart display mode
+        // Draw sensor data: either as a single parameter or multiple sub-parameters (e.g., X/Y/Z)
         if (viewModel.ChartDisplayMode == ChartDisplayMode.Multi)
         {
             DrawMultipleParameters(canvas, leftMargin, margin, graphWidth, graphHeight,
@@ -88,60 +106,105 @@ public partial class DataPage : ContentPage
                                yRange, bottomY, topY, timeStart, timeRange);
         }
 
-        // Draw axes labels and title
+        // Draw axis labels (time and units), Y-axis ticks, and chart title
         DrawAxesAndTitle(canvas, info, leftMargin, margin, graphWidth, graphHeight,
                         yRange, bottomY, timeStart);
     }
 
+
+    /// <summary>
+    /// Checks whether the currently selected sensor parameter is enabled
+    /// in the current sensor configuration.
+    /// </summary>
+    /// <returns>True if the sensor is enabled; otherwise, false.</returns>
     private bool IsSensorEnabled()
     {
+
+        // Remove any formatting from the parameter name (e.g., "→ ")
         string cleanName = CleanParameterName(viewModel.SelectedParameter);
+
+        // Get the current sensor configuration object
         var config = viewModel.GetCurrentSensorConfiguration();
 
+        // Return true if the sensor associated with the selected parameter is enabled
         return cleanName switch
         {
+
+            // Low-noise accelerometer (full group or individual axis)
             "Low-Noise Accelerometer" or
             "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ"
                 => config.EnableLowNoiseAccelerometer,
 
+            // Wide-range accelerometer (full group or individual axis)
             "Wide-Range Accelerometer" or
             "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ"
                 => config.EnableWideRangeAccelerometer,
 
+            // Gyroscope (full group or individual axis)
             "Gyroscope" or
             "GyroscopeX" or "GyroscopeY" or "GyroscopeZ"
                 => config.EnableGyroscope,
 
+            // Magnetometer (full group or individual axis)
             "Magnetometer" or
             "MagnetometerX" or "MagnetometerY" or "MagnetometerZ"
                 => config.EnableMagnetometer,
 
+            // Pressure and temperature sensor (BMP180)
             "Temperature_BMP180" or "Pressure_BMP180"
                 => config.EnablePressureTemperature,
 
+            // Battery voltage or percentage
             "BatteryVoltage" or "BatteryPercent"
                 => config.EnableBattery,
 
+            // External ADC inputs
             "ExtADC_A6" => config.EnableExtA6,
             "ExtADC_A7" => config.EnableExtA7,
             "ExtADC_A15" => config.EnableExtA15,
+
+            // Any other unknown or unsupported parameter
             _ => false
         };
     }
 
+
+    /// <summary>
+    /// Retrieves the current elapsed time in seconds, as tracked by the ViewModel.
+    /// </summary>
+    /// <returns>The current time in seconds.</returns>
     private double GetCurrentTimeInSeconds()
     {
         return viewModel.CurrentTimeInSeconds;
     }
 
+
+    /// <summary>
+    /// Draws a single data parameter (e.g., AccelerometerX) as a line chart on the canvas.
+    /// Converts each data point into screen coordinates based on time and value range,
+    /// and plots them as a continuous path.
+    /// </summary>
+    /// <param name="canvas">The SkiaSharp canvas to draw on.</param>
+    /// <param name="leftMargin">Left margin in pixels for chart alignment.</param>
+    /// <param name="margin">Top margin in pixels.</param>
+    /// <param name="graphWidth">Width of the drawable graph area.</param>
+    /// <param name="graphHeight">Height of the drawable graph area.</param>
+    /// <param name="yRange">Value range on the Y-axis (max - min).</param>
+    /// <param name="bottomY">Bottom Y position for plotting (pixel coordinate).</param>
+    /// <param name="topY">Top Y position for plotting (pixel coordinate).</param>
+    /// <param name="timeStart">Start time for the X-axis window (in seconds).</param>
+    /// <param name="timeRange">Total time span displayed on the X-axis (in seconds).</param>
     private void DrawSingleParameter(SKCanvas canvas, float leftMargin, float margin,
                                     float graphWidth, float graphHeight, double yRange,
                                     float bottomY, float topY, double timeStart, double timeRange)
     {
+
+        // Get clean parameter name and corresponding data/time series
         string cleanParameterName = CleanParameterName(viewModel.SelectedParameter);
         var currentDataPoints = viewModel.GetDataPoints(cleanParameterName);
         var currentTimeStamps = viewModel.GetTimeStamps(cleanParameterName);
 
+        // If no valid data is available, show a placeholder message
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
         {
             DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
@@ -149,6 +212,7 @@ public partial class DataPage : ContentPage
             return;
         }
 
+        // Define paint style for the data line
         using var linePaint = new SKPaint
         {
             Color = SKColors.Blue,
@@ -157,47 +221,77 @@ public partial class DataPage : ContentPage
             IsAntialias = true
         };
 
+        // Create the path that will be drawn as the curve
         using var path = new SKPath();
 
+        // Convert each data point into canvas coordinates and build the path
         for (int i = 0; i < currentDataPoints.Count; i++)
         {
+
+            // Convert timestamp from milliseconds to seconds and normalize over X-axis
             double sampleTime = currentTimeStamps[i] / 1000.0;
             double normalizedX = (sampleTime - timeStart) / timeRange;
             var x = leftMargin + (float)(normalizedX * graphWidth);
 
+            // Normalize Y value and invert it for canvas coordinates (origin is top-left)
             var normalizedValue = (currentDataPoints[i] - viewModel.YAxisMin) / yRange;
             var y = bottomY - (float)(normalizedValue * graphHeight);
             y = Math.Clamp(y, topY, bottomY);
 
+            // Build the path (move to first point, line to the rest)
             if (i == 0)
                 path.MoveTo(x, y);
             else
                 path.LineTo(x, y);
         }
 
+        // Draw the full path on the canvas
         canvas.DrawPath(path, linePaint);
     }
 
+
+    /// <summary>
+    /// Draws multiple sub-parameters (e.g., X, Y, Z components of a sensor)
+    /// as separate colored lines on the same chart.
+    /// Each parameter is plotted using its own color for visual distinction.
+    /// </summary>
+    /// <param name="canvas">The SkiaSharp canvas to draw on.</param>
+    /// <param name="leftMargin">Left margin of the chart area.</param>
+    /// <param name="margin">Top margin of the chart area.</param>
+    /// <param name="graphWidth">Width of the drawable graph area.</param>
+    /// <param name="graphHeight">Height of the drawable graph area.</param>
+    /// <param name="yRange">Range of Y-axis values (max - min).</param>
+    /// <param name="bottomY">Bottom pixel coordinate of the chart area.</param>
+    /// <param name="topY">Top pixel coordinate of the chart area.</param>
+    /// <param name="timeStart">Start of the visible time window (in seconds).</param>
+    /// <param name="timeRange">Total duration of the visible time window (in seconds).</param>
     private void DrawMultipleParameters(SKCanvas canvas, float leftMargin, float margin,
                                        float graphWidth, float graphHeight, double yRange,
                                        float bottomY, float topY, double timeStart, double timeRange)
     {
+
+        // Get all sub-parameters for the selected group (e.g., X/Y/Z)
         var subParameters = viewModel.GetCurrentSubParameters();
+
+        // Assign colors based on parameter type (e.g., RGB for XYZ axes)
         var colors = GetParameterColors(CleanParameterName(viewModel.SelectedParameter));
 
         bool hasData = false;
 
+        // Iterate through each sub-parameter (e.g., X, Y, Z)
         for (int paramIndex = 0; paramIndex < subParameters.Count; paramIndex++)
         {
             var parameter = subParameters[paramIndex];
             var currentDataPoints = viewModel.GetDataPoints(parameter);
             var currentTimeStamps = viewModel.GetTimeStamps(parameter);
 
+            // Skip empty or invalid datasets
             if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
                 continue;
 
             hasData = true;
 
+            // Set paint color and stroke style for this parameter
             using var linePaint = new SKPaint
             {
                 Color = colors[paramIndex % colors.Length],
@@ -208,6 +302,7 @@ public partial class DataPage : ContentPage
 
             using var path = new SKPath();
 
+            // Convert data points into canvas coordinates and build the path
             for (int i = 0; i < currentDataPoints.Count; i++)
             {
                 double sampleTime = currentTimeStamps[i] / 1000.0;
@@ -224,9 +319,11 @@ public partial class DataPage : ContentPage
                     path.LineTo(x, y);
             }
 
+            // Draw the current parameter's path
             canvas.DrawPath(path, linePaint);
         }
 
+        // If no valid data was found for any parameter, show "No Data" message
         if (!hasData)
         {
             DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
@@ -234,15 +331,30 @@ public partial class DataPage : ContentPage
         }
     }
 
+
+    /// <summary>
+    /// Draws a dashed oscilloscope-style grid on the chart area,
+    /// with horizontal divisions for Y-axis and vertical divisions for the X-axis
+    /// based on the configured time window.
+    /// </summary>
+    /// <param name="canvas">The SkiaSharp canvas to draw on.</param>
+    /// <param name="leftMargin">The left margin of the drawing area.</param>
+    /// <param name="topMargin">The top margin of the drawing area.</param>
+    /// <param name="graphWidth">The width of the drawable graph area.</param>
+    /// <param name="graphHeight">The height of the drawable graph area.</param>
     private void DrawOscilloscopeGrid(SKCanvas canvas, float leftMargin, float topMargin,
                                      float graphWidth, float graphHeight)
     {
+
+        // Calculate right and bottom boundaries of the grid
         float right = leftMargin + graphWidth;
         float bottom = topMargin + graphHeight;
 
+        // Define number of divisions on each axis
         int horizontalDivisions = 4;
         int verticalDivisions = viewModel.TimeWindowSeconds;
 
+        // Create dashed line style for the grid
         using var majorGridPaint = new SKPaint
         {
             Color = SKColors.LightSlateGray,
@@ -251,14 +363,14 @@ public partial class DataPage : ContentPage
             PathEffect = SKPathEffect.CreateDash(new float[] { 4, 4 }, 0)
         };
 
-        // Horizontal grid lines (Y-axis)
+        // Draw horizontal grid lines (Y-axis)
         for (int i = 0; i <= horizontalDivisions; i++)
         {
             float y = bottom - (i * graphHeight / horizontalDivisions);
             canvas.DrawLine(leftMargin, y, right, y, majorGridPaint);
         }
 
-        // Vertical grid lines (X-axis)
+        // Draw vertical grid lines (X-axis)
         for (int i = 0; i <= verticalDivisions; i++)
         {
             float x = leftMargin + (i * graphWidth / verticalDivisions);
@@ -266,10 +378,26 @@ public partial class DataPage : ContentPage
         }
     }
 
+
+    /// <summary>
+    /// Draws the X and Y axis labels, axis units, and the chart title on the canvas.
+    /// X-axis is labeled with time values; Y-axis with measurement units.
+    /// </summary>
+    /// <param name="canvas">The canvas on which to draw.</param>
+    /// <param name="info">The surface size and pixel information.</param>
+    /// <param name="leftMargin">Left margin of the chart area.</param>
+    /// <param name="margin">Top margin of the chart area.</param>
+    /// <param name="graphWidth">Width of the graph area.</param>
+    /// <param name="graphHeight">Height of the graph area.</param>
+    /// <param name="yRange">The full range of values on the Y-axis.</param>
+    /// <param name="bottomY">The bottom Y coordinate of the chart drawing area.</param>
+    /// <param name="timeStart">The starting time (in seconds) for the X-axis.</param>
     private void DrawAxesAndTitle(SKCanvas canvas, SKImageInfo info, float leftMargin,
                                  float margin, float graphWidth, float graphHeight,
                                  double yRange, float bottomY, double timeStart)
     {
+
+        // Define general-purpose paint for axis tick labels
         using var textPaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -277,33 +405,39 @@ public partial class DataPage : ContentPage
             IsAntialias = true
         };
 
-        // X-axis labels
+        // === Draw X-axis tick labels ===
         int numDivisions = viewModel.TimeWindowSeconds;
         int labelInterval = viewModel.IsXAxisLabelIntervalEnabled ? viewModel.XAxisLabelInterval : 1;
 
         for (int i = 0; i <= numDivisions; i++)
         {
+
+            // Compute actual time value at this division
             double actualTime = timeStart + (i * viewModel.TimeWindowSeconds / (double)numDivisions);
             int timeValueForLabel = (int)Math.Floor(actualTime);
 
+            // Skip labels not matching the configured interval
             if (timeValueForLabel < 0 || (timeValueForLabel % labelInterval != 0)) continue;
 
+            // Compute X coordinate and draw the label centered
             float x = leftMargin + (i * graphWidth / numDivisions);
             string label = FormatTimeLabel((int)actualTime);
             var textWidth = textPaint.MeasureText(label);
             canvas.DrawText(label, x - textWidth / 2, bottomY + 20, textPaint);
         }
 
-        // Y-axis labels
+        // === Draw Y-axis tick labels ===
         for (int i = 0; i <= 4; i++)
         {
+
+            // Compute Y value and corresponding canvas coordinate
             var value = viewModel.YAxisMin + (yRange * i / 4);
             var y = bottomY - (float)((value - viewModel.YAxisMin) / yRange * graphHeight);
             var label = value.ToString("F1");
             canvas.DrawText(label, leftMargin - 45, y + 6, textPaint);
         }
 
-        // Axis labels
+        // === Draw axis labels (X and Y titles) ===
         using var axisLabelPaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -312,11 +446,13 @@ public partial class DataPage : ContentPage
             FakeBoldText = true
         };
 
+        // Draw X-axis label centered horizontally at the bottom
         string xAxisLabel = "Time [s]";
         var labelX = (info.Width - axisLabelPaint.MeasureText(xAxisLabel)) / 2;
         var labelY = info.Height - 8;
         canvas.DrawText(xAxisLabel, labelX, labelY, axisLabelPaint);
 
+        // Draw Y-axis label rotated vertically on the left
         var yAxisLabelText = $"{viewModel.YAxisLabel} [{viewModel.YAxisUnit}]";
         canvas.Save();
         canvas.Translate(15, (info.Height + axisLabelPaint.MeasureText(yAxisLabelText)) / 2);
@@ -324,7 +460,7 @@ public partial class DataPage : ContentPage
         canvas.DrawText(yAxisLabelText, 0, 0, axisLabelPaint);
         canvas.Restore();
 
-        // Title
+        // === Draw chart title ===
         using var titlePaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -337,69 +473,24 @@ public partial class DataPage : ContentPage
         canvas.DrawText(viewModel.ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
-    private void DrawDisabledSensorMessage(SKCanvas canvas, SKImageInfo info)
-    {
-        var margin = 40f;
-        var bottomMargin = 65f;
-        var leftMargin = 65f;
-        var graphWidth = info.Width - leftMargin - margin;
-        var graphHeight = info.Height - margin - bottomMargin;
 
-        using var borderPaint = new SKPaint
-        {
-            Color = SKColors.LightGray,
-            Style = SKPaintStyle.Stroke,
-            StrokeWidth = 2
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
-
-        using var backgroundPaint = new SKPaint
-        {
-            Color = SKColors.LightGray.WithAlpha(100),
-            Style = SKPaintStyle.Fill
-        };
-        canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, backgroundPaint);
-
-        using var messagePaint = new SKPaint
-        {
-            Color = SKColors.Red,
-            TextSize = 24,
-            IsAntialias = true,
-            FakeBoldText = true
-        };
-
-        string cleanParameterName = CleanParameterName(viewModel.SelectedParameter);
-        string sensorName = GetSensorDisplayName(cleanParameterName);
-
-        var disabledMessage = $"{sensorName} Disabled";
-        var messageWidth = messagePaint.MeasureText(disabledMessage);
-        var centerX = leftMargin + graphWidth / 2;
-        var centerY = margin + graphHeight / 2;
-
-        canvas.DrawText(disabledMessage, centerX - messageWidth / 2, centerY, messagePaint);
-
-        using var subtitlePaint = new SKPaint
-        {
-            Color = SKColors.Gray,
-            TextSize = 16,
-            IsAntialias = true
-        };
-
-        var subtitleMessage = "Enable this sensor to view data";
-        var subtitleWidth = subtitlePaint.MeasureText(subtitleMessage);
-        canvas.DrawText(subtitleMessage, centerX - subtitleWidth / 2, centerY + 35, subtitlePaint);
-
-        DrawTitle(canvas, info);
-    }
-
+    /// <summary>
+    /// Draws a placeholder message on the canvas indicating that no valid data is available
+    /// to render.
+    /// </summary>
+    /// <param name="canvas">The SkiaSharp canvas to draw on.</param>
+    /// <param name="info">Information about the drawing surface, such as width and height.</param>
     private void DrawNoDataMessage(SKCanvas canvas, SKImageInfo info)
     {
+
+        // Define graph boundaries and margins
         var margin = 40f;
         var bottomMargin = 65f;
         var leftMargin = 65f;
         var graphWidth = info.Width - leftMargin - margin;
         var graphHeight = info.Height - margin - bottomMargin;
 
+        // Draw border around the chart area
         using var borderPaint = new SKPaint
         {
             Color = SKColors.LightGray,
@@ -408,6 +499,7 @@ public partial class DataPage : ContentPage
         };
         canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, borderPaint);
 
+        // Draw semi-transparent background inside the chart area
         using var backgroundPaint = new SKPaint
         {
             Color = SKColors.LightGray.WithAlpha(100),
@@ -415,6 +507,7 @@ public partial class DataPage : ContentPage
         };
         canvas.DrawRect(leftMargin, margin, graphWidth, graphHeight, backgroundPaint);
 
+        // Draw main message in the center of the chart
         using var messagePaint = new SKPaint
         {
             Color = SKColors.OrangeRed,
@@ -430,11 +523,20 @@ public partial class DataPage : ContentPage
 
         canvas.DrawText(message, centerX - messageWidth / 2, centerY, messagePaint);
 
+        // Draw the chart title above the message
         DrawTitle(canvas, info);
     }
 
+
+    /// <summary>
+    /// Draws the chart title centered at the top of the canvas.
+    /// </summary>
+    /// <param name="canvas">The canvas to draw the title on.</param>
+    /// <param name="info">Provides the size of the drawing surface.</param>
     private void DrawTitle(SKCanvas canvas, SKImageInfo info)
     {
+
+        // Define paint style for the title text
         using var titlePaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -442,66 +544,73 @@ public partial class DataPage : ContentPage
             IsAntialias = true,
             FakeBoldText = true
         };
+
+        // Measure text width to center it horizontally
         var titleWidth = titlePaint.MeasureText(viewModel.ChartTitle);
+
+        // Draw title at fixed Y-position (25px from top), horizontally centered
         canvas.DrawText(viewModel.ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
 
-    #endregion
 
-    #region Helper Methods
-
+    /// <summary>
+    /// Removes leading formatting symbols (e.g., arrows or indentation)
+    /// from a parameter display name to extract its raw name.
+    /// </summary>
+    /// <param name="displayName">The display name shown in the UI (possibly formatted).</param>
+    /// <returns>The cleaned parameter name without formatting.</returns>
     private string CleanParameterName(string displayName)
     {
+
+        // Remove leading arrow and indentation (used for visual nesting in dropdowns)
         if (displayName.StartsWith("    → "))
         {
             return displayName.Substring(6);
         }
+
+        // Return the name unchanged if no formatting is found
         return displayName;
     }
 
+
+    /// <summary>
+    /// Returns a predefined set of colors for visualizing grouped sensor parameters,
+    /// such as X/Y/Z components of an accelerometer or gyroscope.
+    /// </summary>
+    /// <param name="groupParameter">The name of the sensor group (e.g., "Accelerometer").</param>
+    /// <returns>An array of SKColor values to use when rendering each sub-parameter.</returns>
     private SKColor[] GetParameterColors(string groupParameter)
     {
+
+        // Assign RGB colors for known grouped sensors (e.g., X = red, Y = green, Z = blue)
         return groupParameter switch
         {
             "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
             "Gyroscope" or "Magnetometer" => new[] { SKColors.Red, SKColors.Green, SKColors.Blue },
+
+            // Default to blue if the parameter is not part of a known group
             _ => new[] { SKColors.Blue }
         };
     }
 
-    private string GetSensorDisplayName(string cleanParameterName)
-    {
-        return cleanParameterName switch
-        {
-            "Low-Noise Accelerometer" or "Low-Noise AccelerometerX" or
-            "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => "Low-Noise Accelerometer",
-            "Wide-Range Accelerometer" or "Wide-Range AccelerometerX" or
-            "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => "Wide-Range Accelerometer",
-            "Gyroscope" or "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => "Gyroscope",
-            "Magnetometer" or "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => "Magnetometer",
-            "Temperature_BMP180" => "Temperature (BMP180)",
-            "Pressure_BMP180" => "Pressure (BMP180)",
-            "BatteryVoltage" or "BatteryPercent" => "Battery",
-            "ExtADC_A6" => "External ADC A6",
-            "ExtADC_A7" => "External ADC A7",
-            "ExtADC_A15" => "External ADC A15",
-            _ => "Sensor"
-        };
-    }
 
+    /// <summary>
+    /// Formats a time value as seconds with "s" suffix for X-axis display.
+    /// </summary>
+    /// <param name="timeValue">The time value in seconds to format.</param>
+    /// <returns>A string representing the time in seconds (e.g., "12s").</returns>
     private string FormatTimeLabel(int timeValue)
     {
-        return viewModel.TimeDisplayMode switch
-        {
-            TimeDisplayMode.Clock => DateTime.Now.AddSeconds(timeValue).ToString("HH:mm:ss"),
-            _ => timeValue.ToString() + "s"
-        };
+        return timeValue.ToString() + "s";
     }
 
-    #endregion
 
-    #region Event Handlers
-
+    /// <summary>
+    /// Handles the chart update request event triggered by the ViewModel.
+    /// Forces the canvas to redraw on the main UI thread.
+    /// </summary>
+    /// <param name="sender">The source of the event (typically the ViewModel).</param>
+    /// <param name="e">The event arguments (unused).</param>
     private void OnChartUpdateRequested(object? sender, EventArgs e)
     {
         MainThread.BeginInvokeOnMainThread(() =>
@@ -510,25 +619,43 @@ public partial class DataPage : ContentPage
         });
     }
 
-    #endregion
 
-    #region Lifecycle Methods
-
+    /// <summary>
+    /// Called when the page becomes visible. Initializes timing and subscribes to
+    /// chart update events to enable real-time rendering of sensor data.
+    /// </summary>
     protected override void OnAppearing()
     {
         base.OnAppearing();
+
+        // Reset the time reference used for the X-axis
         viewModel.ResetStartTime();
+
+        // Start the internal timer that triggers chart updates
         viewModel.StartTimer();
+
+        // Subscribe to chart update requests
         viewModel.ChartUpdateRequested += OnChartUpdateRequested;
     }
 
+
+    /// <summary>
+    /// Called when the page is about to disappear. Stops timers,
+    /// unsubscribes from events, and disposes resources to prevent leaks.
+    /// </summary>
     protected override void OnDisappearing()
     {
+
+        // Stop the chart update timer
         viewModel.StopTimer();
+
+        // Unsubscribe from chart update events to prevent memory leaks
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
+
+        // Dispose of the ViewModel if it holds unmanaged resources or background tasks
         viewModel?.Dispose();
+
         base.OnDisappearing();
     }
 
-    #endregion
 }
