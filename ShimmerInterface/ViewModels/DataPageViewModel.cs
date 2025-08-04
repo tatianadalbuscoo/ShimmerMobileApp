@@ -307,6 +307,8 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             dataParameters.AddRange(new[] { "Temperature_BMP180", "Pressure_BMP180" });
         }
 
+
+
         if (enableExtA6)
             dataParameters.Add("ExtADC_A6");
         if (enableExtA7)
@@ -1066,17 +1068,28 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
             if (enableBattery && sample.BatteryVoltage != null)
             {
-                values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data;
-                values["BatteryPercent"] = (float)Math.Clamp(
-                    ((sample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
+                values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data / 1000f; // mV → V
+                float batteryV = values["BatteryVoltage"];
+                float percent;
+                if (batteryV <= 3.3f)
+                    percent = 0;
+                else if (batteryV >= 4.2f)
+                    percent = 100;
+                else if (batteryV <= 4.10f)
+                    percent = (batteryV - 3.3f) / (4.10f - 3.3f) * 97f;
+                else
+                    percent = 97f + (batteryV - 4.10f) / (4.20f - 4.10f) * 3f;
+                values["BatteryPercent"] = Math.Clamp(percent, 0, 100);
             }
 
+
             if (enableExtA6)
-                values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data;
+                values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data / 1000f;
             if (enableExtA7)
-                values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data;
+                values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data / 1000f;
             if (enableExtA15)
-                values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data;
+                values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data / 1000f;
+
 
         }
         catch (Exception ex)
@@ -1148,21 +1161,35 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         string batteryText = "";
         if (enableBattery && sample.BatteryVoltage != null)
         {
-            float batteryPercent = (float)Math.Clamp(
-                ((sample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
+            float batteryMv = (float)sample.BatteryVoltage.Data;
+            float batteryV = batteryMv / 1000f;
+            float batteryPercent;
 
-            batteryText = $"\nBattery: {sample.BatteryVoltage.Data} [{sample.BatteryVoltage.Unit}] " +
-                          $"({batteryPercent:F1}%)";
+            if (batteryV <= 3.3f)
+                batteryPercent = 0;
+            else if (batteryV >= 4.2f)
+                batteryPercent = 100;
+            else if (batteryV <= 4.10f)
+                batteryPercent = (batteryV - 3.3f) / (4.10f - 3.3f) * 97f;
+            else
+                batteryPercent = 97f + (batteryV - 4.10f) / (4.20f - 4.10f) * 3f;
+
+            batteryPercent = Math.Clamp(batteryPercent, 0, 100);
+
+            batteryText = $"\nBattery: {batteryV:F2} V ({batteryPercent:F1}%)";
+
         }
+
 
         // External ADC Info
         string adcText = "";
         if (enableExtA6)
-            adcText += $"\nExt A6: {sample.ExtADC_A6.Data} [{sample.ExtADC_A6.Unit}]";
+            adcText += $"\nExt A6: {(float)sample.ExtADC_A6.Data / 1000f:F3} V";
         if (enableExtA7)
-            adcText += $"\nExt A7: {sample.ExtADC_A7.Data} [{sample.ExtADC_A7.Unit}]";
+            adcText += $"\nExt A7: {(float)sample.ExtADC_A7.Data / 1000f:F3} V";
         if (enableExtA15)
-            adcText += $"\nExt A15: {sample.ExtADC_A15.Data} [{sample.ExtADC_A15.Unit}]";
+            adcText += $"\nExt A15: {(float)sample.ExtADC_A15.Data / 1000f:F3} V";
+
 
         string pressureText = "";
         if (enablePressureTemperature)
@@ -1367,10 +1394,10 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 break;
             case "BatteryVoltage":
                 YAxisLabel = "Battery Voltage";
-                YAxisUnit = "mV";
+                YAxisUnit = "V";
                 ChartTitle = "Real-time Battery Voltage";
-                YAxisMin = 3000;
-                YAxisMax = 4200;
+                YAxisMin = 3.3;
+                YAxisMax = 4.2;
                 break;
             case "BatteryPercent":
                 YAxisLabel = "Battery Percent";
@@ -1381,24 +1408,24 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 break;
             case "ExtADC_A6":
                 YAxisLabel = "External ADC A6";
-                YAxisUnit = "mV";
+                YAxisUnit = "V";
                 ChartTitle = "External ADC A6";
                 YAxisMin = 0;
-                YAxisMax = 3000;
+                YAxisMax = 3.3;
                 break;
             case "ExtADC_A7":
                 YAxisLabel = "External ADC A7";
-                YAxisUnit = "mV";
+                YAxisUnit = "V";
                 ChartTitle = "External ADC A7";
                 YAxisMin = 0;
-                YAxisMax = 3000;
+                YAxisMax = 3.3;
                 break;
             case "ExtADC_A15":
                 YAxisLabel = "External ADC A15";
-                YAxisUnit = "mV";
+                YAxisUnit = "V";
                 ChartTitle = "External ADC A15";
                 YAxisMin = 0;
-                YAxisMax = 3000;
+                YAxisMax = 3.3;
                 break;
         }
     }
