@@ -47,6 +47,21 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private bool enableExtA7;
     private bool enableExtA15;
 
+    // Limiti generali numerici
+    private const double MAX_DOUBLE = 1e6;
+    private const double MIN_DOUBLE = -1e6;
+
+    // Limiti specifici per la tua applicazione
+    private const double MAX_Y_AXIS = 100_000;
+    private const double MIN_Y_AXIS = -100_000;
+    private const int MAX_TIME_WINDOW_SECONDS = 600;   // 10 minuti
+    private const int MIN_TIME_WINDOW_SECONDS = 1;
+    private const int MAX_X_AXIS_LABEL_INTERVAL = 1000;
+    private const int MIN_X_AXIS_LABEL_INTERVAL = 1;
+    private const double MAX_SAMPLING_RATE = 1000;
+    private const double MIN_SAMPLING_RATE = 1;
+
+
 
 
     // Valori di backup per il ripristino in caso di input non validi
@@ -442,14 +457,15 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
 
     // Valida e aggiorna il valore minimo dell'asse Y.
+
+
+
+
     private void ValidateAndUpdateYAxisMin(string value)
     {
-        // Se siamo in modalità automatica, ignora gli input manuali
         if (AutoYAxis)
             return;
 
-        // Resto del metodo rimane uguale...
-        // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
         if (string.IsNullOrWhiteSpace(value))
         {
             var defaultMin = GetDefaultYAxisMin(SelectedParameter);
@@ -460,7 +476,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             return;
         }
 
-        // Permetti input parziali come "-" o "+"
         if (value.Trim() == "-" || value.Trim() == "+")
         {
             ValidationMessage = "";
@@ -469,6 +484,13 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
         if (TryParseDouble(value, out double result))
         {
+            // *** AGGIUNGI QUESTO CONTROLLO ***
+            if (result < MIN_Y_AXIS || result > MAX_Y_AXIS)
+            {
+                ValidationMessage = $"Y Min out of range ({MIN_Y_AXIS} to {MAX_Y_AXIS}).";
+                ResetYAxisMinText();
+                return;
+            }
             if (result >= YAxisMax)
             {
                 ValidationMessage = "Y Min cannot be greater than or equal to Y Max.";
@@ -488,17 +510,11 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         }
     }
 
-
-
-    // Valida e aggiorna il valore massimo dell'asse Y.
     private void ValidateAndUpdateYAxisMax(string value)
     {
-        // Se siamo in modalità automatica, ignora gli input manuali
         if (AutoYAxis)
             return;
 
-        // Resto del metodo rimane uguale...
-        // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
         if (string.IsNullOrWhiteSpace(value))
         {
             var defaultMax = GetDefaultYAxisMax(SelectedParameter);
@@ -509,7 +525,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             return;
         }
 
-        // Permetti input parziali come "-" o "+"
         if (value.Trim() == "-" || value.Trim() == "+")
         {
             ValidationMessage = "";
@@ -518,6 +533,13 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
         if (TryParseDouble(value, out double result))
         {
+            // *** AGGIUNGI QUESTO CONTROLLO ***
+            if (result < MIN_Y_AXIS || result > MAX_Y_AXIS)
+            {
+                ValidationMessage = $"Y Max out of range ({MIN_Y_AXIS} to {MAX_Y_AXIS}).";
+                ResetYAxisMaxText();
+                return;
+            }
             if (result <= YAxisMin)
             {
                 ValidationMessage = "Y Max cannot be less than or equal to Y Min.";
@@ -538,7 +560,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
 
-    // Modifica il metodo ValidateAndUpdateSamplingRate
+
     private void ValidateAndUpdateSamplingRate(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -557,24 +579,16 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
         if (TryParseDouble(value, out double result))
         {
-            if (result <= 0)
+            // *** AGGIUNGI QUESTO CONTROLLO ***
+            if (result > MAX_SAMPLING_RATE)
             {
-                ValidationMessage = "Sampling rate must be greater than 0 Hz.";
+                ValidationMessage = $"Sampling rate too high. Maximum {MAX_SAMPLING_RATE} Hz.";
                 ResetSamplingRateText();
                 return;
             }
-
-            // Limita il sampling rate a valori ragionevoli
-            if (result > 1000)
+            if (result < MIN_SAMPLING_RATE)
             {
-                ValidationMessage = "Sampling rate too high. Maximum 1000 Hz.";
-                ResetSamplingRateText();
-                return;
-            }
-
-            if (result < 0.1)
-            {
-                ValidationMessage = "Sampling rate too low. Minimum 0.1 Hz.";
+                ValidationMessage = $"Sampling rate too low. Minimum {MIN_SAMPLING_RATE} Hz.";
                 ResetSamplingRateText();
                 return;
             }
@@ -588,6 +602,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             ResetSamplingRateText();
         }
     }
+
 
     private void UpdateSamplingRateAndRestart(double newRate)
     {
@@ -631,7 +646,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
 
 
-    // Valida e aggiorna la finestra temporale in secondi.
     private void ValidateAndUpdateTimeWindow(string value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -641,8 +655,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             TimeWindowSeconds = defaultTimeWindow;
             _lastValidTimeWindowSeconds = defaultTimeWindow;
 
-            ClearAllDataCollections(); // <--- AGGIUNGI QUI
-
+            ClearAllDataCollections();
             ResetAllTimestamps();
             ResetAllCounters();
 
@@ -652,9 +665,16 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
         if (TryParseInt(value, out int result))
         {
-            if (result <= 0)
+            // *** AGGIUNGI QUESTO CONTROLLO ***
+            if (result > MAX_TIME_WINDOW_SECONDS)
             {
-                ValidationMessage = "Time Window must be greater than 0 seconds.";
+                ValidationMessage = $"Time Window too large. Maximum {MAX_TIME_WINDOW_SECONDS} s.";
+                ResetTimeWindowText();
+                return;
+            }
+            if (result < MIN_TIME_WINDOW_SECONDS)
+            {
+                ValidationMessage = $"Time Window too small. Minimum {MIN_TIME_WINDOW_SECONDS} s.";
                 ResetTimeWindowText();
                 return;
             }
@@ -663,8 +683,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             TimeWindowSeconds = result;
             _lastValidTimeWindowSeconds = result;
 
-            ClearAllDataCollections(); // <--- AGGIUNGI QUI
-
+            ClearAllDataCollections();
             ResetAllTimestamps();
             ResetAllCounters();
 
@@ -679,28 +698,32 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
 
 
+
     // Valida e aggiorna l’intervallo tra le etichette sull’asse X.
     private void ValidateAndUpdateXAxisInterval(string value)
     {
-        // Se il campo è vuoto, usa il valore di default ma lascia il campo vuoto
         if (string.IsNullOrWhiteSpace(value))
         {
             const int defaultInterval = 5;
             ValidationMessage = "";
             XAxisLabelInterval = defaultInterval;
             _lastValidXAxisLabelInterval = defaultInterval;
-
-            // Non aggiornare il testo - lascia il campo vuoto
-
             UpdateChart();
             return;
         }
 
         if (TryParseInt(value, out int result))
         {
-            if (result <= 0)
+            // *** AGGIUNGI QUESTO CONTROLLO ***
+            if (result > MAX_X_AXIS_LABEL_INTERVAL)
             {
-                ValidationMessage = "X Labels interval must be greater than 0.";
+                ValidationMessage = $"X Labels interval too high. Maximum {MAX_X_AXIS_LABEL_INTERVAL}.";
+                ResetXAxisIntervalText();
+                return;
+            }
+            if (result < MIN_X_AXIS_LABEL_INTERVAL)
+            {
+                ValidationMessage = $"X Labels interval too low. Minimum {MIN_X_AXIS_LABEL_INTERVAL}.";
                 ResetXAxisIntervalText();
                 return;
             }
@@ -716,6 +739,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             ResetXAxisIntervalText();
         }
     }
+
 
     // Metodi helper per ottenere i valori di default
     // Restituisce il valore minimo di default per l’asse Y in base al parametro selezionato.
