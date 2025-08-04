@@ -10,15 +10,15 @@ namespace ShimmerInterface.Models
     {
         // Display name shown in the UI (e.g., "Shimmer E123 (COM4)")
         [ObservableProperty]
-        private string displayName;
+        private string displayName = "";
 
         // Internal Shimmer identifier (e.g., "E123")
         [ObservableProperty]
-        private string shimmerName;
+        private string shimmerName = "";
 
         // Serial port used for communication
         [ObservableProperty]
-        private string port1;
+        private string port1 = "";
 
         // Whether this device is selected for connection (checkbox)
         [ObservableProperty]

@@ -56,7 +56,7 @@ public partial class LoadingPage : ContentPage
     /// Specifically handles the case where an alert needs to be shown to the user upon connection success or failure.
     /// The logic of when and what to show is controlled entirely by the ViewModel.
     /// </summary>
-    private async void OnViewModelPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+    private async void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(viewModel.ShowAlert) && viewModel.ShowAlert)
         {

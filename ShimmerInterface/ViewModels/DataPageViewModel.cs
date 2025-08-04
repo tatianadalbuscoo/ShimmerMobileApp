@@ -32,10 +32,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private readonly object _dataLock = new();
 
     // Elapsed seconds since data collection started
-    private int secondsElapsed = 0;
+
     private int sampleCounter = 0;
 
-    private DateTime startTime = DateTime.Now;
 
     // Sensor enable flags (set from SensorConfiguration passed in constructor)
     private bool enableLowNoiseAccelerometer;
@@ -122,20 +121,10 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// </summary>
     public double CurrentTimeInSeconds => sampleCounter / shimmer.SamplingRate;
 
-    /// <summary>
-    /// Ora di inizio della raccolta dati per i calcoli temporali
-    /// </summary>
-    public DateTime StartTime => startTime;
 
-    /// <summary>
-    /// Contatore dei campioni raccolti
-    /// </summary>
-    public int SampleCounter => sampleCounter;
 
-    /// <summary>
-    /// Secondi trascorsi dall'inizio della raccolta
-    /// </summary>
-    public int SecondsElapsed => secondsElapsed;
+
+
 
 
     private string _samplingRateText = "51.2";
@@ -261,8 +250,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         OnPropertyChanged(nameof(SamplingRateText));
         _lastValidTimeWindowSeconds = TimeWindowSeconds;
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
-
-        startTime = DateTime.Now;
 
         UpdateTextProperties();
 
@@ -631,8 +618,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     private void ResetAllCounters()
     {
         sampleCounter = 0;
-        secondsElapsed = 0;
-        startTime = DateTime.Now;
     }
 
 
@@ -964,9 +949,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         return timeStampsCollections.ContainsKey(cleanName) ? timeStampsCollections[cleanName] : new List<int>();
     }
 
-    public Dictionary<string, List<float>> SensorDataCollections => dataPointsCollections;
-    public List<string> SensorNames => dataPointsCollections.Keys.ToList();
-
     public List<string> GetCurrentSubParameters()
     {
         // Pulisce il nome del parametro prima di verificare
@@ -1005,27 +987,15 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     {
         try
         {
-            // Get single sample instead of collecting for a full second
             var sample = shimmer.LatestData;
             if (sample == null) return;
 
-            // Increment sample counter
             sampleCounter++;
 
-            // Calculate current time in seconds (fractional)
             double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
 
-            // Update sensor text display every second (approximately)
-            int samplesPerSecond = (int)Math.Round(shimmer.SamplingRate);
-            if (samplesPerSecond > 0 && sampleCounter % samplesPerSecond == 0)
-            {
-                secondsElapsed = (int)Math.Floor(currentTimeSeconds);
-            }
-
-            // Update data collections with single sample
             UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
 
-            // Update chart
             UpdateChart();
         }
         catch (Exception ex)
@@ -1033,6 +1003,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             System.Diagnostics.Debug.WriteLine($"Error in OnTimerElapsed: {ex.Message}");
         }
     }
+
 
     private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
     {
@@ -1374,18 +1345,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
 
-    public void Cleanup()
-    {
-        StopTimer();
-        ClearAllDataCollections();
-    }
-
-    public void ToggleGrid()
-    {
-        ShowGrid = !ShowGrid;
-        UpdateChart();
-    }
-
 
 
     // Cerca di convertire una stringa in un numero double valido.
@@ -1507,10 +1466,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         }
     }
 
-    public void ResetStartTime()
-    {
-        startTime = DateTime.Now;
-    }
 
     
 

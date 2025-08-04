@@ -26,11 +26,11 @@ public partial class LoadingPageViewModel : ObservableObject
 
     // Title of the alert dialog to be shown after connection attempt
     [ObservableProperty]
-    private string alertTitle;
+    private string alertTitle = "";
 
     // Message body of the alert dialog shown to the user.
     [ObservableProperty]
-    private string alertMessage;
+    private string alertMessage = "";
 
     // Flag that indicates whether an alert should be shown on the UI.
     [ObservableProperty]
@@ -85,8 +85,15 @@ public partial class LoadingPageViewModel : ObservableObject
         alertCompletionSource = new TaskCompletionSource<bool>();
         await alertCompletionSource.Task;
 
-        // Return the connection result
-        completion.SetResult(shimmer);
+        if (shimmer != null)
+        {
+            completion.SetResult(shimmer);
+        }
+        else
+        {
+            completion.SetException(new Exception($"Could not connect to {device.ShimmerName} on {device.Port1}"));
+        }
+
         IsConnecting = false;
     }
 
@@ -94,7 +101,7 @@ public partial class LoadingPageViewModel : ObservableObject
     /// <summary>
     /// TaskCompletionSource used internally to wait for the alert dialog to be dismissed by the user.
     /// </summary>
-    private TaskCompletionSource<bool> alertCompletionSource;
+    private TaskCompletionSource<bool> alertCompletionSource = new TaskCompletionSource<bool>();
 
 
     /// <summary>
@@ -174,5 +181,6 @@ public partial class LoadingPageViewModel : ObservableObject
 
     /// <summary>
     /// Exposes the ShimmerDevice object to the View for binding
+    /// </summary>
     public ShimmerDevice Device => device;
 }

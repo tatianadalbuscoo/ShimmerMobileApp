@@ -6,6 +6,8 @@ using ShimmerInterface.Views;
 using XR2Learn_ShimmerAPI.IMU;
 using XR2Learn_ShimmerAPI;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
+
 
 #if WINDOWS
 using System.Management;
@@ -24,7 +26,7 @@ public partial class MainPageViewModel : ObservableObject
     public ObservableCollection<ShimmerDevice> AvailableDevices { get; } = new();
 
     // Internal list to keep track of connected Shimmer instances
-    private List<(XR2Learn_ShimmerIMU shimmer, ShimmerDevice device)> connectedShimmers = new();
+    private readonly List<(XR2Learn_ShimmerIMU shimmer, ShimmerDevice device)> connectedShimmers = new();
 
     // Command to connect to selected Shimmer devices
     public IRelayCommand<INavigation> ConnectCommand { get; }
@@ -68,10 +70,8 @@ public partial class MainPageViewModel : ObservableObject
         foreach (var port in ports)
         {
             // Check if a Shimmer name is associated with this port
-            if (shimmerNames.ContainsKey(port))
-            {
-                string shimmerName = shimmerNames[port];
-
+            if (shimmerNames.TryGetValue(port, out string? shimmerName))
+            { 
                 // Skip ports labeled as "Unknown"
                 if (shimmerName != "Unknown")
                 {
@@ -98,16 +98,16 @@ public partial class MainPageViewModel : ObservableObject
     /// </summary>
     /// <param name="nav">The navigation object used to manage page transitions.</param>
     /// <returns>A Task representing the asynchronous operation.</returns>
-    private async Task Connect(INavigation nav)
+    private async Task Connect(INavigation? nav)
     {
 
         // Get all devices that the user has selected
         var selectedDevices = AvailableDevices.Where(d => d.IsSelected).ToList();
 
         // If no device is selected, show an error message and stop
-        if (!selectedDevices.Any())
+        if (selectedDevices.Count == 0)
         {
-            await App.Current.MainPage.DisplayAlert("Error", "Please select at least one Shimmer device", "OK");
+            await App.Current!.MainPage!.DisplayAlert("Error", "Please select at least one Shimmer device", "OK");
             return;
         }
 
@@ -123,7 +123,8 @@ public partial class MainPageViewModel : ObservableObject
 
             // Show a loading page to initialize the connection
             var loadingPage = new LoadingPage(device, tcs);
-            await Application.Current.MainPage.Navigation.PushModalAsync(loadingPage);
+            await Application.Current!.MainPage!.Navigation.PushModalAsync(loadingPage);
+
 
             // Wait for the loading page to finish connecting
             var shimmer = await tcs.Task;
@@ -139,7 +140,7 @@ public partial class MainPageViewModel : ObservableObject
         }
 
         // If at least one device was connected, create the tabbed interface
-        if (connectedShimmers.Any())
+        if (connectedShimmers.Count > 0)
         {
             CreateTabbedPage();
         }
@@ -166,7 +167,7 @@ public partial class MainPageViewModel : ObservableObject
             // Set the title of the tab: use Shimmer ID if known, otherwise use index number
             string tabTitle = !string.IsNullOrEmpty(device?.ShimmerName) && device.ShimmerName != "Unknown"
                 ? $"Shimmer {device.ShimmerName}"
-                : $"Shimmer {connectedShimmers.IndexOf((shimmer, device)) + 1}";
+                : $"Shimmer {connectedShimmers.IndexOf((shimmer, device!)) + 1}";
 
             // Add the DataPage to the TabbedPage
             dataPage.Title = tabTitle;
@@ -174,7 +175,10 @@ public partial class MainPageViewModel : ObservableObject
         }
 
         // Set the new TabbedPage as the main page of the application inside a NavigationPage
-        Application.Current.MainPage = new NavigationPage(tabbedPage);
+        if (Application.Current != null)
+        {
+            Application.Current.MainPage = new NavigationPage(tabbedPage);
+        }
     }
 
 
@@ -188,7 +192,7 @@ public partial class MainPageViewModel : ObservableObject
     /// <returns>
     /// Dictionary mapping COM port (e.g., "COM15") to Shimmer name (e.g., "DDCE").
     /// </returns>
-    private Dictionary<string, string> GetShimmerNamesFromWMI()
+    private static Dictionary<string, string> GetShimmerNamesFromWMI()
     {
 
         // Create a dictionary to hold the mapping: COM port -> Shimmer name
@@ -205,8 +209,8 @@ public partial class MainPageViewModel : ObservableObject
                 {
 
                     // Read the Name and DeviceID of each matching device
-                    string name = obj["Name"]?.ToString();
-                    string deviceId = obj["DeviceID"]?.ToString();
+                    string name = obj["Name"]?.ToString() ?? "";
+                    string? deviceId = obj["DeviceID"]?.ToString();
 
                     // Skip this entry if name or device ID is missing
                     if (name == null || deviceId == null) continue;
@@ -252,7 +256,7 @@ public partial class MainPageViewModel : ObservableObject
     /// <returns>
     /// The 4-character uppercase Shimmer ID (e.g., "DDCE"), or "Unknown" if not found.
     /// </returns>
-    private string ExtractShimmerName(string deviceId, string friendlyName)
+    private static string ExtractShimmerName(string deviceId, string friendlyName)
     {
         // Try to find "Shimmer3-XXXX" pattern in friendly name
         if (!string.IsNullOrEmpty(friendlyName))
@@ -282,12 +286,7 @@ public partial class MainPageViewModel : ObservableObject
         // If not found in name, try extracting from the DeviceID using regex
         if (!string.IsNullOrEmpty(deviceId))
         {
-
-            // Match a pattern like "&00066680XXXX_" where XXXX is the hex ID
-            var match = System.Text.RegularExpressions.Regex.Match(
-                deviceId,
-                @"&00066680([A-F0-9]{4})_",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            var match = DeviceIdRegex().Match(deviceId);
 
             if (match.Success)
             {
@@ -307,7 +306,7 @@ public partial class MainPageViewModel : ObservableObject
     /// <returns>
     /// True if the string contains only valid hexadecimal characters; otherwise, false.
     /// </returns>
-    private bool IsHexString(string str)
+    private static bool IsHexString(string str)
     {
 
         // Loop through each character in the input string
@@ -321,4 +320,8 @@ public partial class MainPageViewModel : ObservableObject
         // All characters are valid hex digits
         return true;
     }
+
+    [GeneratedRegex(@"&00066680([A-F0-9]{4})_", RegexOptions.IgnoreCase)]
+    private static partial Regex DeviceIdRegex();
+
 }
