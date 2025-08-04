@@ -52,9 +52,9 @@ namespace XR2Learn_ShimmerAPI.IMU
         public XR2Learn_ShimmerIMUData(
             SensorData timeStamp,
             SensorData accelerometerX, SensorData accelerometerY, SensorData accelerometerZ,
+            SensorData wideAccelerometerX, SensorData wideAccelerometerY, SensorData wideAccelerometerZ,
             SensorData gyroscopeX, SensorData gyroscopeY, SensorData gyroscopeZ,
             SensorData magnetometerX, SensorData magnetometerY, SensorData magnetometerZ,
-            SensorData wideAccelerometerX, SensorData wideAccelerometerY, SensorData wideAccelerometerZ,
             SensorData temperatureBMP180, SensorData pressureBMP180,
             SensorData batteryVoltage,
             SensorData extADC_A6, SensorData extADC_A7, SensorData extADC_A15

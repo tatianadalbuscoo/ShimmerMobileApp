@@ -1,23 +1,14 @@
-﻿// ViewModel for the DataPage. It manages real-time data acquisition from a Shimmer device,
-// input validation, and UI chart updates using SkiaSharp.
-
-using CommunityToolkit.Mvvm.ComponentModel;
-using XR2Learn_ShimmerAPI;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using XR2Learn_ShimmerAPI.IMU;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using ShimmerInterface.Models;
 
-
-
 namespace ShimmerInterface.ViewModels;
 
-public enum TimeDisplayMode
-{
-    Seconds,
-    Clock
-}
-
+/// <summary>
+/// Specifies the display mode for the chart: either a single parameter or a group of parameters (e.g., X/Y/Z).
+/// </summary>
 public enum ChartDisplayMode
 {
     Single,
@@ -113,8 +104,6 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     private double samplingRateDisplay;
 
-    [ObservableProperty]
-    private TimeDisplayMode timeDisplayMode = TimeDisplayMode.Seconds;
 
     [ObservableProperty]
     private bool showGrid = true;
@@ -460,8 +449,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
 
-    // Modifica i metodi di validazione per gestire campi vuoti con valori di default
-
     // Valida e aggiorna il valore minimo dell'asse Y.
     private void ValidateAndUpdateYAxisMin(string value)
     {
@@ -643,42 +630,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         startTime = DateTime.Now;
     }
 
-
-    private void RestartTimerWithNewSamplingRate()
-    {
-        // Questo metodo ora è sostituito da UpdateSamplingRateAndRestart
-        // Mantienilo per compatibilità se usato altrove
-        UpdateSamplingRateAndRestart(shimmer.SamplingRate);
-    }
-
-
-    // Nuovo metodo per ricalcolare i punti massimi
-    private void RecalculateMaxPointsForAllCollections()
-    {
-        var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
-
-        // Itera direttamente sulle chiavi delle collezioni invece che su AvailableParameters
-        foreach (var parameter in dataPointsCollections.Keys.ToList())
-        {
-            if (dataPointsCollections.ContainsKey(parameter) &&
-                timeStampsCollections.ContainsKey(parameter))
-            {
-                // Taglia la collezione se ha troppi punti
-                while (dataPointsCollections[parameter].Count > maxPoints)
-                {
-                    dataPointsCollections[parameter].RemoveAt(0);
-                    timeStampsCollections[parameter].RemoveAt(0);
-                }
-            }
-        }
-    }
-
-
-    public void ResetSampleCounter()
-    {
-        sampleCounter = 0;
-        secondsElapsed = 0;
-    }
 
 
     private void ResetSamplingRateText()
@@ -924,17 +875,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         return displayName;
     }
 
-    private string GetDisplayName(string cleanName)
-    {
-        // Se il parametro è un sub-parametro, restituisce la versione con freccia
-        if (cleanName.Contains("AccelerometerX") || cleanName.Contains("AccelerometerY") || cleanName.Contains("AccelerometerZ") ||
-            cleanName.Contains("GyroscopeX") || cleanName.Contains("GyroscopeY") || cleanName.Contains("GyroscopeZ") ||
-            cleanName.Contains("MagnetometerX") || cleanName.Contains("MagnetometerY") || cleanName.Contains("MagnetometerZ"))
-        {
-            return "    → " + cleanName;
-        }
-        return cleanName;
-    }
+
 
 
 
@@ -964,33 +905,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
 
 
-    // Restituisce true se il sensore associato al parametro è abilitato.
-    private bool IsSensorEnabled(string parameter)
-    {
-        // Pulisce il nome del parametro prima di verificare
-        string cleanName = CleanParameterName(parameter);
 
-        return cleanName switch
-        {
-            // Gruppi multi-parametro
-            "Low-Noise Accelerometer" => enableLowNoiseAccelerometer,
-            "Wide-Range Accelerometer" => enableWideRangeAccelerometer,
-            "Gyroscope" => enableGyroscope,
-            "Magnetometer" => enableMagnetometer,
-
-            // Parametri singoli
-            "Low-Noise AccelerometerX" or "Low-Noise AccelerometerY" or "Low-Noise AccelerometerZ" => enableLowNoiseAccelerometer,
-            "Wide-Range AccelerometerX" or "Wide-Range AccelerometerY" or "Wide-Range AccelerometerZ" => enableWideRangeAccelerometer,
-            "GyroscopeX" or "GyroscopeY" or "GyroscopeZ" => enableGyroscope,
-            "MagnetometerX" or "MagnetometerY" or "MagnetometerZ" => enableMagnetometer,
-            "Temperature_BMP180" or "Pressure_BMP180" => enablePressureTemperature,
-            "BatteryVoltage" or "BatteryPercent" => enableBattery,
-            "ExtADC_A6" => enableExtA6,
-            "ExtADC_A7" => enableExtA7,
-            "ExtADC_A15" => enableExtA15,
-            _ => false
-        };
-    }
 
     private void ClearAllDataCollections()
     {
@@ -1021,6 +936,10 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         string cleanName = CleanParameterName(parameter);
         return timeStampsCollections.ContainsKey(cleanName) ? timeStampsCollections[cleanName] : new List<int>();
     }
+
+    public Dictionary<string, List<float>> SensorDataCollections => dataPointsCollections;
+    public List<string> SensorNames => dataPointsCollections.Keys.ToList();
+
     public List<string> GetCurrentSubParameters()
     {
         // Pulisce il nome del parametro prima di verificare
@@ -1050,11 +969,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
 
-    private void RestartTimer()
-    {
-        StopTimer();
-        StartTimer();
-    }
 
 
 
@@ -1200,98 +1114,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
 
 
-
-
-
-    private void UpdateAllDataCollectionsWithAllSamples(List<dynamic> samples)
-    {
-        foreach (var sample in samples)
-        {
-            var values = new Dictionary<string, float>();
-
-            try
-            {
-                if (enableLowNoiseAccelerometer)
-                {
-                    values["Low-Noise AccelerometerX"] = (float)sample.LowNoiseAccelerometerX.Data;
-                    values["Low-Noise AccelerometerY"] = (float)sample.LowNoiseAccelerometerY.Data;
-                    values["Low-Noise AccelerometerZ"] = (float)sample.LowNoiseAccelerometerZ.Data;
-                }
-
-                if (enableWideRangeAccelerometer)
-                {
-                    values["Wide-Range AccelerometerX"] = (float)sample.WideRangeAccelerometerX.Data;
-                    values["Wide-Range AccelerometerY"] = (float)sample.WideRangeAccelerometerY.Data;
-                    values["Wide-Range AccelerometerZ"] = (float)sample.WideRangeAccelerometerZ.Data;
-                }
-
-                if (enableGyroscope)
-                {
-                    values["GyroscopeX"] = (float)sample.GyroscopeX.Data;
-                    values["GyroscopeY"] = (float)sample.GyroscopeY.Data;
-                    values["GyroscopeZ"] = (float)sample.GyroscopeZ.Data;
-                }
-
-                if (enableMagnetometer)
-                {
-                    values["MagnetometerX"] = (float)sample.MagnetometerX.Data;
-                    values["MagnetometerY"] = (float)sample.MagnetometerY.Data;
-                    values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
-                }
-
-                if (enablePressureTemperature)
-                {
-                    values["Temperature_BMP180"] = (float)sample.Temperature_BMP180.Data;
-                    values["Pressure_BMP180"] = (float)sample.Pressure_BMP180.Data;
-                }
-
-                if (enableBattery && sample.BatteryVoltage != null)
-                {
-                    values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data;
-                    values["BatteryPercent"] = (float)Math.Clamp(
-                        ((sample.BatteryVoltage.Data - 3300) / 900) * 100, 0, 100);
-                }
-                if (enableExtA6)
-                    values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data;
-                if (enableExtA7)
-                    values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data;
-                if (enableExtA15)
-                    values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data;
-
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error processing sample: {ex.Message}");
-                continue;
-            }
-
-            // Calcola il timestamp per questo campione specifico
-            var sampleIndex = samples.IndexOf(sample);
-            var fractionalTime = secondsElapsed + (double)sampleIndex / samples.Count;
-
-            // Aggiorna ogni collezione SOLO se c'è un valore valido
-            foreach (var parameter in AvailableParameters)
-            {
-                if (values.ContainsKey(parameter))
-                {
-                    dataPointsCollections[parameter].Add(values[parameter]);
-                    timeStampsCollections[parameter].Add((int)Math.Round(fractionalTime * 1000));
-
-                    // Mantieni solo i punti degli ultimi TimeWindowSeconds
-                    var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
-                    while (dataPointsCollections[parameter].Count > maxPoints)
-                    {
-                        dataPointsCollections[parameter].RemoveAt(0);
-                        timeStampsCollections[parameter].RemoveAt(0);
-                    }
-                }
-            }
-        }
-    }
-
-
-   
-
     private void UpdateSensorTextDisplay(dynamic sample)
     {
         // Battery info
@@ -1339,183 +1161,10 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             pressureText +
             batteryText +
             adcText;
+
+
     }
 
-
-    // Aggiungi questo nuovo metodo per raccogliere i campioni:
-    private List<dynamic> CollectSamplesForLastSecond()
-    {
-        var samples = new List<dynamic>();
-        var samplesPerSecond = (int)Math.Round(shimmer.SamplingRate);
-
-        // Raccogli i campioni per l'ultimo secondo
-        for (int i = 0; i < samplesPerSecond; i++)
-        {
-            var data = shimmer.LatestData;
-            if (data != null)
-            {
-                samples.Add(data);
-            }
-
-            // Piccola pausa per rispettare il sampling rate
-            System.Threading.Thread.Sleep((int)(1000.0 / shimmer.SamplingRate));
-        }
-
-        return samples;
-    }
-
-  
-
-    // Aggiungi questo metodo per calcolare i valori mediati:
-    // Replace the existing CalculateAveragedData method with this fixed version:
-    private dynamic CalculateAveragedData(List<dynamic> samples)
-    {
-        if (samples.Count == 0) return null;
-
-        // Calculate averages for standard sensors
-        var avgAccelX = samples.Average(s => (double)s.LowNoiseAccelerometerX.Data);
-        var avgAccelY = samples.Average(s => (double)s.LowNoiseAccelerometerY.Data);
-        var avgAccelZ = samples.Average(s => (double)s.LowNoiseAccelerometerZ.Data);
-
-        var avgGyroX = samples.Average(s => (double)s.GyroscopeX.Data);
-        var avgGyroY = samples.Average(s => (double)s.GyroscopeY.Data);
-        var avgGyroZ = samples.Average(s => (double)s.GyroscopeZ.Data);
-
-        var avgMagX = samples.Average(s => (double)s.MagnetometerX.Data);
-        var avgMagY = samples.Average(s => (double)s.MagnetometerY.Data);
-        var avgMagZ = samples.Average(s => (double)s.MagnetometerZ.Data);
-
-        var avgTemp = samples.Average(s => (double)s.Temperature_BMP180.Data);
-        var avgPress = samples.Average(s => (double)s.Pressure_BMP180.Data);
-
-
-        var avgWideAccX = samples.Average(s => (double)s.WideRangeAccelerometerX.Data);
-        var avgWideAccY = samples.Average(s => (double)s.WideRangeAccelerometerY.Data);
-        var avgWideAccZ = samples.Average(s => (double)s.WideRangeAccelerometerZ.Data);
-
-        var avgExtA6 = samples.Average(s => (double)s.ExtADC_A6.Data);
-        var avgExtA7 = samples.Average(s => (double)s.ExtADC_A7.Data);
-        var avgExtA15 = samples.Average(s => (double)s.ExtADC_A15.Data);
-
-
-        // 🪫 Battery average (senza reflection)
-        double avgBatteryVoltage = 0;
-        string batteryUnit = "mV";
-
-        double avgBatteryPercent = 0;
-
-        if (enableBattery && samples.Count > 0)
-        {
-            avgBatteryVoltage = samples.Average(s => (double)s.BatteryVoltage.Data);
-            avgBatteryPercent = Math.Clamp((avgBatteryVoltage - 3300) / 900 * 100, 0, 100);
-            batteryUnit = samples.First().BatteryVoltage.Unit;
-        }
-
-        // Create the result object
-        var result = new
-        {
-            TimeStamp = samples.Last().TimeStamp,
-            AccelerometerX = new { Data = avgAccelX, Unit = samples.First().LowNoiseAccelerometerX.Unit },
-            AccelerometerY = new { Data = avgAccelY, Unit = samples.First().LowNoiseAccelerometerY.Unit },
-            AccelerometerZ = new { Data = avgAccelZ, Unit = samples.First().LowNoiseAccelerometerZ.Unit },
-            WideRangeAccelerometerX = new { Data = avgWideAccX, Unit = samples.First().WideRangeAccelerometerX.Unit },
-            WideRangeAccelerometerY = new { Data = avgWideAccY, Unit = samples.First().WideRangeAccelerometerY.Unit },
-            WideRangeAccelerometerZ = new { Data = avgWideAccZ, Unit = samples.First().WideRangeAccelerometerZ.Unit },
-            GyroscopeX = new { Data = avgGyroX, Unit = samples.First().GyroscopeX.Unit },
-            GyroscopeY = new { Data = avgGyroY, Unit = samples.First().GyroscopeY.Unit },
-            GyroscopeZ = new { Data = avgGyroZ, Unit = samples.First().GyroscopeZ.Unit },
-            MagnetometerX = new { Data = avgMagX, Unit = samples.First().MagnetometerX.Unit },
-            MagnetometerY = new { Data = avgMagY, Unit = samples.First().MagnetometerY.Unit },
-            MagnetometerZ = new { Data = avgMagZ, Unit = samples.First().MagnetometerZ.Unit },
-            Temperature_BMP180 = new { Data = avgTemp, Unit = samples.First().Temperature_BMP180.Unit },
-            Pressure_BMP180 = new { Data = avgPress, Unit = samples.First().Pressure_BMP180.Unit },
-            BatteryVoltage = new { Data = avgBatteryVoltage, Unit = batteryUnit },
-            BatteryPercent = new { Data = avgBatteryPercent, Unit = "%" },
-            ExtADC_A6 = new { Data = avgExtA6, Unit = samples.First().ExtADC_A6.Unit },
-            ExtADC_A7 = new { Data = avgExtA7, Unit = samples.First().ExtADC_A7.Unit },
-            ExtADC_A15 = new { Data = avgExtA15, Unit = samples.First().ExtADC_A15.Unit }
-        };
-
-        return result;
-    }
-
-
-
-    // Inserisce i nuovi dati raccolti nelle collezioni dei parametri abilitati.
-    private void UpdateAllDataCollections(dynamic data)
-    {
-        var values = new Dictionary<string, float>();
-
-        try
-        {
-            if (enableLowNoiseAccelerometer)
-            {
-                values["Low-Noise AccelerometerX"] = (float)data.LowNoiseAccelerometerX.Data;
-                values["Low-Noise AccelerometerY"] = (float)data.LowNoiseAccelerometerY.Data;
-                values["Low-Noise AccelerometerZ"] = (float)data.LowNoiseAccelerometerZ.Data;
-            }
-
-            if (enableWideRangeAccelerometer)
-            {
-                values["Wide-Range AccelerometerX"] = (float)data.WideRangeAccelerometerX.Data;
-                values["Wide-Range AccelerometerY"] = (float)data.WideRangeAccelerometerY.Data;
-                values["Wide-Range AccelerometerZ"] = (float)data.WideRangeAccelerometerZ.Data;
-            }
-
-            if (enableGyroscope)
-            {
-                values["GyroscopeX"] = (float)data.GyroscopeX.Data;
-                values["GyroscopeY"] = (float)data.GyroscopeY.Data;
-                values["GyroscopeZ"] = (float)data.GyroscopeZ.Data;
-            }
-
-            if (enableMagnetometer)
-            {
-                values["MagnetometerX"] = (float)data.MagnetometerX.Data;
-                values["MagnetometerY"] = (float)data.MagnetometerY.Data;
-                values["MagnetometerZ"] = (float)data.MagnetometerZ.Data;
-            }
-            if (enablePressureTemperature)
-            {
-                values["Temperature_BMP180"] = (float)data.Temperature_BMP180.Data;
-                values["Pressure_BMP180"] = (float)data.Pressure_BMP180.Data;
-            }
-
-            if (enableBattery && data.BatteryVoltage != null)
-            {
-                values["BatteryVoltage"] = (float)data.BatteryVoltage.Data;
-            }
-            if (enableExtA6)
-                values["ExtADC_A6"] = (float)data.ExtADC_A6.Data;
-            if (enableExtA7)
-                values["ExtADC_A7"] = (float)data.ExtADC_A7.Data;
-            if (enableExtA15)
-                values["ExtADC_A15"] = (float)data.ExtADC_A15.Data;
-
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error in UpdateAllDataCollections: {ex.Message}");
-            return;
-        }
-
-        // Aggiorna ogni collezione SOLO se c'è un valore valido
-        foreach (var parameter in AvailableParameters)
-        {
-            if (values.ContainsKey(parameter))
-            {
-                dataPointsCollections[parameter].Add(values[parameter]);
-                timeStampsCollections[parameter].Add(secondsElapsed);
-
-                // Mantieni solo gli ultimi punti secondo la finestra temporale
-                while (dataPointsCollections[parameter].Count > TimeWindowSeconds)
-                {
-                    dataPointsCollections[parameter].RemoveAt(0);
-                    timeStampsCollections[parameter].RemoveAt(0);
-                }
-            }
-        }
-    }
 
 
     // Genera un evento per aggiornare il grafico.
@@ -1727,47 +1376,6 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
     }
 
 
-
-    // Aggiorna manualmente i limiti degli assi e la finestra temporale.
-    public void UpdateAxisScales(double minY, double maxY, int timeWindow)
-    {
-
-        if (minY >= maxY)
-        {
-            ValidationMessage = "Y Min cannot be greater than or equal to Y Max.";
-            return;
-        }
-
-        if (timeWindow <= 0)
-        {
-            ValidationMessage = "Time Window must be greater than 0 seconds.";
-            return;
-        }
-
-        ValidationMessage = "";
-        YAxisMin = minY;
-        YAxisMax = maxY;
-        TimeWindowSeconds = timeWindow;
-
-        // Aggiorna i valori di backup
-        _lastValidYAxisMin = minY;
-        _lastValidYAxisMax = maxY;
-        _lastValidTimeWindowSeconds = timeWindow;
-
-        // Aggiorna i testi
-        UpdateTextProperties();
-    }
-
-    // Disegna il grafico dei dati sul canvas SkiaSharp.
-    
-
-   
-
-
-    
-
-   
-
     public void Cleanup()
     {
         StopTimer();
@@ -1780,19 +1388,7 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         UpdateChart();
     }
 
-    // Metodi di validazione numerica 
 
-    //// Verifica se un numero double è valido (non infinito, non NaN, ecc.).
-    private static bool IsValidNumber(double value)
-    {
-        return !double.IsNaN(value) && !double.IsInfinity(value) && value != double.MinValue && value != double.MaxValue;
-    }
-
-    // Verifica se un intero è positivo e valido.
-    private static bool IsValidPositiveInteger(int value)
-    {
-        return value > 0 && value < int.MaxValue;
-    }
 
     // Cerca di convertire una stringa in un numero double valido.
     public static bool TryParseDouble(string input, out double result)
@@ -1861,67 +1457,9 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         return int.TryParse(cleanInput, out result);
     }
 
-    // Disegna un messaggio che segnala che il sensore è disattivato.
     
 
-
-    // Disegna un messaggio quando non ci sono dati validi da mostrare.
-   
-
-    // Disegna un messaggio che indica che il sensore è in fase di calibrazione.
-    
-
-    // Aggiorna la configurazione dei sensori attivi e rigenera la lista dei parametri.
-    public void UpdateSensorConfiguration(
-       bool enableAccelerometer,
-       bool enableWideRangeAccelerometer,
-       bool enableGyroscope,
-       bool enableMagnetometer,
-       bool enablePressureTemperature,
-       bool enableBattery,
-       bool enableExtA6,
-       bool enableExtA7,
-       bool enableExtA15)
-    {
-        // Salva il parametro attualmente selezionato
-        string currentParameter = SelectedParameter;
-
-        // Aggiorna i flag dei sensori
-        this.enableLowNoiseAccelerometer = enableAccelerometer;
-        this.enableWideRangeAccelerometer = enableWideRangeAccelerometer;
-        this.enableGyroscope = enableGyroscope;
-        this.enableMagnetometer = enableMagnetometer;
-        this.enablePressureTemperature = enablePressureTemperature;
-        this.enableBattery = enableBattery;
-        this.enableExtA6 = enableExtA6;
-        this.enableExtA7 = enableExtA7;
-        this.enableExtA15 = enableExtA15;
-
-        // Rigenera la lista dei parametri disponibili
-        InitializeAvailableParameters();
-
-        // Se il parametro precedente non è più disponibile, seleziona il primo disponibile
-        if (!AvailableParameters.Contains(currentParameter))
-        {
-            SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
-        }
-
-        // Aggiorna le collezioni di dati
-        UpdateDataCollections();
-
-    }
-
-    // Metodo per aggiornare le collezioni di dati dopo cambio configurazione
-    // Aggiorna le collezioni di dati per riflettere i sensori attivi.
-    private void UpdateDataCollections()
-    {
-        // Cancella tutto e ricrea
-        dataPointsCollections.Clear();
-        timeStampsCollections.Clear();
-
-        // Reinizializza con la configurazione attuale
-        InitializeDataCollections();
-    }
+ 
 
 
     // Metodo per ottenere la configurazione corrente
