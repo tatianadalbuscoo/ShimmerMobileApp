@@ -85,6 +85,7 @@ public partial class LoadingPageViewModel : ObservableObject
         alertCompletionSource = new TaskCompletionSource<bool>();
         await alertCompletionSource.Task;
 
+        // If the connection was successful, complete the external Task with the shimmer device
         if (shimmer != null)
         {
             completion.SetResult(shimmer);
@@ -178,9 +179,4 @@ public partial class LoadingPageViewModel : ObservableObject
         return null;
     }
 
-
-    /// <summary>
-    /// Exposes the ShimmerDevice object to the View for binding
-    /// </summary>
-    public ShimmerDevice Device => device;
 }
