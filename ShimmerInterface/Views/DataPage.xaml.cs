@@ -201,8 +201,8 @@ public partial class DataPage : ContentPage
 
         // Get clean parameter name and corresponding data/time series
         string cleanParameterName = CleanParameterName(viewModel.SelectedParameter);
-        var currentDataPoints = viewModel.GetDataPoints(cleanParameterName);
-        var currentTimeStamps = viewModel.GetTimeStamps(cleanParameterName);
+        var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(cleanParameterName);
+        
 
         // If no valid data is available, show a placeholder message
         if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
@@ -282,8 +282,8 @@ public partial class DataPage : ContentPage
         for (int paramIndex = 0; paramIndex < subParameters.Count; paramIndex++)
         {
             var parameter = subParameters[paramIndex];
-            var currentDataPoints = viewModel.GetDataPoints(parameter);
-            var currentTimeStamps = viewModel.GetTimeStamps(parameter);
+            var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(parameter);
+
 
             // Skip empty or invalid datasets
             if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))

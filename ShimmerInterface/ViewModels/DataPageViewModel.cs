@@ -29,6 +29,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private readonly Dictionary<string, List<float>> dataPointsCollections = new();
     private readonly Dictionary<string, List<int>> timeStampsCollections = new();
 
+    private readonly object _dataLock = new();
+
     // Elapsed seconds since data collection started
     private int secondsElapsed = 0;
     private int sampleCounter = 0;
@@ -653,15 +655,12 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
 
         // Taglia tutte le collezioni alla nuova dimensione usando le chiavi delle collezioni
         var maxPoints = (int)(defaultTimeWindow * shimmer.SamplingRate);
-        foreach (var parameter in dataPointsCollections.Keys.ToList())
-        {
-            while (dataPointsCollections[parameter].Count > maxPoints)
+            foreach (var parameter in dataPointsCollections.Keys.ToList())
             {
-                dataPointsCollections[parameter].RemoveAt(0);
-                timeStampsCollections[parameter].RemoveAt(0);
+                TrimCollection(parameter, maxPoints);
             }
-        }
-        UpdateChart();
+
+            UpdateChart();
         return;
     }
 
@@ -920,6 +919,22 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
         }
     }
 
+    private void TrimCollection(string parameter, int maxPoints)
+    {
+        if (dataPointsCollections.TryGetValue(parameter, out var dataList) &&
+            timeStampsCollections.TryGetValue(parameter, out var timeList))
+        {
+            while (dataList.Count > maxPoints && timeList.Count > 0)
+            {
+                if (dataList.Count > 0)
+                    dataList.RemoveAt(0);
+                if (timeList.Count > 0)
+                    timeList.RemoveAt(0);
+            }
+        }
+    }
+
+
 
 
 
@@ -1070,26 +1085,27 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
             return;
         }
 
-        // Convert current time to milliseconds for timestamp
-        int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
-
-        // Calculate max points based on current sampling rate
-        var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
-
-        // Update each collection with the new sample
-        foreach (var parameter in AvailableParameters)
+        lock (_dataLock)
         {
-            string cleanName = CleanParameterName(parameter);
-            if (values.ContainsKey(cleanName))
-            {
-                dataPointsCollections[cleanName].Add(values[cleanName]);
-                timeStampsCollections[cleanName].Add(timestampMs);
 
-                // Mantieni solo TimeWindowSeconds * samplingRate punti
-                while (dataPointsCollections[cleanName].Count > maxPoints)
+            // Convert current time to milliseconds for timestamp
+            int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
+
+            // Calculate max points based on current sampling rate
+            var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
+
+            // Update each collection with the new sample
+            var parametersSnapshot = AvailableParameters.ToList();
+            foreach (var parameter in parametersSnapshot)
+            {
+                string cleanName = CleanParameterName(parameter);
+                if (values.ContainsKey(cleanName))
                 {
-                    dataPointsCollections[cleanName].RemoveAt(0);
-                    timeStampsCollections[cleanName].RemoveAt(0);
+                    dataPointsCollections[cleanName].Add(values[cleanName]);
+                    timeStampsCollections[cleanName].Add(timestampMs);
+
+                    // Mantieni solo TimeWindowSeconds * samplingRate punti
+                    TrimCollection(cleanName, maxPoints);
                 }
             }
         }
@@ -1109,6 +1125,18 @@ public ObservableCollection<string> AvailableParameters { get; } = new();
                 // Aggiorna i testi solo se necessario
                 UpdateTextProperties();
             }
+        }
+    }
+
+    public (List<float> data, List<int> time) GetSeriesSnapshot(string parameter)
+    {
+        lock (_dataLock)
+        {
+            string cleanName = CleanParameterName(parameter);
+            return (
+                dataPointsCollections.ContainsKey(cleanName) ? new List<float>(dataPointsCollections[cleanName]) : new List<float>(),
+                timeStampsCollections.ContainsKey(cleanName) ? new List<int>(timeStampsCollections[cleanName]) : new List<int>()
+            );
         }
     }
 
