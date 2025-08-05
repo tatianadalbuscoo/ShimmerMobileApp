@@ -1,4 +1,23 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
+    
+<!--
+    ResourceDictionary for application-wide colors and styles (MAUI).
+    This dictionary defines the main color palette and reusable styles
+    for pages, labels, frames, and buttons. To use these resources,
+    reference the keys defined here in your XAML pages or controls.
+
+    Colors:
+      - PageBackground, FrameBackground, TextPrimary, TitleColor, etc.
+
+    Styles:
+      - TitleLabel:        Main page titles
+      - SectionLabel:      Section headers and subtitles
+      - RoundedFrame:      Frames with rounded corners and border
+      - PrimaryButton:     Main action buttons
+      - SecondaryButton:   Outlined, secondary action buttons
+    
+-->
+   
 <ResourceDictionary xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
                     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml">
     <!-- Main Colors -->

@@ -1,23 +1,37 @@
 ﻿using Microsoft.Extensions.Logging;
 using SkiaSharp.Views.Maui.Controls.Hosting;
 
+
+/*
+* MauiProgram.cs
+* ---------------
+* Application entry point for configuring and creating the .NET MAUI app.
+* This file sets up fonts, logging, and platform-specific services such as SkiaSharp.
+*/
+
+
 namespace ShimmerInterface
 {
     public static class MauiProgram
     {
-        // Metodo principale per configurare e creare l'app MAUI
+
+        /// <summary>
+        /// Main entry point for configuring and creating the MAUI app.
+        /// Sets up fonts, logging, SkiaSharp support, and builds the app instance.
+        /// </summary>
+        /// <returns>The configured <see cref="MauiApp"/> instance.</returns>
         public static MauiApp CreateMauiApp()
         {
             var builder = MauiApp.CreateBuilder();
 
-            // Inizializza l'app principale (App.xaml.cs)
+            // Initialize the main application (App.xaml.cs)
             builder
                 .UseMauiApp<App>()
 
-                // Abilita il supporto a SkiaSharp per disegni e grafici
+                // Enable SkiaSharp support for drawing and charts
                 .UseSkiaSharp()
 
-                // Configura i font personalizzati usati nell'app
+                // Configure custom fonts used in the app
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -25,10 +39,12 @@ namespace ShimmerInterface
                 });
 
 #if DEBUG
-            // Abilita il logging di debug in fase di sviluppo
+
+            // Enable debug logging in development mode
             builder.Logging.AddDebug();
 #endif
-            // Costruisce e restituisce l'app configurata
+
+            // Build and return the configured application instance
             return builder.Build();
         }
     }

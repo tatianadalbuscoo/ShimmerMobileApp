@@ -1231,7 +1231,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Stops and disposes the timer if it is running, ensuring no further periodic updates occur.
     /// This method is safe to call even if the timer is already stopped or null.
-    /// </summary
+    /// </summary>
     public void StopTimer()
     {
         if (timer != null)

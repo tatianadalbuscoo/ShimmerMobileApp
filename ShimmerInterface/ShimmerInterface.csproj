@@ -75,15 +75,15 @@
 	</ItemGroup>
 
 
-	<!-- SOLO per Android -->
+	<!-- Only for Android -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
 		<PackageReference Include="SkiaSharp.Views.Maui.Controls.Compatibility" Version="2.88.9" />
 	</ItemGroup>
 
+
 	<ItemGroup>
 		<ProjectReference Include="..\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI.csproj" />
 	</ItemGroup>
-
 
 	<ItemGroup>
 		<MauiXaml Update="Resources\Styles\BaseStyles.xaml">
@@ -99,6 +99,7 @@
 			<Generator>MSBuild:Compile</Generator>
 		</MauiXaml>
 	</ItemGroup>
+
 
 	<ItemGroup>
 		<Compile Update="Views\MainPage.xaml.cs">

@@ -286,8 +286,11 @@ public partial class MainPageViewModel : ObservableObject
         // If not found in name, try extracting from the DeviceID using regex
         if (!string.IsNullOrEmpty(deviceId))
         {
+
+            // Match the DeviceID against the expected regex pattern
             var match = DeviceIdRegex().Match(deviceId);
 
+            // If the pattern matches, return the extracted value in uppercase
             if (match.Success)
             {
                 return match.Groups[1].Value.ToUpper();
@@ -321,6 +324,12 @@ public partial class MainPageViewModel : ObservableObject
         return true;
     }
 
+
+    /// <summary>
+    /// Provides a regular expression to extract a 4-character hexadecimal identifier
+    /// from a DeviceID string that matches the pattern '&amp;00066680XXXX_',  where XXXX are hexadecimal digits.
+    /// The matching is case-insensitive.
+    /// </summary>
     [GeneratedRegex(@"&00066680([A-F0-9]{4})_", RegexOptions.IgnoreCase)]
     private static partial Regex DeviceIdRegex();
 
