@@ -679,7 +679,7 @@ namespace ShimmerAPI
 
 
 
-        public int ReadTimeout = 1000; //ms
+        public int ReadTimeout = 10000; //ms
         public int WriteTimeout = 1000; //ms
 
         //EXG
@@ -1224,7 +1224,7 @@ namespace ShimmerAPI
                                 if ((EnabledSensors & (int)SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE) == 0 &&
                                 (EnabledSensors & (int)SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG) == 0)
                                 {
-                                    Debug.WriteLine("Misaligned ByteStream Detected Temperature Disable");
+                                    Console.WriteLine("Misaligned ByteStream Detected Temperature Disable");
                                     // If it gets here means the previous packet is invalid so make it null so it wont be added to the buffer
                                     KeepObjectCluster = null;
 
@@ -1235,7 +1235,7 @@ namespace ShimmerAPI
 
                                 // Sensore di pressione attivo
                                 else { 
-                                    Debug.WriteLine(" Misalignment: unrecognized byte → I'll try to resync ");
+                                    Console.WriteLine(" Misalignment: unrecognized byte → I'll try to resync ");
 
                                     // Scan until the next 0x00 (DATA_PACKET)
                                     int maxSearch = 100;
@@ -1249,7 +1249,7 @@ namespace ShimmerAPI
                                         {
                                             if (nextByte == (byte)PacketTypeShimmer2.DATA_PACKET || nextByte == (byte)PacketTypeShimmer2.ACK_COMMAND)
                                             {
-                                                Debug.WriteLine($" Resynced after {attempts} bytes dropped..");
+                                                Console.WriteLine($" Resynced after {attempts} bytes dropped..");
                                                 break;
                                             }
                                         }
@@ -1257,7 +1257,7 @@ namespace ShimmerAPI
                                         {
                                             if (nextByte == (byte)PacketTypeShimmer2.DATA_PACKET)
                                             {
-                                                Debug.WriteLine($" Resynced after {attempts} bytes dropped..");
+                                                Console.WriteLine($" Resynced after {attempts} bytes dropped..");
                                                 break;
                                             }
                                         }
@@ -1266,7 +1266,7 @@ namespace ShimmerAPI
 
                                     if (nextByte != (byte)PacketTypeShimmer2.DATA_PACKET)
                                     {
-                                        Debug.WriteLine(" Resync failed after 100 bytes. ");
+                                        Console.WriteLine(" Resync failed after 100 bytes. ");
                                     }
 
                                     // Reset stato

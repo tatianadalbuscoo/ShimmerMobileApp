@@ -119,7 +119,7 @@ public partial class MainPageViewModel : ObservableObject
         {
 
             // Create a TaskCompletionSource to wait for the device to be initialized
-            var tcs = new TaskCompletionSource<XR2Learn_ShimmerIMU>();
+            var tcs = new TaskCompletionSource<XR2Learn_ShimmerIMU?>();
 
             // Show a loading page to initialize the connection
             var loadingPage = new LoadingPage(device, tcs);

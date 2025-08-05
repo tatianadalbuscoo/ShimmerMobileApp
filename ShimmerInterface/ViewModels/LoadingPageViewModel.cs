@@ -14,7 +14,7 @@ namespace ShimmerInterface.ViewModels;
 public partial class LoadingPageViewModel : ObservableObject
 {
     private readonly ShimmerDevice device;
-    private readonly TaskCompletionSource<XR2Learn_ShimmerIMU> completion;
+    private readonly TaskCompletionSource<XR2Learn_ShimmerIMU?> completion;
 
     // Message displayed on the UI during the connection process
     [ObservableProperty]
@@ -42,7 +42,7 @@ public partial class LoadingPageViewModel : ObservableObject
     /// </summary>
     /// <param name="device">The Shimmer device to be connected.</param>
     /// <param name="completion">A TaskCompletionSource to return the connection result asynchronously.</param>
-    public LoadingPageViewModel(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU> completion)
+    public LoadingPageViewModel(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU?> completion)
     {
         this.device = device;
         this.completion = completion;
@@ -92,7 +92,7 @@ public partial class LoadingPageViewModel : ObservableObject
         }
         else
         {
-            completion.SetException(new Exception($"Could not connect to {device.ShimmerName} on {device.Port1}"));
+            completion.SetResult(null);
         }
 
         IsConnecting = false;
@@ -124,10 +124,18 @@ public partial class LoadingPageViewModel : ObservableObject
     /// <returns>
     /// An instance of <see cref="XR2Learn_ShimmerIMU"/> if the connection is successful; otherwise, null.
     /// </returns>
+    /// <summary>
+    /// Attempts to connect to the Shimmer device asynchronously. 
+    /// Returns the initialized device if successful, otherwise null.
+    /// Handles connection timeouts and any exceptions safely, 
+    /// ensuring the application does not crash on connection failure.
+    /// </summary>
+    /// <returns>The connected <see cref="XR2Learn_ShimmerIMU"/> instance if successful; otherwise, null.</returns>
     private async Task<XR2Learn_ShimmerIMU?> ConnectAsync()
     {
         try
         {
+            // Create and configure the Shimmer device instance with enabled sensors
             var shimmer = new XR2Learn_ShimmerIMU
             {
                 EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
@@ -152,31 +160,43 @@ public partial class LoadingPageViewModel : ObservableObject
                 device.EnableExtA7,
                 device.EnableExtA15);
 
-            // Start the connection on a separate thread
+            // Start the connection attempt on a background thread
             var connectTask = Task.Run(() => shimmer.Connect());
 
-            // Wait for the connection to complete or timeout
+            // Wait for either the connection to complete, or a 30-second timeout
             var completedTask = await Task.WhenAny(connectTask, Task.Delay(30000));
 
-            if (completedTask != connectTask || !shimmer.IsConnected())
+            if (completedTask == connectTask)
             {
+                // The connection task completed (may be successful or faulted)
 
-                // Timeout or failed connection
-                Debug.WriteLine($"[SHIMMER TIMEOUT] on {device.Port1}");
+                if (connectTask.IsFaulted)
+                {
+                    return null;
+                }
+
+                if (!shimmer.IsConnected())
+                {
+                    // Connection attempt completed, but the device is not connected
+                    return null;
+                }
+
+                // Successfully connected, start streaming data
+                shimmer.StartStreaming();
+                return shimmer;
+            }
+            else
+            {
+                // Timeout: the connection did not complete in time
                 return null;
             }
-
-            // Start streaming if successfully connected
-            shimmer.StartStreaming();
-            return shimmer;
-
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[SHIMMER ERROR] on {device.Port1}: {ex.Message}");
+            // Catch any unexpected exceptions outside of the connection task
+            return null;
         }
-
-        return null;
     }
 
 }
+

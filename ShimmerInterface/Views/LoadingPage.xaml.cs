@@ -25,7 +25,7 @@ public partial class LoadingPage : ContentPage
     /// </summary>
     /// <param name="device">The Shimmer device selected by the user for connection.</param>
     /// <param name="completion">A TaskCompletionSource used to return the connected device instance asynchronously to the caller.</param>
-    public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU> completion)
+    public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU?> completion)
     {
         InitializeComponent();
 

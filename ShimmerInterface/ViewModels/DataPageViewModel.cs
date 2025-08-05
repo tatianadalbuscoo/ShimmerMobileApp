@@ -53,15 +53,15 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
     // ==== Sensor enablement flags (from current device config) ====
     // These indicate which sensors are enabled for this device/session
-    private bool enableLowNoiseAccelerometer;
-    private bool enableWideRangeAccelerometer;
-    private bool enableGyroscope;
-    private bool enableMagnetometer;
-    private bool enablePressureTemperature;
-    private bool enableBattery;
-    private bool enableExtA6;
-    private bool enableExtA7;
-    private bool enableExtA15;
+    private readonly bool enableLowNoiseAccelerometer;
+    private readonly bool enableWideRangeAccelerometer;
+    private readonly bool enableGyroscope;
+    private readonly bool enableMagnetometer;
+    private readonly bool enablePressureTemperature;
+    private readonly bool enableBattery;
+    private readonly bool enableExtA6;
+    private readonly bool enableExtA7;
+    private readonly bool enableExtA15;
 
     // ==== Last valid values for restoring user input ====
     private double _lastValidYAxisMin = 0;
@@ -80,6 +80,15 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     // ==== Temporary values for auto-range Y axis calculation ====
     private double _autoYAxisMin = 0;
     private double _autoYAxisMax = 1;
+
+    // ==== Parameter name arrays for each sensor group ====
+    private static readonly string[] LowNoiseAccelerometerAxes = ["Low-Noise AccelerometerX", "Low-Noise AccelerometerY", "Low-Noise AccelerometerZ"];
+    private static readonly string[] WideRangeAccelerometerAxes = [ "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" ];
+    private static readonly string[] GyroscopeAxes = [ "GyroscopeX", "GyroscopeY", "GyroscopeZ" ];
+    private static readonly string[] MagnetometerAxes = [ "MagnetometerX", "MagnetometerY", "MagnetometerZ" ];
+    private static readonly string[] EnvSensors = [ "Temperature_BMP180", "Pressure_BMP180" ];
+    private static readonly string[] BatteryParams = [ "BatteryVoltage", "BatteryPercent" ];
+
 
     // ==== MVVM Bindable Properties ====
     // These properties are observable and used for data binding in the UI
@@ -322,41 +331,33 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
 
     /// <summary>
-    /// Initializes the internal collections for time series data storage,
-    /// creating an entry for each enabled sensor parameter.
-    /// Only parameters with real data (not group labels) are included.
+    /// Initializes the internal collections used for storing time series data.
+    /// For each enabled sensor parameter, creates empty lists for data and timestamps.
     /// </summary>
     private void InitializeDataCollections()
     {
-
-        // List all parameter names that will actually store real sensor data (no groups)
+        // Build a list of all sensor parameter names to store real data for (not group labels)
         var dataParameters = new List<string>();
 
-        // Add axes for low-noise accelerometer if enabled
+        // Use predefined static arrays for each group to optimize memory and performance
         if (enableLowNoiseAccelerometer)
-            dataParameters.AddRange(new[] { "Low-Noise AccelerometerX", "Low-Noise AccelerometerY", "Low-Noise AccelerometerZ" });
+            dataParameters.AddRange(LowNoiseAccelerometerAxes);
 
-        // Add axes for wide-range accelerometer if enabled
         if (enableWideRangeAccelerometer)
-            dataParameters.AddRange(new[] { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" });
+            dataParameters.AddRange(WideRangeAccelerometerAxes);
 
-        // Add axes for gyroscope if enabled
         if (enableGyroscope)
-            dataParameters.AddRange(new[] { "GyroscopeX", "GyroscopeY", "GyroscopeZ" });
+            dataParameters.AddRange(GyroscopeAxes);
 
-        // Add axes for magnetometer if enabled
         if (enableMagnetometer)
-            dataParameters.AddRange(new[] { "MagnetometerX", "MagnetometerY", "MagnetometerZ" });
+            dataParameters.AddRange(MagnetometerAxes);
 
-        // Add environmental sensor parameters if enabled
         if (enablePressureTemperature)
-            dataParameters.AddRange(new[] { "Temperature_BMP180", "Pressure_BMP180" });
+            dataParameters.AddRange(EnvSensors);
 
-        // Add battery parameters if enabled
         if (enableBattery)
-            dataParameters.AddRange(new[] { "BatteryVoltage", "BatteryPercent" });
+            dataParameters.AddRange(BatteryParams);
 
-        // Add external ADC channels if enabled
         if (enableExtA6)
             dataParameters.Add("ExtADC_A6");
         if (enableExtA7)
@@ -364,7 +365,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         if (enableExtA15)
             dataParameters.Add("ExtADC_A15");
 
-        // Create empty collections for all selected parameters (if not already present)
+        // Create empty data and timestamp collections if not already present
         foreach (var parameter in dataParameters)
         {
             if (!dataPointsCollections.ContainsKey(parameter))
@@ -442,7 +443,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             // Gather all values from all relevant sub-parameters
             foreach (var param in subParams)
             {
-                if (dataPointsCollections.ContainsKey(param) && dataPointsCollections[param].Count > 0)
+                if (dataPointsCollections.TryGetValue(param, out var list) && list.Count > 0)
                     allValues.AddRange(dataPointsCollections[param]);
             }
 
@@ -482,7 +483,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         {
 
             // If no data for this parameter: use fallback defaults
-            if (!dataPointsCollections.ContainsKey(cleanParam) || dataPointsCollections[cleanParam].Count == 0)
+            if (!dataPointsCollections.TryGetValue(cleanParam, out var list) || list.Count == 0)
             {
                 _autoYAxisMin = GetDefaultYAxisMin(cleanParam);
                 _autoYAxisMax = GetDefaultYAxisMax(cleanParam);
@@ -909,7 +910,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <param name="parameter">The name of the sensor parameter (e.g., "GyroscopeX").</param>
     /// <returns>Default minimum value for the parameter's Y axis.</returns>
-    private double GetDefaultYAxisMin(string parameter)
+    private static double GetDefaultYAxisMin(string parameter)
     {
         return parameter switch
         {
@@ -940,7 +941,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <param name="parameter">The name of the sensor parameter (e.g., "GyroscopeX").</param>
     /// <returns>Default maximum value for the parameter's Y axis.</returns>
-    private double GetDefaultYAxisMax(string parameter)
+    private static double GetDefaultYAxisMax(string parameter)
     {
         return parameter switch
         {
@@ -1088,11 +1089,11 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <param name="displayName">The display name as shown in the UI (may include "    → ").</param>
     /// <returns>The clean, unformatted parameter name.</returns>
-    public string CleanParameterName(string displayName)
+    public static string CleanParameterName(string displayName)
     {
         if (displayName.StartsWith("    → "))
         {
-            return displayName.Substring(6);    // Remove "    → " prefix
+            return displayName[6..];   // Remove "    → " prefix
         }
         return displayName;
     }
@@ -1104,7 +1105,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <param name="parameter">The parameter or group name to check.</param>
     /// <returns>True if the parameter is a group (MultiChart); otherwise, false.</returns>
-    private bool IsMultiChart(string parameter)
+    private static bool IsMultiChart(string parameter)
     {
         // Clean the display name to get the actual parameter name (remove formatting)
         string cleanName = CleanParameterName(parameter);
@@ -1122,7 +1123,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// </summary>
     /// <param name="groupParameter">The display name or group name selected by the user.</param>
     /// <returns>List of parameter names for the group (e.g., X/Y/Z axes).</returns>
-    public List<string> GetSubParameters(string groupParameter)
+    public static List<string> GetSubParameters(string groupParameter)
     {
 
         // Clean the display name to get the actual group name
@@ -1389,12 +1390,10 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             foreach (var parameter in parametersSnapshot)
             {
                 string cleanName = CleanParameterName(parameter);
-                if (values.ContainsKey(cleanName))
+                if (values.TryGetValue(cleanName, out var v))
                 {
-                    dataPointsCollections[cleanName].Add(values[cleanName]);
+                    dataPointsCollections[cleanName].Add(v);
                     timeStampsCollections[cleanName].Add(timestampMs);
-
-                    // Trim collections to respect the time window (keep only the latest points)
                     TrimCollection(cleanName, maxPoints);
                 }
             }
@@ -1434,13 +1433,12 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         {
             string cleanName = CleanParameterName(parameter);
 
-            // Return copies of the lists to prevent external modification of internal collections
-            return (
-                dataPointsCollections.ContainsKey(cleanName) ? new List<float>(dataPointsCollections[cleanName]) : new List<float>(),
-                timeStampsCollections.ContainsKey(cleanName) ? new List<int>(timeStampsCollections[cleanName]) : new List<int>()
-            );
+            var dataList = dataPointsCollections.TryGetValue(cleanName, out var d) ? new List<float>(d) : new List<float>();
+            var timeList = timeStampsCollections.TryGetValue(cleanName, out var t) ? new List<int>(t) : new List<int>();
+            return (dataList, timeList);
         }
     }
+
 
 
     /// <summary>
