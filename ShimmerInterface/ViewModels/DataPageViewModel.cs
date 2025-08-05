@@ -37,7 +37,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private const int MIN_TIME_WINDOW_SECONDS = 1;
     private const int MAX_X_AXIS_LABEL_INTERVAL = 1000;
     private const int MIN_X_AXIS_LABEL_INTERVAL = 1;
-    private const double MAX_SAMPLING_RATE = 1000;
+    private const double MAX_SAMPLING_RATE = 100;
     private const double MIN_SAMPLING_RATE = 1;
 
     // ==== Device references and internal timer for periodic updates ====
@@ -1187,69 +1187,92 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         }
     }
 
-/// <summary>
-/// ///////////////////////////////////////////////////////////////////////////////////////
-/// </summary>
-/// <returns></returns> 
 
+    /// <summary>
+    /// Returns the list of sub-parameters to be displayed for the currently selected parameter.
+    /// If the parameter supports multiple sub-parameters (i.e., is a multi-chart),
+    /// the method returns all sub-parameters; otherwise, it returns a list containing
+    /// only the cleaned parameter name.
+    /// </summary>
+    /// <returns>
+    /// A list of strings containing the sub-parameters for the current parameter selection.
+    /// </returns>
     public List<string> GetCurrentSubParameters()
     {
-        // Pulisce il nome del parametro prima di verificare
         string cleanName = CleanParameterName(SelectedParameter);
         return IsMultiChart(cleanName) ? GetSubParameters(cleanName) : new List<string> { cleanName };
     }
 
 
-    // Avvia il timer che legge e aggiorna i dati a intervalli regolari.
+    /// <summary>
+    /// Starts the timer that periodically reads and updates data at intervals
+    /// based on the current sampling rate. If a timer is already running, it is stopped and replaced.
+    /// </summary>
     public void StartTimer()
     {
-        // Ferma eventuali timer esistenti
+
+        // Stop any existing timer before starting a new one
         StopTimer();
 
-        // Calcola l'intervallo basato sul sampling rate
+        // Calculate the timer interval based on the sampling rate (in milliseconds)
         double intervalMs = 1000.0 / shimmer.SamplingRate;
 
-        // Assicurati che l'intervallo sia ragionevole
-        intervalMs = Math.Max(intervalMs, 10);   // Minimo 10ms (100Hz max)
-        intervalMs = Math.Min(intervalMs, 1000); // Massimo 1000ms (1Hz min)
+        // Ensure the interval is within a reasonable range
+        intervalMs = Math.Max(intervalMs, 10);    // Minimum interval: 10ms (maximum 100Hz)
+        intervalMs = Math.Min(intervalMs, 1000);  // Maximum interval: 1000ms (minimum 1Hz)
 
+        // Create and start the timer with the computed interval
         timer = new System.Timers.Timer(intervalMs);
         timer.Elapsed += OnTimerElapsed;
         timer.Start();
-
-        System.Diagnostics.Debug.WriteLine($"Timer started with interval: {intervalMs}ms for sampling rate: {shimmer.SamplingRate}Hz");
     }
 
 
+    /// <summary>
+    /// Stops and disposes the timer if it is running, ensuring no further periodic updates occur.
+    /// This method is safe to call even if the timer is already stopped or null.
+    /// </summary
     public void StopTimer()
     {
         if (timer != null)
         {
+
+            // Stop the timer and detach the event handler
             timer.Stop();
             timer.Elapsed -= OnTimerElapsed;
+
+            // Release the timer resources
             timer.Dispose();
             timer = null;
         }
     }
 
 
-
-
-    // Metodo chiamato ogni volta che scatta il timer: aggiorna i dati e il grafico.
-    // 1. First, modify the OnTimerElapsed method to handle battery data safely
+    /// <summary>
+    /// Called each time the timer elapses; retrieves the latest data sample from the Shimmer device,
+    /// updates internal data collections and the chart. Handles errors gracefully to avoid breaking the timer loop.
+    /// </summary>
+    /// <param name="sender">The source of the timer event (the timer itself).</param>
+    /// <param name="e">Event arguments containing timer event data.</param>
     private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
     {
         try
         {
+
+            // Retrieve the most recent sample from the Shimmer device
             var sample = shimmer.LatestData;
             if (sample == null) return;
 
+            // Increment the sample counter
             sampleCounter++;
 
+            // Calculate the current timestamp in seconds based on the sampling rate
             double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
 
+            // Update the collections with the new data sample and its timestamp
             UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
 
+            // Refresh the chart to display the new data
             UpdateChart();
         }
         catch (Exception ex)
@@ -1259,13 +1282,23 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
+    /// <summary>
+    /// Processes a single data sample from the Shimmer device, updates all enabled data collections
+    /// with the new values, manages timestamps, trims collections to respect the time window,
+    /// and updates the Y-axis range automatically if required.
+    /// </summary>
+    /// <param name="sample">The latest dynamic data sample from the Shimmer device.</param>
+    /// <param name="currentTimeSeconds">The timestamp (in seconds) of the current sample.</param>
     private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
     {
-        var values = new Dictionary<string, float>();
 
+        // Dictionary to store extracted values for enabled parameters
+        var values = new Dictionary<string, float>();
 
         try
         {
+
+            // Add Low-Noise Accelerometer values if enabled
             if (enableLowNoiseAccelerometer)
             {
                 values["Low-Noise AccelerometerX"] = (float)sample.LowNoiseAccelerometerX.Data;
@@ -1273,6 +1306,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 values["Low-Noise AccelerometerZ"] = (float)sample.LowNoiseAccelerometerZ.Data;
             }
 
+            // Add Wide-Range Accelerometer values if enabled
             if (enableWideRangeAccelerometer)
             {
                 values["Wide-Range AccelerometerX"] = (float)sample.WideRangeAccelerometerX.Data;
@@ -1280,6 +1314,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 values["Wide-Range AccelerometerZ"] = (float)sample.WideRangeAccelerometerZ.Data;
             }
 
+            // Add Gyroscope values if enabled
             if (enableGyroscope)
             {
                 values["GyroscopeX"] = (float)sample.GyroscopeX.Data;
@@ -1287,6 +1322,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 values["GyroscopeZ"] = (float)sample.GyroscopeZ.Data;
             }
 
+            // Add Magnetometer values if enabled
             if (enableMagnetometer)
             {
                 values["MagnetometerX"] = (float)sample.MagnetometerX.Data;
@@ -1294,15 +1330,21 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
             }
 
+            // Add Pressure and Temperature values if enabled
             if (enablePressureTemperature)
             {
                 values["Temperature_BMP180"] = (float)sample.Temperature_BMP180.Data;
                 values["Pressure_BMP180"] = (float)sample.Pressure_BMP180.Data;
             }
 
+            // Add Battery Voltage and Percentage if enabled and available
             if (enableBattery && sample.BatteryVoltage != null)
             {
-                values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data / 1000f; // mV → V
+
+                // Convert mV to V
+                values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data / 1000f;
+
+                // Calculate battery percentage based on voltage range
                 float batteryV = values["BatteryVoltage"];
                 float percent;
                 if (batteryV <= 3.3f)
@@ -1316,7 +1358,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 values["BatteryPercent"] = Math.Clamp(percent, 0, 100);
             }
 
-
+            // Add external ADC channels if enabled
             if (enableExtA6)
                 values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data / 1000f;
             if (enableExtA7)
@@ -1332,16 +1374,17 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // Synchronize access to data collections, otherwise when the app is not in full screen it throws an exception
         lock (_dataLock)
         {
 
-            // Convert current time to milliseconds for timestamp
+            // Convert current time to milliseconds for the timestamp
             int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
 
-            // Calculate max points based on current sampling rate
+            // Calculate the maximum allowed points for each collection (according to the time window)
             var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
 
-            // Update each collection with the new sample
+            // For each available parameter, add the new value and timestamp (if present in the extracted values)
             var parametersSnapshot = AvailableParameters.ToList();
             foreach (var parameter in parametersSnapshot)
             {
@@ -1351,35 +1394,47 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                     dataPointsCollections[cleanName].Add(values[cleanName]);
                     timeStampsCollections[cleanName].Add(timestampMs);
 
-                    // Mantieni solo TimeWindowSeconds * samplingRate punti
+                    // Trim collections to respect the time window (keep only the latest points)
                     TrimCollection(cleanName, maxPoints);
                 }
             }
         }
 
-
-        // Se l'asse Y è in modalità automatica, ricalcola il range
+        // If Y-axis is set to automatic mode, recalculate its range and update properties if necessary
         if (AutoYAxis)
         {
             CalculateAutoYAxisRange();
 
-            // Aggiorna solo se i valori sono cambiati significativamente
+            // Only update if the auto range has changed significantly
             if (Math.Abs(YAxisMin - _autoYAxisMin) > 0.01 || Math.Abs(YAxisMax - _autoYAxisMax) > 0.01)
             {
                 YAxisMin = _autoYAxisMin;
                 YAxisMax = _autoYAxisMax;
 
-                // Aggiorna i testi solo se necessario
+                // Refresh the displayed text properties if needed
                 UpdateTextProperties();
             }
         }
     }
 
+
+    /// <summary>
+    /// Retrieves a snapshot (deep copy) of the data and timestamp series for a given parameter.
+    /// This method is thread-safe and returns empty lists if the parameter does not exist.
+    /// </summary>
+    /// <param name="parameter">The name of the parameter whose data series to retrieve.</param>
+    /// <returns>
+    /// A tuple containing:
+    /// - data: a list of float values representing the parameter data,
+    /// - time: a list of int values representing the corresponding timestamps (in ms).
+    /// </returns>
     public (List<float> data, List<int> time) GetSeriesSnapshot(string parameter)
     {
         lock (_dataLock)
         {
             string cleanName = CleanParameterName(parameter);
+
+            // Return copies of the lists to prevent external modification of internal collections
             return (
                 dataPointsCollections.ContainsKey(cleanName) ? new List<float>(dataPointsCollections[cleanName]) : new List<float>(),
                 timeStampsCollections.ContainsKey(cleanName) ? new List<int>(timeStampsCollections[cleanName]) : new List<int>()
@@ -1388,25 +1443,37 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
-
-
-    // Genera un evento per aggiornare il grafico.
+    /// <summary>
+    /// Triggers an event to notify that the chart should be updated.
+    /// Subscribers to ChartUpdateRequested will be notified.
+    /// </summary>
     private void UpdateChart()
     {
+
+        // Raise the ChartUpdateRequested event
         ChartUpdateRequested?.Invoke(this, EventArgs.Empty);
     }
 
-    // Gestisce il cambio di parametro selezionato e aggiorna le impostazioni asse Y.
+
+    /// <summary>
+    /// Handles changes to the selected parameter, updating the chart display mode,
+    /// Y-axis settings, label intervals, and triggers a chart update.
+    /// This method is called automatically when the SelectedParameter property changes.
+    /// </summary>
+    /// <param name="value">The newly selected parameter name.</param>
     partial void OnSelectedParameterChanged(string value)
     {
-        // Pulisce il nome del parametro prima di verificare
+
+        // Clean up the parameter name for internal checks
         string cleanName = CleanParameterName(value);
 
-        // Determina la modalità di visualizzazione
+        // Set the chart display mode based on whether the parameter is multi-channel
         ChartDisplayMode = IsMultiChart(cleanName) ? ChartDisplayMode.Multi : ChartDisplayMode.Single;
 
-        UpdateYAxisSettings(value); // Passa il valore originale che viene pulito dentro il metodo
+        // Update the Y-axis settings for the new parameter
+        UpdateYAxisSettings(value);
 
+        // If auto-scaling is enabled, recalculate the Y-axis range
         if (AutoYAxis)
         {
             CalculateAutoYAxisRange();
@@ -1414,26 +1481,36 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             YAxisMax = _autoYAxisMax;
         }
 
+        // Store the last valid Y-axis range for possible validation or rollback
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
 
+        // Update any text properties related to the Y-axis or chart labels
         UpdateTextProperties();
-        IsXAxisLabelIntervalEnabled = cleanName != "HeartRate";
+
+        // Clear any validation messages
         ValidationMessage = "";
 
+        // Notify chart subscribers to update the display
         UpdateChart();
     }
 
 
-
-    // Imposta etichette e limiti asse Y in base al parametro selezionato.
+    /// <summary>
+    /// Sets the Y-axis label, unit, chart title, and min/max limits according to the selected parameter.
+    /// This ensures the chart is correctly labeled and scaled for the currently displayed data.
+    /// </summary>
+    /// <param name="parameter">The name of the selected parameter.</param>
     private void UpdateYAxisSettings(string parameter)
     {
-        // Pulisce il nome del parametro prima di verificare
+
+        // Clean up the parameter name before checking
         string cleanName = CleanParameterName(parameter);
 
         switch (cleanName)
         {
+
+            // Groups
             case "Low-Noise Accelerometer":
                 YAxisLabel = "Low-Noise Accelerometer";
                 YAxisUnit = "m/s²";
@@ -1462,6 +1539,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 YAxisMin = -5;
                 YAxisMax = 5;
                 break;
+
+            // Single axis
             case "Low-Noise AccelerometerX":
                 YAxisLabel = "Low-Noise Accelerometer X";
                 YAxisUnit = "m/s²";
@@ -1546,6 +1625,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 YAxisMin = -5;
                 YAxisMax = 5;
                 break;
+
+            // Environmental sensors
             case "Temperature_BMP180":
                 YAxisLabel = "Temperature";
                 YAxisUnit = "°C";
@@ -1560,6 +1641,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 YAxisMin = 90;
                 YAxisMax = 110;
                 break;
+
+            // Battery monitoring
             case "BatteryVoltage":
                 YAxisLabel = "Battery Voltage";
                 YAxisUnit = "V";
@@ -1574,6 +1657,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 YAxisMin = 0;
                 YAxisMax = 100;
                 break;
+
+            // External ADC channels
             case "ExtADC_A6":
                 YAxisLabel = "External ADC A6";
                 YAxisUnit = "V";
@@ -1599,12 +1684,24 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
-
-
-    // Cerca di convertire una stringa in un numero double valido.
+    /// <summary>
+    /// Attempts to convert a string to a valid double value.
+    /// Handles partial user input (e.g. just "-" or "+") as temporarily valid,
+    /// and accepts both '.' and ',' as decimal separators.
+    /// </summary>
+    /// <param name="input">The string to parse.</param>
+    /// <param name="result">
+    /// When this method returns, contains the double value equivalent of the input string, if the conversion succeeded,
+    /// or 0 if the conversion failed or input is a partial sign ("-" or "+").
+    /// </param>
+    /// <returns>
+    /// True if the input is a valid double (or a temporarily valid partial input like "+" or "-"); otherwise, false.
+    /// </returns>
     public static bool TryParseDouble(string input, out double result)
     {
         result = 0;
+
+        // Reject null, empty, or whitespace input as invalid
         if (string.IsNullOrWhiteSpace(input))
             return false;
 
@@ -1612,45 +1709,57 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         if (string.IsNullOrEmpty(cleanInput))
             return false;
 
-        // Casi speciali: permettere solo "-" o "+" come input parziale
+        // Special case: allow single "+" or "-" as a valid partial input during user editing
         if (cleanInput == "-" || cleanInput == "+")
         {
-            result = 0; // Valore temporaneo
-            return true; // Consideriamo valido per permettere la digitazione
+            result = 0;   // Temporary value
+            return true;  // Considered valid for input scenarios
         }
 
-        // Controlla caratteri validi e posizione del segno
+        // Check for valid characters and proper position of sign
         for (int i = 0; i < cleanInput.Length; i++)
         {
             char c = cleanInput[i];
 
-            // Il segno meno o più può essere solo al primo carattere
+            // Only allow "+" or "-" as the very first character
             if (c == '-' || c == '+')
             {
-                if (i != 0) // Se non è il primo carattere, non è valido
+                if (i != 0) // Sign is only valid at the first position
                     return false;
             }
             else if (c == '.' || c == ',')
             {
-                // Il separatore decimale è valido
+                // Accept "." or "," as possible decimal separators
                 continue;
             }
             else if (!char.IsDigit(c))
             {
-                // Carattere non valido
+                // Reject any other non-digit character
                 return false;
             }
         }
 
-        // Prova a parsare usando sia il punto che la virgola come separatore decimale
+        // Try to parse using both InvariantCulture and CurrentCulture
+        // to support both dot and comma as decimal separators
         return double.TryParse(cleanInput, NumberStyles.Float, CultureInfo.InvariantCulture, out result) ||
                double.TryParse(cleanInput, NumberStyles.Float, CultureInfo.CurrentCulture, out result);
     }
 
-    // Cerca di convertire una stringa in un numero intero valido.
+
+    /// <summary>
+    /// Attempts to convert a string to a valid integer value.
+    /// Accepts optional leading '+' or '-' signs and checks for valid numeric characters only.
+    /// </summary>
+    /// <param name="input">The string to parse.</param>
+    /// <param name="result">
+    /// When this method returns, contains the integer value equivalent of the input string if the conversion succeeded, or 0 if the conversion failed.
+    /// </param>
+    /// <returns>True if the input is a valid integer; otherwise, false.</returns>
     public static bool TryParseInt(string input, out int result)
     {
         result = 0;
+
+        // Reject null, empty, or whitespace input
         if (string.IsNullOrWhiteSpace(input))
             return false;
 
@@ -1658,23 +1767,25 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         if (string.IsNullOrEmpty(cleanInput))
             return false;
 
-        // Controlla caratteri validi per interi
+        // Check for valid characters (digits, optional leading '+' or '-')
         foreach (char c in cleanInput)
         {
             if (!char.IsDigit(c) && c != '-' && c != '+')
                 return false;
         }
 
+        // Attempt to parse the cleaned input as an integer
         return int.TryParse(cleanInput, out result);
     }
 
-    
 
- 
-
-
-    // Metodo per ottenere la configurazione corrente
-    // Restituisce un oggetto che rappresenta la configurazione attuale dei sensori.
+    /// <summary>
+    /// Returns an object representing the current sensor configuration.
+    /// Each property indicates whether a specific sensor is enabled.
+    /// </summary>
+    /// <returns>
+    /// A <see cref="ShimmerDevice"/> object reflecting the currently selected sensor settings.
+    /// </returns>
     public ShimmerDevice GetCurrentSensorConfiguration()
     {
         return new ShimmerDevice
@@ -1692,22 +1803,30 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         };
     }
 
+
+    /// <summary>
+    /// Resets all timestamps in the timeStampsCollections for each parameter.
+    /// The timestamps are set as if acquired regularly based on the current sampling rate,
+    /// starting from zero and increasing by a fixed interval for each sample.
+    /// This method is thread-safe.
+    /// </summary>
     public void ResetAllTimestamps()
     {
         lock (_dataLock)
         {
+
+            // For each parameter, update each timestamp to be evenly spaced based on sampling rate
             foreach (var param in timeStampsCollections.Keys.ToList())
             {
                 int count = timeStampsCollections[param].Count;
                 for (int i = 0; i < count; i++)
                 {
-                    // Timestamp in millisecondi, come in acquisizione regolare
+
+                    // Set timestamp in milliseconds, as in regular acquisition
                     timeStampsCollections[param][i] = (int)(i * (1000.0 / shimmer.SamplingRate));
                 }
             }
         }
     }
-
-
-
 }
+
