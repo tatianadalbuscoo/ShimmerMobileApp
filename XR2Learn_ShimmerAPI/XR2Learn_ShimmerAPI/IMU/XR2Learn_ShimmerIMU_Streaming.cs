@@ -75,6 +75,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             return shimmer.IsConnected();
 #else
             Console.WriteLine("Connect() non supportato su questa piattaforma.");
+            return false;
 #endif
         }
 
