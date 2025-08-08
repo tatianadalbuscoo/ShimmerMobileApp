@@ -11,6 +11,7 @@ namespace XR2Learn_ShimmerAPI
     /// </summary>
     public class TestGSR
     {
+#if WINDOWS
         private static readonly XR2Learn_ShimmerGSR api = new XR2Learn_ShimmerGSR();
 
         private static Timer timer; // keep global or it will be garbage-collected after few seconds
@@ -27,10 +28,10 @@ namespace XR2Learn_ShimmerAPI
                 api.Configure(deviceName, comPort);
 
                 api.NumberOfHeartBeatsToAverage = XR2Learn_ShimmerGSR.DefaultNumberOfHeartBeatsToAverage;
-                api.TrainingPeriodPPG           = XR2Learn_ShimmerGSR.DefaultTrainingPeriodPPG;
-                api.LowPassFilterCutoff         = XR2Learn_ShimmerGSR.DefaultLowPassFilterCutoff;
-                api.HighPassFilterCutoff        = XR2Learn_ShimmerGSR.DefaultHighPassFilterCutoff;
-                api.SamplingRate                = XR2Learn_ShimmerGSR.DefaultSamplingRate;
+                api.TrainingPeriodPPG = XR2Learn_ShimmerGSR.DefaultTrainingPeriodPPG;
+                api.LowPassFilterCutoff = XR2Learn_ShimmerGSR.DefaultLowPassFilterCutoff;
+                api.HighPassFilterCutoff = XR2Learn_ShimmerGSR.DefaultHighPassFilterCutoff;
+                api.SamplingRate = XR2Learn_ShimmerGSR.DefaultSamplingRate;
 
                 api.EnableAccelerator = true;
                 api.EnableGSR = true;
@@ -41,7 +42,7 @@ namespace XR2Learn_ShimmerAPI
             }
 
             if (api.IsConnected())
-            { 
+            {
                 Console.WriteLine("Device connected");
 
                 Console.WriteLine("Sending StartStreaming message");
@@ -81,6 +82,16 @@ namespace XR2Learn_ShimmerAPI
             api.Disconnect();
             Console.WriteLine("Device disconnected");
         }
+#else
+        /// <summary>
+        /// Main entry point - stub per piattaforme non-Windows
+        /// </summary>
+        public static void Main(string[] args)
+        {
+            Console.WriteLine("TestGSR non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Premi un tasto per uscire...");
+            Console.ReadKey();
+        }
+#endif
     }
 }
-

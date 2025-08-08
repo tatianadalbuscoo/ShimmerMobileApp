@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Threading;
+
+#if WINDOWS
 using XR2Learn_ShimmerAPI.IMU;
+#endif
 
 namespace XR2Learn_ShimmerAPI
 {
@@ -13,6 +16,7 @@ namespace XR2Learn_ShimmerAPI
     public class TestIMU
     {
 
+#if WINDOWS
         // Instance of the IMU communication API used for configuration, connection, and data retrieval
         private static readonly XR2Learn_ShimmerIMU api = new XR2Learn_ShimmerIMU();
 
@@ -158,5 +162,16 @@ namespace XR2Learn_ShimmerAPI
             api.Disconnect();
             Console.WriteLine("Device disconnected");
         }
+#else
+        /// <summary>
+        /// Main entry point - stub per piattaforme non-Windows
+        /// </summary>
+        public static void Main(string[] args)
+        {
+            Console.WriteLine("TestIMU non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Premi un tasto per uscire...");
+            Console.ReadKey();
+        }
+#endif
     }
 }
