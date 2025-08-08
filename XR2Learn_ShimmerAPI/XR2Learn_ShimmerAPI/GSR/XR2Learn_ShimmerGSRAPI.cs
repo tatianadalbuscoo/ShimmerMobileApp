@@ -15,7 +15,7 @@ namespace XR2Learn_ShimmerAPI
             if (IsConnected()) return;
             Shimmer.Connect();
 #else
-            Console.WriteLine("...messaggio...");
+
 #endif
         }
 
@@ -29,7 +29,7 @@ namespace XR2Learn_ShimmerAPI
             await DelayWork(1000);
             Shimmer.UICallback = null;
 #else
-            Console.WriteLine("...messaggio...");
+
 #endif
         }
 
@@ -42,7 +42,7 @@ namespace XR2Learn_ShimmerAPI
             await DelayWork(1000);
             Shimmer.StartStreaming();
 #else
-            Console.WriteLine("...messaggio...");
+
 #endif
         }
 
@@ -55,7 +55,7 @@ namespace XR2Learn_ShimmerAPI
             Shimmer.StopStreaming();
             await DelayWork(1000);
 #else
-            Console.WriteLine("...messaggio...");
+
 #endif
         }
 
@@ -68,7 +68,6 @@ namespace XR2Learn_ShimmerAPI
 #if WINDOWS
             return Shimmer.IsConnected();
 #else
-            Console.WriteLine("...messaggio...");
             return false;
 #endif
         }

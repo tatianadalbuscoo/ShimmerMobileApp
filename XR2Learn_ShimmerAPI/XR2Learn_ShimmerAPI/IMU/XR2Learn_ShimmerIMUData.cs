@@ -128,7 +128,6 @@ namespace XR2Learn_ShimmerAPI.IMU
         )
         {
             // Questa versione non fa nulla - è solo per permettere la compilazione
-            Console.WriteLine("...messaggio...");
         }
 #endif
     }

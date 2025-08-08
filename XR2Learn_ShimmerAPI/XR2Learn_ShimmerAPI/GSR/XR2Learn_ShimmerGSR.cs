@@ -114,7 +114,7 @@ namespace XR2Learn_ShimmerAPI
             // Define event callback
             Shimmer.UICallback += this.HandleEvent;
 #else
-            Console.WriteLine("...messaggio...");
+
 #endif
         }
 
