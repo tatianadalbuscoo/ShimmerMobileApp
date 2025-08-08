@@ -128,7 +128,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         )
         {
             // Questa versione non fa nulla - è solo per permettere la compilazione
-            throw new PlatformNotSupportedException("XR2Learn_ShimmerIMUData non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("...messaggio...");
         }
 #endif
     }

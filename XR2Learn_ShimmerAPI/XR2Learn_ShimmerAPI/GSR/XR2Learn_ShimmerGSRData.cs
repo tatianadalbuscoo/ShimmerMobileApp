@@ -81,7 +81,7 @@ namespace XR2Learn_ShimmerAPI
         public XR2Learn_ShimmerGSRData(object timeStamp = null, object acceleratorX = null, object acceleratorY = null, object acceleratorZ = null, object galvanicSkinResponse = null, object photoPlethysmoGram = null, int HeartRate = 0)
         {
             // Questa versione non fa nulla - è solo per permettere la compilazione
-            throw new PlatformNotSupportedException("XR2Learn_ShimmerGSRData non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("...messaggio...");
         }
 #endif
 

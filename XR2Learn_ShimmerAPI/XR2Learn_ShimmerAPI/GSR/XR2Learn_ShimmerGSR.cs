@@ -114,7 +114,7 @@ namespace XR2Learn_ShimmerAPI
             // Define event callback
             Shimmer.UICallback += this.HandleEvent;
 #else
-            throw new PlatformNotSupportedException("Shimmer GSR non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("...messaggio...");
 #endif
         }
 
