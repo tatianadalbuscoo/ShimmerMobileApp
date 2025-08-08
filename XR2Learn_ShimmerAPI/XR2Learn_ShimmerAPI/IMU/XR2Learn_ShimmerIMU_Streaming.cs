@@ -20,7 +20,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             if (IsConnected()) return;
             shimmer.Connect();
 #else
-            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Connect() non supportato su questa piattaforma.");
 #endif
         }
 
@@ -35,7 +35,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             await DelayWork(1000);
             shimmer.UICallback = null;
 #else
-            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Connect() non supportato su questa piattaforma.");
 #endif
         }
 
@@ -48,7 +48,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             await DelayWork(1000);
             shimmer.StartStreaming();
 #else
-            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Connect() non supportato su questa piattaforma.");
 #endif
         }
 
@@ -61,7 +61,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             shimmer.StopStreaming();
             await DelayWork(1000);
 #else
-            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Connect() non supportato su questa piattaforma.");
 #endif
         }
 
@@ -74,7 +74,7 @@ namespace XR2Learn_ShimmerAPI.IMU
 #if WINDOWS
             return shimmer.IsConnected();
 #else
-            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Connect() non supportato su questa piattaforma.");
 #endif
         }
 

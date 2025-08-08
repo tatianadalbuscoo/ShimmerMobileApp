@@ -138,7 +138,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             // Register the data callback handler
             shimmer.UICallback += this.HandleEvent;
 #else
-            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+            Console.WriteLine("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
 #endif
         }
 
