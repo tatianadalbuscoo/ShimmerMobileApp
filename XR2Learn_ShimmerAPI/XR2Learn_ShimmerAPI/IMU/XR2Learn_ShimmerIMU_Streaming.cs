@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Threading.Tasks;
 
 namespace XR2Learn_ShimmerAPI.IMU
 {
@@ -15,8 +16,12 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public void Connect()
         {
+#if WINDOWS
             if (IsConnected()) return;
             shimmer.Connect();
+#else
+            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -25,9 +30,13 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public async void Disconnect()
         {
+#if WINDOWS
             shimmer.Disconnect();
             await DelayWork(1000);
             shimmer.UICallback = null;
+#else
+            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -35,8 +44,12 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public async void StartStreaming()
         {
+#if WINDOWS
             await DelayWork(1000);
             shimmer.StartStreaming();
+#else
+            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -44,8 +57,12 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public async void StopStreaming()
         {
+#if WINDOWS
             shimmer.StopStreaming();
             await DelayWork(1000);
+#else
+            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -54,7 +71,11 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// <returns>True if connected; otherwise, false.</returns>
         public bool IsConnected()
         {
+#if WINDOWS
             return shimmer.IsConnected();
+#else
+            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
 

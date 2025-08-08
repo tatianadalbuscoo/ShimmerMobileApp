@@ -7,6 +7,11 @@
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	</PropertyGroup>
 
+	<!-- Definisce il simbolo WINDOWS quando compili su Windows -->
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
+		<DefineConstants>WINDOWS</DefineConstants>
+	</PropertyGroup>
+
 	<!-- Riferimento alla DLL nativa SOLO per Windows -->
 	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
 		<Reference Include="ShimmerLibrary">

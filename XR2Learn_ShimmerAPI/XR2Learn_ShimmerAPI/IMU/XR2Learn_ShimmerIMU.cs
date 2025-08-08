@@ -1,4 +1,6 @@
-﻿using ShimmerAPI;
+﻿#if WINDOWS
+using ShimmerAPI;
+#endif
 using System;
 using System.Threading;
 
@@ -13,6 +15,7 @@ namespace XR2Learn_ShimmerAPI.IMU
     public partial class XR2Learn_ShimmerIMU
     {
 
+#if WINDOWS
         // Instance of the enhanced Shimmer serial port communication class.
         private ShimmerLogAndStreamSystemSerialPortV2 shimmer;
 
@@ -38,6 +41,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         private int indexExtA6;
         private int indexExtA7;
         private int indexExtA15;
+#endif
 
         /// <summary>
         /// Latest IMU data sample received from the Shimmer device.
@@ -77,12 +81,13 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// <param name="enableExtA7">Enable external ADC A7.</param>
         /// <param name="enableExtA15">Enable external ADC A15.</param>
         public void Configure(
-            string deviceName, string comPort, bool enableLowNoiseAcc, 
-            bool enableWideRangeAcc, bool enableGyro, bool enableMag, 
-            bool enablePressureTemp, bool enableBattery, 
+            string deviceName, string comPort, bool enableLowNoiseAcc,
+            bool enableWideRangeAcc, bool enableGyro, bool enableMag,
+            bool enablePressureTemp, bool enableBattery,
             bool enableExtA6, bool enableExtA7, bool enableExtA15
         )
         {
+#if WINDOWS
             int enabledSensors = 0;
 
             // Set sensor enable flags
@@ -132,8 +137,12 @@ namespace XR2Learn_ShimmerAPI.IMU
 
             // Register the data callback handler
             shimmer.UICallback += this.HandleEvent;
+#else
+            throw new PlatformNotSupportedException("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
+#if WINDOWS
         /// <summary>
         /// Handles incoming data packets from the Shimmer device and extracts sensor values.
         /// </summary>
@@ -203,5 +212,6 @@ namespace XR2Learn_ShimmerAPI.IMU
                 );
             }
         }
+#endif
     }
 }
