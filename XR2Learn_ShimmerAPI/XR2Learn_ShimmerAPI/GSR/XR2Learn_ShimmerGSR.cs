@@ -1,8 +1,10 @@
 ﻿// Class to manage configuration and data processing from a Shimmer3 device,
 // including real-time heart rate calculation from PPG and acquisition of accelerometer and GSR signals.
 
+#if WINDOWS
 using ShimmerAPI;
 using ShimmerLibrary;
+#endif
 using System;
 
 namespace XR2Learn_ShimmerAPI
@@ -11,6 +13,7 @@ namespace XR2Learn_ShimmerAPI
     {
         #region Instance variables
 
+#if WINDOWS
         // Shimmer3 device
         private ShimmerLogAndStreamSystemSerialPort Shimmer;
 
@@ -30,6 +33,7 @@ namespace XR2Learn_ShimmerAPI
         private int IndexAcceleratorZ;
         private int IndexGSR;
         private int IndexPPG;
+#endif
 
         public XR2Learn_ShimmerGSRData LatestData { get; private set; }
 
@@ -40,6 +44,7 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public XR2Learn_ShimmerGSR()
         {
+#if WINDOWS
             // Device properties
             _numberOfHeartBeatsToAverage = DefaultNumberOfHeartBeatsToAverage;
             _trainingPeriodPPG = DefaultTrainingPeriodPPG;
@@ -56,6 +61,17 @@ namespace XR2Learn_ShimmerAPI
             PPGtoHeartRateCalculation = new PPGToHRAlgorithm(_samplingRate, _numberOfHeartBeatsToAverage, _trainingPeriodPPG);
             LPF_PPG = new Filter(Filter.LOW_PASS, _samplingRate, new double[] { _LowPassFilterCutoff });
             HPF_PPG = new Filter(Filter.HIGH_PASS, _samplingRate, new double[] { _HighPassFilterCutoff });
+#else
+            // Stub initialization for non-Windows platforms
+            _numberOfHeartBeatsToAverage = DefaultNumberOfHeartBeatsToAverage;
+            _trainingPeriodPPG = DefaultTrainingPeriodPPG;
+            _LowPassFilterCutoff = DefaultLowPassFilterCutoff;
+            _HighPassFilterCutoff = DefaultHighPassFilterCutoff;
+            _samplingRate = DefaultSamplingRate;
+            _enableAccelerator = 1;
+            _enableGSR = 1;
+            _enablePPG = 1;
+#endif
         }
 
         /// <summary>
@@ -65,15 +81,16 @@ namespace XR2Learn_ShimmerAPI
         /// <param name="comPort">Bluetooth Com Port</param>
         public void Configure(string deviceName, string comPort)
         {
+#if WINDOWS
             // Setup PPG-to-HR filters and algorithm
             PPGtoHeartRateCalculation.setParameters(_samplingRate, _numberOfHeartBeatsToAverage, _trainingPeriodPPG);
-            LPF_PPG.SetFilterParameters(Filter.LOW_PASS,  _samplingRate, new double[] { _LowPassFilterCutoff }, Filter.defaultNTaps);
+            LPF_PPG.SetFilterParameters(Filter.LOW_PASS, _samplingRate, new double[] { _LowPassFilterCutoff }, Filter.defaultNTaps);
             HPF_PPG.SetFilterParameters(Filter.HIGH_PASS, _samplingRate, new double[] { _HighPassFilterCutoff }, Filter.defaultNTaps);
 
             // Define enabled sensors
             int enabledSensors = (
                 (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL & _enableAccelerator |  /// Accelerator
-                (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_GSR     & _enableGSR |          /// Galvanic Skin Response
+                (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_GSR & _enableGSR |          /// Galvanic Skin Response
                 (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_INT_A13 & _enablePPG            /// PPG (photoplethysmogram)
             );
 
@@ -96,8 +113,12 @@ namespace XR2Learn_ShimmerAPI
 
             // Define event callback
             Shimmer.UICallback += this.HandleEvent;
+#else
+            throw new PlatformNotSupportedException("Shimmer GSR non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
+#if WINDOWS
         /// <summary>
         /// Handles stream callback event
         /// </summary>
@@ -135,12 +156,12 @@ namespace XR2Learn_ShimmerAPI
                     ObjectCluster objectCluster = (ObjectCluster)eventArgs.getObject();
                     if (FirstDataPacket)
                     {
-                        IndexTimeStamp    = objectCluster.GetIndex(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL);
+                        IndexTimeStamp = objectCluster.GetIndex(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL);
                         IndexAcceleratorX = objectCluster.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
                         IndexAcceleratorY = objectCluster.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
                         IndexAcceleratorZ = objectCluster.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
-                        IndexGSR          = objectCluster.GetIndex(Shimmer3Configuration.SignalNames.GSR, ShimmerConfiguration.SignalFormats.CAL);
-                        IndexPPG          = objectCluster.GetIndex(Shimmer3Configuration.SignalNames.INTERNAL_ADC_A13, ShimmerConfiguration.SignalFormats.CAL);
+                        IndexGSR = objectCluster.GetIndex(Shimmer3Configuration.SignalNames.GSR, ShimmerConfiguration.SignalFormats.CAL);
+                        IndexPPG = objectCluster.GetIndex(Shimmer3Configuration.SignalNames.INTERNAL_ADC_A13, ShimmerConfiguration.SignalFormats.CAL);
 
                         FirstDataPacket = false;
                     }
@@ -162,5 +183,6 @@ namespace XR2Learn_ShimmerAPI
                     break;
             }
         }
+#endif
     }
 }

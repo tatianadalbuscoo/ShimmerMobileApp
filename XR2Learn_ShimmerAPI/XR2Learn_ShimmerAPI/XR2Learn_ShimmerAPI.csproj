@@ -20,8 +20,8 @@
 		</Reference>
 	</ItemGroup>
 
-	<!-- Riferimento al progetto ShimmerAPI -->
-	<ItemGroup>
+	<!-- Riferimento al progetto ShimmerAPI SOLO per Windows -->
+	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
 		<ProjectReference Include="..\..\ShimmerAPI\ShimmerAPI\ShimmerAPI.csproj" />
 	</ItemGroup>
 

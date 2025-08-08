@@ -1,6 +1,8 @@
 ﻿// Defines configurable parameters and sensor activation flags for the Shimmer3 device used in biosignal analysis.
 
+#if WINDOWS
 using ShimmerAPI;
+#endif
 
 namespace XR2Learn_ShimmerAPI
 {
@@ -8,14 +10,14 @@ namespace XR2Learn_ShimmerAPI
     {
         #region Default values
 
-        public static readonly int      DefaultNumberOfHeartBeatsToAverage = 10;
-        public static readonly int      DefaultTrainingPeriodPPG = 10;
-        public static readonly double   DefaultLowPassFilterCutoff = 5;
-        public static readonly double   DefaultHighPassFilterCutoff = 0.5;
-        public static readonly double   DefaultSamplingRate = 10;
-        public static readonly bool     DefaultEnableAccelerator = true;
-        public static readonly bool     DefaultEnableGSR = true;
-        public static readonly bool     DefaultEnablePPG = true;
+        public static readonly int DefaultNumberOfHeartBeatsToAverage = 10;
+        public static readonly int DefaultTrainingPeriodPPG = 10;
+        public static readonly double DefaultLowPassFilterCutoff = 5;
+        public static readonly double DefaultHighPassFilterCutoff = 0.5;
+        public static readonly double DefaultSamplingRate = 10;
+        public static readonly bool DefaultEnableAccelerator = true;
+        public static readonly bool DefaultEnableGSR = true;
+        public static readonly bool DefaultEnablePPG = true;
 
         #endregion
 
@@ -76,8 +78,13 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public bool EnableAccelerator
         {
+#if WINDOWS
             get { return _enableAccelerator == (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL; }
             set { _enableAccelerator = value ? (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL : 0; }
+#else
+            get { return _enableAccelerator == 1; }
+            set { _enableAccelerator = value ? 1 : 0; }
+#endif
         }
         private int _enableAccelerator;
 
@@ -86,8 +93,13 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public bool EnableGSR
         {
+#if WINDOWS
             get { return _enableGSR == (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_GSR; }
             set { _enableGSR = value ? (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_GSR : 0; }
+#else
+            get { return _enableGSR == 1; }
+            set { _enableGSR = value ? 1 : 0; }
+#endif
         }
         private int _enableGSR;
 
@@ -96,8 +108,13 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public bool EnablePPG
         {
+#if WINDOWS
             get { return _enablePPG == (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_INT_A13; }
             set { _enablePPG = value ? (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_INT_A13 : 0; }
+#else
+            get { return _enablePPG == 1; }
+            set { _enablePPG = value ? 1 : 0; }
+#endif
         }
         private int _enablePPG;
 

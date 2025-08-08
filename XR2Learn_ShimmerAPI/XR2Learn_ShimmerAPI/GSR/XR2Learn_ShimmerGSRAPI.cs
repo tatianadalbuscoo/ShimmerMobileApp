@@ -11,8 +11,12 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public void Connect()
         {
+#if WINDOWS
             if (IsConnected()) return;
             Shimmer.Connect();
+#else
+            throw new PlatformNotSupportedException("Shimmer GSR non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -20,9 +24,13 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public async void Disconnect()
         {
+#if WINDOWS
             Shimmer.Disconnect();
             await DelayWork(1000);
             Shimmer.UICallback = null;
+#else
+            throw new PlatformNotSupportedException("Shimmer GSR non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -30,8 +38,12 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public async void StartStreaming()
         {
+#if WINDOWS
             await DelayWork(1000);
             Shimmer.StartStreaming();
+#else
+            throw new PlatformNotSupportedException("Shimmer GSR non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -39,8 +51,12 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public async void StopStreaming()
         {
+#if WINDOWS
             Shimmer.StopStreaming();
             await DelayWork(1000);
+#else
+            throw new PlatformNotSupportedException("Shimmer GSR non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>
@@ -49,7 +65,11 @@ namespace XR2Learn_ShimmerAPI
         /// <returns>True if connected, False otherwise</returns>
         public bool IsConnected()
         {
+#if WINDOWS
             return Shimmer.IsConnected();
+#else
+            throw new PlatformNotSupportedException("Shimmer GSR non supportato su questa piattaforma. Funziona solo su Windows.");
+#endif
         }
 
         /// <summary>

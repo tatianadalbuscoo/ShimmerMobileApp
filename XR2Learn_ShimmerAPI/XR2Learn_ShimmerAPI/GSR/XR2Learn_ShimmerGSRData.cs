@@ -1,6 +1,8 @@
 ﻿// Data container class for a single frame of Shimmer3 sensor readings (accelerometer, GSR, PPG, and heart rate).
 
+#if WINDOWS
 using ShimmerAPI;
+#endif
 
 namespace XR2Learn_ShimmerAPI
 {
@@ -11,8 +13,9 @@ namespace XR2Learn_ShimmerAPI
     {
         #region Instance variables
 
+#if WINDOWS
         /// <summary>
-        /// Heart Rate in BPM 
+        /// TimeStamp Data and Unit
         /// </summary>
         public readonly SensorData TimeStamp;
 
@@ -42,12 +45,10 @@ namespace XR2Learn_ShimmerAPI
         /// </summary>
         public readonly int HeartRate;
 
-        #endregion
-
         /// <summary>
         /// Default constructor
         /// </summary>
-        /// <param name="timeStamp">Heart Rate in BPM </param>
+        /// <param name="timeStamp">TimeStamp Data and Unit</param>
         /// <param name="acceleratorX">Accelerator X axis Data and Unit</param>
         /// <param name="acceleratorY">Accelerator Y axis Data and Unit</param>
         /// <param name="acceleratorZ">Accelerator Z axis Data and Unit</param>
@@ -64,5 +65,26 @@ namespace XR2Learn_ShimmerAPI
             PhotoPlethysmoGram = photoPlethysmoGram;
             this.HeartRate = HeartRate;
         }
+#else
+        // Stub version per piattaforme non-Windows
+        public readonly object TimeStamp;
+        public readonly object AcceleratorX;
+        public readonly object AcceleratorY;
+        public readonly object AcceleratorZ;
+        public readonly object GalvanicSkinResponse;
+        public readonly object PhotoPlethysmoGram;
+        public readonly int HeartRate;
+
+        /// <summary>
+        /// Stub constructor per piattaforme non-Windows
+        /// </summary>
+        public XR2Learn_ShimmerGSRData(object timeStamp = null, object acceleratorX = null, object acceleratorY = null, object acceleratorZ = null, object galvanicSkinResponse = null, object photoPlethysmoGram = null, int HeartRate = 0)
+        {
+            // Questa versione non fa nulla - è solo per permettere la compilazione
+            throw new PlatformNotSupportedException("XR2Learn_ShimmerGSRData non supportato su questa piattaforma. Funziona solo su Windows.");
+        }
+#endif
+
+        #endregion
     }
 }

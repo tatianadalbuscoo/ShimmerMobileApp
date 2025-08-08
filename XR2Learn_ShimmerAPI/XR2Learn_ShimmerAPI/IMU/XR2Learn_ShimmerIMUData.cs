@@ -1,4 +1,6 @@
-﻿using ShimmerAPI;
+﻿#if WINDOWS
+using ShimmerAPI;
+#endif
 
 namespace XR2Learn_ShimmerAPI.IMU
 {
@@ -11,6 +13,7 @@ namespace XR2Learn_ShimmerAPI.IMU
     /// </summary>
     public class XR2Learn_ShimmerIMUData
     {
+#if WINDOWS
         // Timestamp
         public readonly SensorData TimeStamp;
 
@@ -88,5 +91,45 @@ namespace XR2Learn_ShimmerAPI.IMU
             ExtADC_A7 = extADC_A7;
             ExtADC_A15 = extADC_A15;
         }
+#else
+        // Versione stub per piattaforme non-Windows - usa object invece di SensorData
+        public readonly object TimeStamp;
+        public readonly object LowNoiseAccelerometerX;
+        public readonly object LowNoiseAccelerometerY;
+        public readonly object LowNoiseAccelerometerZ;
+        public readonly object WideRangeAccelerometerX;
+        public readonly object WideRangeAccelerometerY;
+        public readonly object WideRangeAccelerometerZ;
+        public readonly object GyroscopeX;
+        public readonly object GyroscopeY;
+        public readonly object GyroscopeZ;
+        public readonly object MagnetometerX;
+        public readonly object MagnetometerY;
+        public readonly object MagnetometerZ;
+        public readonly object Pressure_BMP180;
+        public readonly object Temperature_BMP180;
+        public readonly object BatteryVoltage;
+        public readonly object ExtADC_A6;
+        public readonly object ExtADC_A7;
+        public readonly object ExtADC_A15;
+
+        /// <summary>
+        /// Stub constructor per piattaforme non-Windows
+        /// </summary>
+        public XR2Learn_ShimmerIMUData(
+            object timeStamp = null,
+            object accelerometerX = null, object accelerometerY = null, object accelerometerZ = null,
+            object wideAccelerometerX = null, object wideAccelerometerY = null, object wideAccelerometerZ = null,
+            object gyroscopeX = null, object gyroscopeY = null, object gyroscopeZ = null,
+            object magnetometerX = null, object magnetometerY = null, object magnetometerZ = null,
+            object temperatureBMP180 = null, object pressureBMP180 = null,
+            object batteryVoltage = null,
+            object extADC_A6 = null, object extADC_A7 = null, object extADC_A15 = null
+        )
+        {
+            // Questa versione non fa nulla - è solo per permettere la compilazione
+            throw new PlatformNotSupportedException("XR2Learn_ShimmerIMUData non supportato su questa piattaforma. Funziona solo su Windows.");
+        }
+#endif
     }
 }
