@@ -58,8 +58,15 @@ public partial class MainPageViewModel : ObservableObject
     /// Extracts Shimmer names from WMI when available.
     /// Only shows devices with known Shimmer names (filters out "Unknown").
     /// </summary>
+    /// <summary>
+    /// Scans available serial ports and creates a ShimmerDevice for each one.
+    /// Extracts Shimmer names from WMI when available.
+    /// Only shows devices with known Shimmer names (filters out "Unknown").
+    /// </summary>
     private void LoadDevices()
     {
+        Debug.WriteLine("=== LoadDevices() INIZIATO ===");
+
 #if WINDOWS
         // Clear the current list of available Shimmer devices
         AvailableDevices.Clear();
@@ -110,13 +117,17 @@ public partial class MainPageViewModel : ObservableObject
         }
 
 #elif MACCATALYST || IOS
+    Debug.WriteLine("Ramo MACCATALYST/IOS");
+    
     // Su Mac/iOS non c'è enumerazione seriale. Aggiungiamo una voce BLE "per nome".
     AvailableDevices.Clear();
+    Debug.WriteLine($"AvailableDevices.Count dopo Clear: {AvailableDevices.Count}");
 
     // Metti qui il nome pubblicitario atteso del tuo Shimmer (o lascialo "Shimmer3")
     var bleNameHint = "Shimmer3";
+    Debug.WriteLine($"Creando device con nome: {bleNameHint}");
 
-    AvailableDevices.Add(new ShimmerDevice
+    var newDevice = new ShimmerDevice
     {
         DisplayName = $"BLE: {bleNameHint}",
         Port1 = bleNameHint, // usiamo Port1 come "nome BLE" da passare alla Configure(...)
@@ -133,10 +144,23 @@ public partial class MainPageViewModel : ObservableObject
         EnableExtA6 = true,
         EnableExtA7 = true,
         EnableExtA15 = true
-    });
+    };
+    
+    Debug.WriteLine($"Device creato: DisplayName='{newDevice.DisplayName}', Port1='{newDevice.Port1}', ShimmerName='{newDevice.ShimmerName}'");
+    
+    AvailableDevices.Add(newDevice);
+    Debug.WriteLine($"Device aggiunto. AvailableDevices.Count: {AvailableDevices.Count}");
+    
+    // Forza la notifica di cambio proprietà
+    OnPropertyChanged(nameof(AvailableDevices));
+    Debug.WriteLine("OnPropertyChanged chiamato");
+    
 #else
+    Debug.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
     // altri OS: nulla
 #endif
+
+        Debug.WriteLine($"=== LoadDevices() COMPLETATO - Totale devices: {AvailableDevices.Count} ===");
     }
 
 
