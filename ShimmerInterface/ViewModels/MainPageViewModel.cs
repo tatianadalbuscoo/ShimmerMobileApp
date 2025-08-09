@@ -63,11 +63,17 @@ public partial class MainPageViewModel : ObservableObject
     /// Extracts Shimmer names from WMI when available.
     /// Only shows devices with known Shimmer names (filters out "Unknown").
     /// </summary>
+    /// <summary>
+    /// Scans available serial ports and creates a ShimmerDevice for each one.
+    /// Extracts Shimmer names from WMI when available.
+    /// Only shows devices with known Shimmer names (filters out "Unknown").
+    /// </summary>
     private void LoadDevices()
     {
-        Debug.WriteLine("=== LoadDevices() INIZIATO ===");
+        Console.WriteLine("=== LoadDevices() INIZIATO ===");
 
 #if WINDOWS
+        Console.WriteLine("Ramo WINDOWS");
         // Clear the current list of available Shimmer devices
         AvailableDevices.Clear();
 
@@ -112,20 +118,21 @@ public partial class MainPageViewModel : ObservableObject
                         EnableExtA7 = true,
                         EnableExtA15 = true
                     });
+                    Console.WriteLine($"Aggiunto device Windows: {displayName}");
                 }
             }
         }
 
 #elif MACCATALYST || IOS
-    Debug.WriteLine("Ramo MACCATALYST/IOS");
+    Console.WriteLine("Ramo MACCATALYST/IOS");
     
     // Su Mac/iOS non c'è enumerazione seriale. Aggiungiamo una voce BLE "per nome".
     AvailableDevices.Clear();
-    Debug.WriteLine($"AvailableDevices.Count dopo Clear: {AvailableDevices.Count}");
+    Console.WriteLine($"AvailableDevices.Count dopo Clear: {AvailableDevices.Count}");
 
     // Metti qui il nome pubblicitario atteso del tuo Shimmer (o lascialo "Shimmer3")
     var bleNameHint = "Shimmer3";
-    Debug.WriteLine($"Creando device con nome: {bleNameHint}");
+    Console.WriteLine($"Creando device con nome: {bleNameHint}");
 
     var newDevice = new ShimmerDevice
     {
@@ -146,23 +153,22 @@ public partial class MainPageViewModel : ObservableObject
         EnableExtA15 = true
     };
     
-    Debug.WriteLine($"Device creato: DisplayName='{newDevice.DisplayName}', Port1='{newDevice.Port1}', ShimmerName='{newDevice.ShimmerName}'");
+    Console.WriteLine($"Device creato: DisplayName='{newDevice.DisplayName}', Port1='{newDevice.Port1}', ShimmerName='{newDevice.ShimmerName}'");
     
     AvailableDevices.Add(newDevice);
-    Debug.WriteLine($"Device aggiunto. AvailableDevices.Count: {AvailableDevices.Count}");
+    Console.WriteLine($"Device aggiunto. AvailableDevices.Count: {AvailableDevices.Count}");
     
     // Forza la notifica di cambio proprietà
     OnPropertyChanged(nameof(AvailableDevices));
-    Debug.WriteLine("OnPropertyChanged chiamato");
+    Console.WriteLine("OnPropertyChanged chiamato");
     
 #else
-    Debug.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
+    Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
     // altri OS: nulla
 #endif
 
-        Debug.WriteLine($"=== LoadDevices() COMPLETATO - Totale devices: {AvailableDevices.Count} ===");
+        Console.WriteLine($"=== LoadDevices() COMPLETATO - Totale devices: {AvailableDevices.Count} ===");
     }
-
 
     /// <summary>
     /// Connects to all selected Shimmer devices and, if successful,
