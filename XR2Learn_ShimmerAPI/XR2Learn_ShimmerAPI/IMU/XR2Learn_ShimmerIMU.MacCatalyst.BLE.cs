@@ -210,23 +210,24 @@ namespace XR2Learn_ShimmerAPI.IMU
     }
 
     // OK: singolare
-    public override void DiscoveredCharacteristic(CBPeripheral peripheral, CBService service, NSError error)
+   public override void DiscoveredCharacteristics(CBPeripheral peripheral, CBService service, NSError error)
+{
+    if (error != null)
     {
-        if (error != null)
-        {
-            _owner?._tcsDiscoveredCharacteristics?.TrySetException(new Exception(error.LocalizedDescription));
-            return;
-        }
-
-        foreach (var c in service.Characteristics ?? Array.Empty<CBCharacteristic>())
-        {
-            if (c.UUID.Equals(SHIMMER_RX_CHAR_UUID)) _owner._rxChar = c;
-            else if (c.UUID.Equals(SHIMMER_TX_CHAR_UUID)) _owner._txChar = c;
-        }
-
-        if (_owner._rxChar != null && _owner._txChar != null)
-            _owner?._tcsDiscoveredCharacteristics?.TrySetResult(true);
+        _owner?._tcsDiscoveredCharacteristics?.TrySetException(new Exception(error.LocalizedDescription));
+        return;
     }
+
+    foreach (var c in service.Characteristics ?? Array.Empty<CBCharacteristic>())
+    {
+        if (c.UUID.Equals(SHIMMER_RX_CHAR_UUID)) _owner._rxChar = c;
+        else if (c.UUID.Equals(SHIMMER_TX_CHAR_UUID)) _owner._txChar = c;
+    }
+
+    if (_owner._rxChar != null && _owner._txChar != null)
+        _owner?._tcsDiscoveredCharacteristics?.TrySetResult(true);
+}
+
 
     // ✅ firma ESATTA in Xamarin/MacCatalyst (con "terter")
     public override void UpdatedCharacterteristicValue(CBPeripheral peripheral, CBCharacteristic characteristic, NSError error)
