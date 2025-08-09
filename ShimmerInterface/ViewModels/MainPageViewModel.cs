@@ -45,9 +45,10 @@ public partial class MainPageViewModel : ObservableObject
 
 #if WINDOWS
     LoadDevices();              // solo Windows
+#elif MACCATALYST
+    LoadDevices();              // su Mac usiamo il ramo MACCATALYST qui sotto
 #else
-        // Su Mac/iOS/Android: niente enumerazione seriale.
-        // Potresti popolare da BLE in futuro, oppure lasciare la lista vuota e mostrare un messaggio.
+        // altri target: lasciare vuoto/nessuna enumerazione
 #endif
     }
 
@@ -96,8 +97,24 @@ public partial class MainPageViewModel : ObservableObject
                 }
             }
         }
+
+#elif MACCATALYST
+    // --- MAC (BLE): aggiungo una card "BLE" pronta a connettersi ---
+    AvailableDevices.Clear();
+
+    // Hint nome BLE: puoi cambiarlo da UI o via codice.
+    const string bleNameHint = "Shimmer3"; // o "Shimmer3R", "Verisense", ecc.
+
+    AvailableDevices.Add(new ShimmerDevice
+    {
+        DisplayName = $"Shimmer BLE ({bleNameHint})",
+        // Riutilizzo Port1 come "name hint" BLE, per compatibilità con Configure(...)
+        Port1 = bleNameHint,
+        IsSelected = true,          // così l’utente può fare Connect subito
+        ShimmerName = bleNameHint
+    });
 #else
-        // noop su non-Windows
+        // noop sugli altri target
 #endif
     }
 

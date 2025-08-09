@@ -46,7 +46,14 @@ public partial class LoadingPageViewModel : ObservableObject
     {
         this.device = device;
         this.completion = completion;
-        this.connectingMessage = $"Connecting to {device.ShimmerName} on {device.Port1}...";
+
+#if WINDOWS
+    this.connectingMessage = $"Connecting to {device.ShimmerName} on {device.Port1}...";
+#elif MACCATALYST
+    this.connectingMessage = $"Connecting to {device.ShimmerName} via BLE...";
+#else
+        this.connectingMessage = $"Connecting to {device.ShimmerName}...";
+#endif
     }
 
 
@@ -135,7 +142,6 @@ public partial class LoadingPageViewModel : ObservableObject
     {
         try
         {
-            // Create and configure the Shimmer device instance with enabled sensors
             var shimmer = new XR2Learn_ShimmerIMU
             {
                 EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
@@ -149,7 +155,14 @@ public partial class LoadingPageViewModel : ObservableObject
                 EnableExtA15 = device.EnableExtA15
             };
 
-            shimmer.Configure("Shimmer3", device.Port1,
+            // ⚠️ Qui l’unica differenza tra Windows e Mac:
+            // - Windows: Port1 = COMxx
+            // - Mac:     Port1 = BLE name hint (es. "Shimmer3")
+#if WINDOWS
+        shimmer.Configure("Shimmer3", device.Port1,
+#else
+            shimmer.Configure("Shimmer3", device.Port1,   // device.Port1 = hint nome BLE su Mac
+#endif
                 device.EnableLowNoiseAccelerometer,
                 device.EnableWideRangeAccelerometer,
                 device.EnableGyroscope,
@@ -160,40 +173,18 @@ public partial class LoadingPageViewModel : ObservableObject
                 device.EnableExtA7,
                 device.EnableExtA15);
 
-            // Start the connection attempt on a background thread
             var connectTask = Task.Run(() => shimmer.Connect());
-
-            // Wait for either the connection to complete, or a 30-second timeout
             var completedTask = await Task.WhenAny(connectTask, Task.Delay(30000));
 
-            if (completedTask == connectTask)
-            {
-                // The connection task completed (may be successful or faulted)
+            if (completedTask != connectTask) return null;       // timeout
+            if (connectTask.IsFaulted) return null;
+            if (!shimmer.IsConnected()) return null;
 
-                if (connectTask.IsFaulted)
-                {
-                    return null;
-                }
-
-                if (!shimmer.IsConnected())
-                {
-                    // Connection attempt completed, but the device is not connected
-                    return null;
-                }
-
-                // Successfully connected, start streaming data
-                shimmer.StartStreaming();
-                return shimmer;
-            }
-            else
-            {
-                // Timeout: the connection did not complete in time
-                return null;
-            }
+            shimmer.StartStreaming();
+            return shimmer;
         }
-        catch (Exception ex)
+        catch
         {
-            // Catch any unexpected exceptions outside of the connection task
             return null;
         }
     }

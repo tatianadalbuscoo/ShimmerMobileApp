@@ -35,4 +35,15 @@
 		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.5.3" />
 		<PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
 	</ItemGroup>
+
+	<!-- Aggiunge net8.0-maccatalyst solo quando compili su Mac -->
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+		<TargetFrameworks>$(TargetFrameworks);net8.0-maccatalyst</TargetFrameworks>
+		<DefineConstants>$(DefineConstants);MACCATALYST</DefineConstants>
+	</PropertyGroup>
+
+	<!-- Abilita le API Mac Catalyst nella libreria -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-maccatalyst'">
+		<FrameworkReference Include="Microsoft.MacCatalyst" />
+	</ItemGroup>
 </Project>
