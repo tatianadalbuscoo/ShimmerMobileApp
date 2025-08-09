@@ -137,8 +137,23 @@ namespace XR2Learn_ShimmerAPI.IMU
 
             // Register the data callback handler
             shimmer.UICallback += this.HandleEvent;
+#elif MACCATALYST
+    // memorizza i flag sensori come su Windows
+    _enableLowNoiseAccelerometer = enableLowNoiseAcc;
+    _enableWideRangeAccelerometer = enableWideRangeAcc;
+    _enableGyroscope = enableGyro;
+    _enableMagnetometer = enableMag;
+    _enablePressureTemperature = enablePressureTemp;
+    _enableBattery = enableBattery;
+    _enableExtA6 = enableExtA6;
+    _enableExtA7 = enableExtA7;
+    _enableExtA15 = enableExtA15;
+
+    // su Mac usiamo comPort come hint del nome BLE (es. "Shimmer3")
+    if (!string.IsNullOrWhiteSpace(comPort))
+        _bleDeviceName = comPort;
 #else
-            Console.WriteLine("Shimmer IMU non supportato su questa piattaforma. Funziona solo su Windows.");
+    Console.WriteLine("Shimmer IMU non supportato su questa piattaforma.");
 #endif
         }
 

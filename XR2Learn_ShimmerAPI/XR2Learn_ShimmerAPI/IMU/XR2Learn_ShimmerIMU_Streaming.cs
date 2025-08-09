@@ -19,8 +19,11 @@ namespace XR2Learn_ShimmerAPI.IMU
 #if WINDOWS
             if (IsConnected()) return;
             shimmer.Connect();
+#elif MACCATALYST
+    if (IsConnectedMac()) return;
+    ConnectMac();
 #else
-            Console.WriteLine("Connect() non supportato su questa piattaforma.");
+    Console.WriteLine("Connect() non supportato su questa piattaforma.");
 #endif
         }
 
@@ -34,10 +37,13 @@ namespace XR2Learn_ShimmerAPI.IMU
             shimmer.Disconnect();
             await DelayWork(1000);
             shimmer.UICallback = null;
+#elif MACCATALYST
+    await DisconnectMacAsync();
 #else
-            Console.WriteLine("Connect() non supportato su questa piattaforma.");
+    Console.WriteLine("Disconnect() non supportato su questa piattaforma.");
 #endif
         }
+
 
         /// <summary>
         /// Starts data streaming from the Shimmer IMU device after a short delay.
@@ -47,10 +53,13 @@ namespace XR2Learn_ShimmerAPI.IMU
 #if WINDOWS
             await DelayWork(1000);
             shimmer.StartStreaming();
+#elif MACCATALYST
+    await StartStreamingMacAsync();
 #else
-            Console.WriteLine("Connect() non supportato su questa piattaforma.");
+    Console.WriteLine("StartStreaming() non supportato su questa piattaforma.");
 #endif
         }
+
 
         /// <summary>
         /// Stops data streaming from the Shimmer IMU device and waits briefly.
@@ -60,10 +69,13 @@ namespace XR2Learn_ShimmerAPI.IMU
 #if WINDOWS
             shimmer.StopStreaming();
             await DelayWork(1000);
+#elif MACCATALYST
+    await StopStreamingMacAsync();
 #else
-            Console.WriteLine("Connect() non supportato su questa piattaforma.");
+    Console.WriteLine("StopStreaming() non supportato su questa piattaforma.");
 #endif
         }
+
 
         /// <summary>
         /// Returns whether the Shimmer IMU device is currently connected.
@@ -73,11 +85,13 @@ namespace XR2Learn_ShimmerAPI.IMU
         {
 #if WINDOWS
             return shimmer.IsConnected();
+#elif MACCATALYST
+    return IsConnectedMac();
 #else
-            Console.WriteLine("Connect() non supportato su questa piattaforma.");
-            return false;
+    return false;
 #endif
         }
+
 
 
         /// <summary>
