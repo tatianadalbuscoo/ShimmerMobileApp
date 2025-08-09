@@ -193,48 +193,48 @@ namespace XR2Learn_ShimmerAPI.IMU
             }
         }
 
-        private class ShimmerPeripheralDelegate : CBPeripheralDelegate
+       private class ShimmerPeripheralDelegate : CBPeripheralDelegate
+{
+    private readonly XR2Learn_ShimmerIMU _owner;
+    public ShimmerPeripheralDelegate(XR2Learn_ShimmerIMU owner) => _owner = owner;
+
+    // Usa i nomi corretti per la tua versione di Xamarin
+    public override void DiscoveredService(CBPeripheral peripheral, NSError error)
+    {
+        if (error != null)
         {
-            private readonly XR2Learn_ShimmerIMU _owner;
-            public ShimmerPeripheralDelegate(XR2Learn_ShimmerIMU owner) => _owner = owner;
-
-            // ✅ firma corretta (singolare)
-            public override void DiscoveredServices(CBPeripheral peripheral, NSError error)
-            {
-                if (error != null)
-                {
-                    _owner?._tcsDiscoveredServices?.TrySetException(new Exception(error.LocalizedDescription));
-                    return;
-                }
-                _owner?._tcsDiscoveredServices?.TrySetResult(true);
-            }
-
-            // ✅ firma corretta (singolare)
-            public override void DiscoveredCharacteristics(CBPeripheral peripheral, CBService service, NSError error)
-            {
-                if (error != null)
-                {
-                    _owner?._tcsDiscoveredCharacteristics?.TrySetException(new Exception(error.LocalizedDescription));
-                    return;
-                }
-
-                foreach (var c in service.Characteristics ?? Array.Empty<CBCharacteristic>())
-                {
-                    if (c.UUID.Equals(SHIMMER_RX_CHAR_UUID)) _owner._rxChar = c;
-                    else if (c.UUID.Equals(SHIMMER_TX_CHAR_UUID)) _owner._txChar = c;
-                }
-
-                if (_owner._rxChar != null && _owner._txChar != null)
-                    _owner?._tcsDiscoveredCharacteristics?.TrySetResult(true);
-            }
-
-            public override void UpdatedCharacteristicValue(CBPeripheral peripheral, CBCharacteristic characteristic, NSError error)
-                {
-                    if (error != null || characteristic?.Value == null) return;
-                    var bytes = characteristic.Value.ToArray();
-                    _owner.OnPacketReceived(bytes);
-                }
+            _owner?._tcsDiscoveredServices?.TrySetException(new Exception(error.LocalizedDescription));
+            return;
         }
+        _owner?._tcsDiscoveredServices?.TrySetResult(true);
+    }
+
+    public override void DiscoveredCharacteristic(CBPeripheral peripheral, CBService service, NSError error)
+    {
+        if (error != null)
+        {
+            _owner?._tcsDiscoveredCharacteristics?.TrySetException(new Exception(error.LocalizedDescription));
+            return;
+        }
+
+        foreach (var c in service.Characteristics ?? Array.Empty<CBCharacteristic>())
+        {
+            if (c.UUID.Equals(SHIMMER_RX_CHAR_UUID)) _owner._rxChar = c;
+            else if (c.UUID.Equals(SHIMMER_TX_CHAR_UUID)) _owner._txChar = c;
+        }
+
+        if (_owner._rxChar != null && _owner._txChar != null)
+            _owner?._tcsDiscoveredCharacteristics?.TrySetResult(true);
+    }
+
+    // Correggi solo il typo nella 't' extra
+    public override void UpdatedCharacteristicValue(CBPeripheral peripheral, CBCharacteristic characteristic, NSError error)
+    {
+        if (error != null || characteristic?.Value == null) return;
+        var bytes = characteristic.Value.ToArray();
+        _owner.OnPacketReceived(bytes);
+    }
+}
     }
 }
 #endif
