@@ -115,13 +115,14 @@ public partial class MainPageViewModel : ObservableObject
     Console.WriteLine("Ramo MACCATALYST/IOS - fallback");
     AvailableDevices.Clear();
 
-    // Fallback leggibile se non trovi nulla (per evitare il riquadro 'vuoto')
     AvailableDevices.Add(new ShimmerDevice
     {
-        DisplayName = "Nessun Shimmer trovato (BLE)",
-        Port1 = "",
-        ShimmerName = "",
+        DisplayName = "Nessun Shimmer trovato (BLE)", // ← titolo card
+        Port1 = "(BLE non rilevato)",                 // ← così dopo "Port:" vedi qualcosa
+        ShimmerName = "----",
         IsSelected = false,
+
+        // default sensori
         EnableLowNoiseAccelerometer = true,
         EnableWideRangeAccelerometer = true,
         EnableGyroscope = true,
@@ -132,6 +133,7 @@ public partial class MainPageViewModel : ObservableObject
         EnableExtA7 = true,
         EnableExtA15 = true
     });
+
 
 #else
     Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
