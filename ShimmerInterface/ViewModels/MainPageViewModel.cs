@@ -124,9 +124,6 @@ public partial class MainPageViewModel : ObservableObject
         }
 
 #elif MACCATALYST
-private void LoadDevices()
-{
-    Console.WriteLine("Ramo MACCATALYST - LoadDevices fallback");
 
     AvailableDevices.Clear();
 
