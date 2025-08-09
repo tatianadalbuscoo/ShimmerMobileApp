@@ -42,7 +42,13 @@ public partial class MainPageViewModel : ObservableObject
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
         RefreshDevicesCommand = new RelayCommand(LoadDevices);
-        LoadDevices();
+
+#if WINDOWS
+    LoadDevices();              // solo Windows
+#else
+        // Su Mac/iOS/Android: niente enumerazione seriale.
+        // Potresti popolare da BLE in futuro, oppure lasciare la lista vuota e mostrare un messaggio.
+#endif
     }
 
 
@@ -53,6 +59,7 @@ public partial class MainPageViewModel : ObservableObject
     /// </summary>
     private void LoadDevices()
     {
+#if WINDOWS
         // Clear the current list of available Shimmer devices
         AvailableDevices.Clear();
 
@@ -89,6 +96,9 @@ public partial class MainPageViewModel : ObservableObject
                 }
             }
         }
+#else
+        // noop su non-Windows
+#endif
     }
 
 
