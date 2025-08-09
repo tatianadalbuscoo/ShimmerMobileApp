@@ -11,28 +11,43 @@
     <!-- Please consult https://developer.apple.com/documentation/bundleresources/information_property_list/lsapplicationcategorytype -->
     <!-- <key>LSApplicationCategoryType</key> -->
     <!-- <string>public.app-category.YOUR-CATEGORY-HERE</string> -->
-	<key>UIDeviceFamily</key>
-	<array>
-		<integer>2</integer>
-	</array>
-	<key>UIRequiredDeviceCapabilities</key>
-	<array>
-		<string>arm64</string>
-	</array>
-	<key>UISupportedInterfaceOrientations</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>XSAppIconAssets</key>
-	<string>Assets.xcassets/appicon.appiconset</string>
+
+    <key>UIDeviceFamily</key>
+    <array>
+        <integer>2</integer>
+    </array>
+
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <key>UISupportedInterfaceOrientations~ipad</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationPortraitUpsideDown</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+
+    <key>XSAppIconAssets</key>
+    <string>Assets.xcassets/appicon.appiconset</string>
+
+    <!-- 📡 Bluetooth permissions for Mac Catalyst/iOS -->
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>L'app usa Bluetooth per trovare e collegarsi ai sensori Shimmer.</string>
+
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>bluetooth-central</string>
+    </array>
+
 </dict>
 </plist>
