@@ -1,6 +1,5 @@
 ﻿#if MACCATALYST
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using CoreBluetooth;
 using CoreFoundation;
@@ -10,18 +9,16 @@ namespace XR2Learn_ShimmerAPI.IMU
 {
     /// <summary>
     /// Implementazione BLE per Mac Catalyst.
-    /// Nota: qui ci sono SOLO helper privati e stato BLE.
-    /// I metodi pubblici (Configure/Connect/…) restano nel file originale
-    /// e usano #elif MACCATALYST per chiamare questi helper.
+    /// SOLO helper privati e stato BLE: nessun metodo pubblico duplicato.
     /// </summary>
     public partial class XR2Learn_ShimmerIMU
     {
-        // ===== UUID (NUS-like dal tuo repo Swift) =====
+        // UUID (NUS-like)
         private static readonly CBUUID SHIMMER_SERVICE_UUID = CBUUID.FromString("6E400001-B5A3-F393-E0A9-E50E24DCCA9E");
         private static readonly CBUUID SHIMMER_RX_CHAR_UUID  = CBUUID.FromString("6E400003-B5A3-F393-E0A9-E50E24DCCA9E"); // notify
         private static readonly CBUUID SHIMMER_TX_CHAR_UUID  = CBUUID.FromString("6E400002-B5A3-F393-E0A9-E50E24DCCA9E"); // write
 
-        // Hint nome periferica (viene impostato in Configure(...) ramo MACCATALYST)
+        // Hint nome periferica (impostato in Configure nel ramo MACCATALYST)
         private string _bleDeviceName = "Shimmer3";
 
         // Stato BLE
@@ -32,7 +29,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         private CBCharacteristic _txChar;
         private readonly DispatchQueue _bleQueue = new DispatchQueue("XR2Learn_ShimmerIMU.BLE");
 
-        // TCS per sincronizzazione fasi
+        // TCS per sincronizzazione
         private TaskCompletionSource<bool> _tcsPoweredOn;
         private TaskCompletionSource<bool> _tcsConnected;
         private TaskCompletionSource<bool> _tcsDiscoveredServices;
@@ -40,7 +37,7 @@ namespace XR2Learn_ShimmerAPI.IMU
 
         private volatile bool _isStreaming;
 
-        // ===== Helper privati chiamati dai metodi pubblici =====
+        // ===== Helper privati usati dai metodi pubblici (nel ramo #elif MACCATALYST) =====
 
         private void ConnectMac()
         {
@@ -55,7 +52,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             // Attendi BT PoweredOn
             _tcsPoweredOn.Task.Wait();
 
-            // Scan filtrato per service UUID (e per nome nel delegate)
+            // Scan (filtriamo per service, e per nome nel delegate)
             _central.ScanForPeripherals(new[] { SHIMMER_SERVICE_UUID });
 
             if (!_tcsConnected.Task.Wait(TimeSpan.FromSeconds(20)))
@@ -65,14 +62,12 @@ namespace XR2Learn_ShimmerAPI.IMU
             if (!_tcsDiscoveredServices.Task.Wait(TimeSpan.FromSeconds(10)))
                 throw new TimeoutException("BLE service discovery timeout.");
 
-            // Caratteristiche
             foreach (var svc in _peripheral.Services ?? Array.Empty<CBService>())
             {
                 if (svc?.UUID != null && svc.UUID.Equals(SHIMMER_SERVICE_UUID))
-                {
                     _peripheral.DiscoverCharacteristics(new[] { SHIMMER_RX_CHAR_UUID, SHIMMER_TX_CHAR_UUID }, svc);
-                }
             }
+
             if (!_tcsDiscoveredCharacteristics.Task.Wait(TimeSpan.FromSeconds(10)))
                 throw new TimeoutException("BLE characteristic discovery timeout.");
 
@@ -128,7 +123,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             _peripheral.WriteValue(NSData.FromArray(new byte[] { b }), _txChar, CBCharacteristicWriteType.WithResponse);
         }
 
-        // ===== Parser (stub: da completare con il tuo protocollo) =====
+        // ===== Parser (stub: da completare secondo il protocollo Shimmer) =====
         private void OnPacketReceived(byte[] payload)
         {
             try
@@ -203,8 +198,8 @@ namespace XR2Learn_ShimmerAPI.IMU
             private readonly XR2Learn_ShimmerIMU _owner;
             public ShimmerPeripheralDelegate(XR2Learn_ShimmerIMU owner) => _owner = owner;
 
-            // ✅ PLURALE
-            public override void DiscoveredServices(CBPeripheral peripheral, NSError error)
+            // ✅ firma corretta (singolare)
+            public override void DiscoveredService(CBPeripheral peripheral, NSError error)
             {
                 if (error != null)
                 {
@@ -214,8 +209,8 @@ namespace XR2Learn_ShimmerAPI.IMU
                 _owner?._tcsDiscoveredServices?.TrySetResult(true);
             }
 
-            // ✅ PLURALE
-            public override void DiscoveredCharacteristics(CBPeripheral peripheral, CBService service, NSError error)
+            // ✅ firma corretta (singolare)
+            public override void DiscoveredCharacteristic(CBPeripheral peripheral, CBService service, NSError error)
             {
                 if (error != null)
                 {
@@ -233,7 +228,7 @@ namespace XR2Learn_ShimmerAPI.IMU
                     _owner?._tcsDiscoveredCharacteristics?.TrySetResult(true);
             }
 
-            // Firma “Characterteristic” è quella corretta per Xamarin/MacCatalyst
+            // firma “Characterteristic” è quella usata da Xamarin/MacCatalyst
             public override void UpdatedCharacterteristicValue(CBPeripheral peripheral, CBCharacteristic characteristic, NSError error)
             {
                 if (error != null || characteristic?.Value == null) return;
