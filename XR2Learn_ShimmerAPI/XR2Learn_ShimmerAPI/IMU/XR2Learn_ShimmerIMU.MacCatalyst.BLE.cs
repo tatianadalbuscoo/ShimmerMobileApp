@@ -198,7 +198,7 @@ namespace XR2Learn_ShimmerAPI.IMU
     private readonly XR2Learn_ShimmerIMU _owner;
     public ShimmerPeripheralDelegate(XR2Learn_ShimmerIMU owner) => _owner = owner;
 
-    // Usa i nomi corretti per la tua versione di Xamarin
+    // OK: singolare
     public override void DiscoveredService(CBPeripheral peripheral, NSError error)
     {
         if (error != null)
@@ -209,6 +209,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         _owner?._tcsDiscoveredServices?.TrySetResult(true);
     }
 
+    // OK: singolare
     public override void DiscoveredCharacteristic(CBPeripheral peripheral, CBService service, NSError error)
     {
         if (error != null)
@@ -227,14 +228,15 @@ namespace XR2Learn_ShimmerAPI.IMU
             _owner?._tcsDiscoveredCharacteristics?.TrySetResult(true);
     }
 
-    // Correggi solo il typo nella 't' extra
-    public override void UpdatedCharacteristicValue(CBPeripheral peripheral, CBCharacteristic characteristic, NSError error)
+    // ✅ firma ESATTA in Xamarin/MacCatalyst (con "terter")
+    public override void UpdatedCharacterteristicValue(CBPeripheral peripheral, CBCharacteristic characteristic, NSError error)
     {
         if (error != null || characteristic?.Value == null) return;
         var bytes = characteristic.Value.ToArray();
         _owner.OnPacketReceived(bytes);
     }
 }
+
     }
 }
 #endif
