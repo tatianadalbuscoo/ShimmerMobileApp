@@ -123,47 +123,40 @@ public partial class MainPageViewModel : ObservableObject
             }
         }
 
-#elif MACCATALYST || IOS
-    Console.WriteLine("Ramo MACCATALYST/IOS");
-    
-    // Su Mac/iOS non c'è enumerazione seriale. Aggiungiamo una voce BLE "per nome".
+#elif MACCATALYST
+private void LoadDevices()
+{
+    Console.WriteLine("Ramo MACCATALYST - LoadDevices fallback");
+
     AvailableDevices.Clear();
-    Console.WriteLine($"AvailableDevices.Count dopo Clear: {AvailableDevices.Count}");
 
-    // Metti qui il nome pubblicitario atteso del tuo Shimmer (o lascialo "Shimmer3")
-    var bleNameHint = "Shimmer3";
-    Console.WriteLine($"Creando device con nome: {bleNameHint}");
-
-    var newDevice = new ShimmerDevice
+    // Qui puoi mettere lo scan BLE reale in futuro
+    // Per ora, fallback se non trovi nulla
+    if (AvailableDevices.Count == 0)
     {
-        DisplayName = $"BLE: {bleNameHint}",
-        Port1 = bleNameHint, // usiamo Port1 come "nome BLE" da passare alla Configure(...)
-        IsSelected = false, // Cambiato da true a false per consistenza con Windows
-        ShimmerName = bleNameHint, // Aggiunto ShimmerName per consistenza
+        AvailableDevices.Add(new ShimmerDevice
+        {
+            DisplayName = "Nessun Shimmer trovato (BLE)",
+            Port1 = "",
+            ShimmerName = "",
+            IsSelected = false,
 
-        // default sensori come vuoi
-        EnableLowNoiseAccelerometer = true,
-        EnableWideRangeAccelerometer = true,
-        EnableGyroscope = true,
-        EnableMagnetometer = true,
-        EnablePressureTemperature = true,
-        EnableBattery = true,
-        EnableExtA6 = true,
-        EnableExtA7 = true,
-        EnableExtA15 = true
-    };
-    
-    Console.WriteLine($"Device creato: DisplayName='{newDevice.DisplayName}', Port1='{newDevice.Port1}', ShimmerName='{newDevice.ShimmerName}'");
-    
-    AvailableDevices.Add(newDevice);
-    Console.WriteLine($"Device aggiunto. AvailableDevices.Count: {AvailableDevices.Count}");
-    
-    // Forza la notifica di cambio proprietà
-    OnPropertyChanged(nameof(AvailableDevices));
-    Console.WriteLine("OnPropertyChanged chiamato");
-    
+            // Switch sensori default (opzionale)
+            EnableLowNoiseAccelerometer = true,
+            EnableWideRangeAccelerometer = true,
+            EnableGyroscope = true,
+            EnableMagnetometer = true,
+            EnablePressureTemperature = true,
+            EnableBattery = true,
+            EnableExtA6 = true,
+            EnableExtA7 = true,
+            EnableExtA15 = true
+        });
+    }
+}
+
 #else
-    Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
+        Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
     // altri OS: nulla
 #endif
 
