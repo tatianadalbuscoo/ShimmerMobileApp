@@ -158,12 +158,26 @@ namespace XR2Learn_ShimmerAPI.IMU
 
             public override void UpdatedState(CBCentralManager central)
             {
-                if (central.State == CBCentralManagerState.PoweredOn)
-                    _owner?._tcsPoweredOn?.TrySetResult(true);
-                else if (central.State == CBCentralManagerState.Unauthorized)
-                    _owner?._tcsPoweredOn?.TrySetException(new UnauthorizedAccessException("Bluetooth unauthorized."));
-                else if (central.State == CBCentralManagerState.Unsupported)
-                    _owner?._tcsPoweredOn?.TrySetException(new PlatformNotSupportedException("BLE unsupported."));
+                switch (central.State)
+                {
+                    case CBManagerState.PoweredOn:
+                        _owner?._tcsPoweredOn?.TrySetResult(true);
+                        break;
+
+                    case CBManagerState.Unauthorized:
+                        _owner?._tcsPoweredOn?.TrySetException(
+                            new UnauthorizedAccessException("Bluetooth unauthorized."));
+                        break;
+
+                    case CBManagerState.Unsupported:
+                        _owner?._tcsPoweredOn?.TrySetException(
+                            new PlatformNotSupportedException("BLE unsupported."));
+                        break;
+
+                    // altri stati: Unknown, Resetting, PoweredOff
+                    default:
+                        break;
+                }
             }
 
             public override void DiscoveredPeripheral(CBCentralManager central, CBPeripheral peripheral, NSDictionary advertisementData, NSNumber RSSI)
@@ -182,7 +196,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             }
 
             public override void ConnectedPeripheral(CBCentralManager central, CBPeripheral peripheral) =>
-                _owner?._tcsConnected?.TrySetResult(true);
+            _owner?._tcsConnected?.TrySetResult(true);
 
             public override void FailedToConnectPeripheral(CBCentralManager central, CBPeripheral peripheral, NSError error) =>
                 _owner?._tcsConnected?.TrySetException(new Exception($"Failed to connect: {error?.LocalizedDescription}"));
