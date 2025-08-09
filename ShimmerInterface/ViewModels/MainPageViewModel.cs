@@ -43,13 +43,8 @@ public partial class MainPageViewModel : ObservableObject
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
         RefreshDevicesCommand = new RelayCommand(LoadDevices);
 
-#if WINDOWS
-    LoadDevices();              // solo Windows
-#elif MACCATALYST
-    LoadDevices();              // su Mac usiamo il ramo MACCATALYST qui sotto
-#else
-        // altri target: lasciare vuoto/nessuna enumerazione
-#endif
+    LoadDevices();              
+
     }
 
 
