@@ -35,70 +35,74 @@ Includes device selection, sensor options toggles, and a button to initiate conn
             <CollectionView ItemsSource="{Binding AvailableDevices}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        
+
                         <!-- Individual device card -->
                         <Frame Padding="15" Margin="5" BorderColor="Gray" BackgroundColor="White" CornerRadius="8">
                             <VerticalStackLayout Spacing="10">
 
                                 <!-- Device display name -->
-                                <Label Text="{Binding DisplayName}" FontAttributes="Bold" FontSize="16" />
+                                <Label Text="{Binding DisplayName}" FontAttributes="Bold" FontSize="16" TextColor="Black" />
 
                                 <!-- Serial port associated with the device -->
                                 <Label Text="{Binding Port1, StringFormat='Port: {0}'}" FontSize="12" TextColor="Gray" />
 
                                 <!-- Checkbox to select the device to connect -->
                                 <HorizontalStackLayout Spacing="10">
-                                    <CheckBox IsChecked="{Binding IsSelected}" />
-                                    <Label Text="Select for connection" VerticalOptions="Center" FontSize="14" />
+                                    <!-- uso uno Switch per coerenza visiva su Mac ma resta legato a IsSelected -->
+                                    <Switch IsToggled="{Binding IsSelected, Mode=TwoWay}"
+                    WidthRequest="48" HeightRequest="28"
+                    HorizontalOptions="Start" VerticalOptions="Center" />
+                                    <Label Text="Select for connection" VerticalOptions="Center" FontSize="14" TextColor="Black" />
                                 </HorizontalStackLayout>
 
                                 <!-- Separator -->
                                 <BoxView HeightRequest="1" BackgroundColor="LightGray" Margin="0,5" />
 
                                 <!-- Sensor configuration section -->
-                                <Label Text="Sensor Configuration" FontAttributes="Bold" FontSize="14" />
+                                <Label Text="Sensor Configuration" FontAttributes="Bold" FontSize="14" TextColor="Black" />
 
                                 <!-- Toggle switches for enabling/disabling specific sensors -->
                                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="8">
 
                                     <!-- Low-Noise Accelerometer -->
-                                    <Label Grid.Row="0" Grid.Column="0" Text="Low-Noise Accelerometer" VerticalOptions="Center" />
-                                    <Switch Grid.Row="0" Grid.Column="1" IsToggled="{Binding EnableLowNoiseAccelerometer}" />
+                                    <Label Grid.Row="0" Grid.Column="0" Text="Low-Noise Accelerometer" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="0" Grid.Column="1" IsToggled="{Binding EnableLowNoiseAccelerometer, Mode=TwoWay}" />
 
                                     <!-- Wide-Range Accelerometer -->
-                                    <Label Grid.Row="1" Grid.Column="0" Text="Wide-Range Accelerometer" VerticalOptions="Center" />
-                                    <Switch Grid.Row="1" Grid.Column="1" IsToggled="{Binding EnableWideRangeAccelerometer}" />
+                                    <Label Grid.Row="1" Grid.Column="0" Text="Wide-Range Accelerometer" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="1" Grid.Column="1" IsToggled="{Binding EnableWideRangeAccelerometer, Mode=TwoWay}" />
 
                                     <!-- Gyroscope -->
-                                    <Label Grid.Row="2" Grid.Column="0" Text="Gyroscope" VerticalOptions="Center" />
-                                    <Switch Grid.Row="2" Grid.Column="1" IsToggled="{Binding EnableGyroscope}" />
+                                    <Label Grid.Row="2" Grid.Column="0" Text="Gyroscope" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="2" Grid.Column="1" IsToggled="{Binding EnableGyroscope, Mode=TwoWay}" />
 
                                     <!-- Magnetometer -->
-                                    <Label Grid.Row="3" Grid.Column="0" Text="Magnetometer" VerticalOptions="Center" />
-                                    <Switch Grid.Row="3" Grid.Column="1" IsToggled="{Binding EnableMagnetometer}" />
+                                    <Label Grid.Row="3" Grid.Column="0" Text="Magnetometer" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="3" Grid.Column="1" IsToggled="{Binding EnableMagnetometer, Mode=TwoWay}" />
 
                                     <!-- Pressure & Temperature -->
-                                    <Label Grid.Row="4" Grid.Column="0" Text="Pressure &amp; Temperature" VerticalOptions="Center" />
-                                    <Switch Grid.Row="4" Grid.Column="1" IsToggled="{Binding EnablePressureTemperature}" />
+                                    <Label Grid.Row="4" Grid.Column="0" Text="Pressure &amp; Temperature" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="4" Grid.Column="1" IsToggled="{Binding EnablePressureTemperature, Mode=TwoWay}" />
 
                                     <!-- Battery Voltage -->
-                                    <Label Grid.Row="5" Grid.Column="0" Text="Battery Voltage" VerticalOptions="Center" />
-                                    <Switch Grid.Row="5" Grid.Column="1" IsToggled="{Binding EnableBattery}" />
+                                    <Label Grid.Row="5" Grid.Column="0" Text="Battery Voltage" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="5" Grid.Column="1" IsToggled="{Binding EnableBattery, Mode=TwoWay}" />
 
                                     <!-- External ADC A6 -->
-                                    <Label Grid.Row="6" Grid.Column="0" Text="External ADC A6" VerticalOptions="Center" />
-                                    <Switch Grid.Row="6" Grid.Column="1" IsToggled="{Binding EnableExtA6}" />
+                                    <Label Grid.Row="6" Grid.Column="0" Text="External ADC A6" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="6" Grid.Column="1" IsToggled="{Binding EnableExtA6, Mode=TwoWay}" />
 
                                     <!-- External ADC A7 -->
-                                    <Label Grid.Row="7" Grid.Column="0" Text="External ADC A7" VerticalOptions="Center" />
-                                    <Switch Grid.Row="7" Grid.Column="1" IsToggled="{Binding EnableExtA7}" />
+                                    <Label Grid.Row="7" Grid.Column="0" Text="External ADC A7" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="7" Grid.Column="1" IsToggled="{Binding EnableExtA7, Mode=TwoWay}" />
 
                                     <!-- External ADC A15 -->
-                                    <Label Grid.Row="8" Grid.Column="0" Text="External ADC A15" VerticalOptions="Center" />
-                                    <Switch Grid.Row="8" Grid.Column="1" IsToggled="{Binding EnableExtA15}" />
+                                    <Label Grid.Row="8" Grid.Column="0" Text="External ADC A15" VerticalOptions="Center" TextColor="Black" />
+                                    <Switch Grid.Row="8" Grid.Column="1" IsToggled="{Binding EnableExtA15, Mode=TwoWay}" />
                                 </Grid>
                             </VerticalStackLayout>
                         </Frame>
+
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
