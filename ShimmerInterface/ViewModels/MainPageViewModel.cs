@@ -58,6 +58,11 @@ public partial class MainPageViewModel : ObservableObject
     /// Extracts Shimmer names from WMI when available.
     /// Only shows devices with known Shimmer names (filters out "Unknown").
     /// </summary>
+    /// <summary>
+    /// Scans available serial ports and creates a ShimmerDevice for each one.
+    /// Extracts Shimmer names from WMI when available.
+    /// Only shows devices with known Shimmer names (filters out "Unknown").
+    /// </summary>
     private void LoadDevices()
     {
 #if WINDOWS
@@ -79,7 +84,7 @@ public partial class MainPageViewModel : ObservableObject
         {
             // Check if a Shimmer name is associated with this port
             if (shimmerNames.TryGetValue(port, out string? shimmerName))
-            { 
+            {
                 // Skip ports labeled as "Unknown"
                 if (shimmerName != "Unknown")
                 {
@@ -92,14 +97,25 @@ public partial class MainPageViewModel : ObservableObject
                         DisplayName = displayName,      // Shown to the user
                         Port1 = port,                   // Serial port name
                         IsSelected = false,             // Not selected by default
-                        ShimmerName = shimmerName       // Device identifier
+                        ShimmerName = shimmerName,      // Device identifier
+
+                        // Set default sensor configuration
+                        EnableLowNoiseAccelerometer = true,
+                        EnableWideRangeAccelerometer = true,
+                        EnableGyroscope = true,
+                        EnableMagnetometer = true,
+                        EnablePressureTemperature = true,
+                        EnableBattery = true,
+                        EnableExtA6 = true,
+                        EnableExtA7 = true,
+                        EnableExtA15 = true
                     });
                 }
             }
         }
 
 #elif MACCATALYST || IOS
-    // Su Mac/iOS non c’è enumerazione seriale. Aggiungiamo una voce BLE “per nome”.
+    // Su Mac/iOS non c'è enumerazione seriale. Aggiungiamo una voce BLE "per nome".
     AvailableDevices.Clear();
 
     // Metti qui il nome pubblicitario atteso del tuo Shimmer (o lascialo "Shimmer3")
@@ -108,8 +124,9 @@ public partial class MainPageViewModel : ObservableObject
     AvailableDevices.Add(new ShimmerDevice
     {
         DisplayName = $"BLE: {bleNameHint}",
-        Port1 = bleNameHint, // usiamo Port1 come “nome BLE” da passare alla Configure(...)
-        IsSelected = true,
+        Port1 = bleNameHint, // usiamo Port1 come "nome BLE" da passare alla Configure(...)
+        IsSelected = false, // Cambiato da true a false per consistenza con Windows
+        ShimmerName = bleNameHint, // Aggiunto ShimmerName per consistenza
 
         // default sensori come vuoi
         EnableLowNoiseAccelerometer = true,
