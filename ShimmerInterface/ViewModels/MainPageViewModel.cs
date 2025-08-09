@@ -98,23 +98,32 @@ public partial class MainPageViewModel : ObservableObject
             }
         }
 
-#elif MACCATALYST
-    // --- MAC (BLE): aggiungo una card "BLE" pronta a connettersi ---
+#elif MACCATALYST || IOS
+    // Su Mac/iOS non c’è enumerazione seriale. Aggiungiamo una voce BLE “per nome”.
     AvailableDevices.Clear();
 
-    // Hint nome BLE: puoi cambiarlo da UI o via codice.
-    const string bleNameHint = "Shimmer3"; // o "Shimmer3R", "Verisense", ecc.
+    // Metti qui il nome pubblicitario atteso del tuo Shimmer (o lascialo "Shimmer3")
+    var bleNameHint = "Shimmer3";
 
     AvailableDevices.Add(new ShimmerDevice
     {
-        DisplayName = $"Shimmer BLE ({bleNameHint})",
-        // Riutilizzo Port1 come "name hint" BLE, per compatibilità con Configure(...)
-        Port1 = bleNameHint,
-        IsSelected = true,          // così l’utente può fare Connect subito
-        ShimmerName = bleNameHint
+        DisplayName = $"BLE: {bleNameHint}",
+        Port1 = bleNameHint, // usiamo Port1 come “nome BLE” da passare alla Configure(...)
+        IsSelected = true,
+
+        // default sensori come vuoi
+        EnableLowNoiseAccelerometer = true,
+        EnableWideRangeAccelerometer = true,
+        EnableGyroscope = true,
+        EnableMagnetometer = true,
+        EnablePressureTemperature = true,
+        EnableBattery = true,
+        EnableExtA6 = true,
+        EnableExtA7 = true,
+        EnableExtA15 = true
     });
 #else
-        // noop sugli altri target
+    // altri OS: nulla
 #endif
     }
 
