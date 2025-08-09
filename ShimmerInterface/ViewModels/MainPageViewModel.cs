@@ -74,40 +74,28 @@ public partial class MainPageViewModel : ObservableObject
 
 #if WINDOWS
         Console.WriteLine("Ramo WINDOWS");
-        // Clear the current list of available Shimmer devices
         AvailableDevices.Clear();
 
-        // Get a sorted list of all available serial port names (e.g., COM3, COM4).
         var ports = XR2Learn_SerialPortsManager
             .GetAvailableSerialPortsNames()
             .OrderBy(p => p)
             .ToList();
 
-        // Retrieve a dictionary of Shimmer device names via WMI (Windows Management Instrumentation),
-        // where key = COM port name, value = Shimmer device name.
         var shimmerNames = GetShimmerNamesFromWMI();
 
-        // Loop through each detected serial port
         foreach (var port in ports)
         {
-            // Check if a Shimmer name is associated with this port
             if (shimmerNames.TryGetValue(port, out string? shimmerName))
             {
-                // Skip ports labeled as "Unknown"
                 if (shimmerName != "Unknown")
                 {
-
-                    // Add the device to the observable list with its details
                     string displayName = $"Shimmer {shimmerName}";
-
                     AvailableDevices.Add(new ShimmerDevice
                     {
-                        DisplayName = displayName,      // Shown to the user
-                        Port1 = port,                   // Serial port name
-                        IsSelected = false,             // Not selected by default
-                        ShimmerName = shimmerName,      // Device identifier
-
-                        // Set default sensor configuration
+                        DisplayName = displayName,
+                        Port1 = port,
+                        IsSelected = false,
+                        ShimmerName = shimmerName,
                         EnableLowNoiseAccelerometer = true,
                         EnableWideRangeAccelerometer = true,
                         EnableGyroscope = true,
@@ -123,42 +111,36 @@ public partial class MainPageViewModel : ObservableObject
             }
         }
 
-#elif MACCATALYST
-
+#elif MACCATALYST || IOS
+    Console.WriteLine("Ramo MACCATALYST/IOS - fallback");
     AvailableDevices.Clear();
 
-    // Qui puoi mettere lo scan BLE reale in futuro
-    // Per ora, fallback se non trovi nulla
-    if (AvailableDevices.Count == 0)
+    // Fallback leggibile se non trovi nulla (per evitare il riquadro 'vuoto')
+    AvailableDevices.Add(new ShimmerDevice
     {
-        AvailableDevices.Add(new ShimmerDevice
-        {
-            DisplayName = "Nessun Shimmer trovato (BLE)",
-            Port1 = "",
-            ShimmerName = "",
-            IsSelected = false,
-
-            // Switch sensori default (opzionale)
-            EnableLowNoiseAccelerometer = true,
-            EnableWideRangeAccelerometer = true,
-            EnableGyroscope = true,
-            EnableMagnetometer = true,
-            EnablePressureTemperature = true,
-            EnableBattery = true,
-            EnableExtA6 = true,
-            EnableExtA7 = true,
-            EnableExtA15 = true
-        });
-    }
-}
+        DisplayName = "Nessun Shimmer trovato (BLE)",
+        Port1 = "",
+        ShimmerName = "",
+        IsSelected = false,
+        EnableLowNoiseAccelerometer = true,
+        EnableWideRangeAccelerometer = true,
+        EnableGyroscope = true,
+        EnableMagnetometer = true,
+        EnablePressureTemperature = true,
+        EnableBattery = true,
+        EnableExtA6 = true,
+        EnableExtA7 = true,
+        EnableExtA15 = true
+    });
 
 #else
-        Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
+    Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
     // altri OS: nulla
 #endif
 
         Console.WriteLine($"=== LoadDevices() COMPLETATO - Totale devices: {AvailableDevices.Count} ===");
     }
+
 
     /// <summary>
     /// Connects to all selected Shimmer devices and, if successful,
