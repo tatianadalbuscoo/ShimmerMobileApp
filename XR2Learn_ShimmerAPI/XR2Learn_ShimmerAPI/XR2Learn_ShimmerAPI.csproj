@@ -7,12 +7,11 @@
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	</PropertyGroup>
 
-	<!-- Definisce il simbolo WINDOWS quando compili su Windows -->
+	<!-- WINDOWS -->
 	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
 		<DefineConstants>WINDOWS</DefineConstants>
 	</PropertyGroup>
 
-	<!-- Riferimento alla DLL nativa SOLO per Windows -->
 	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
 		<Reference Include="ShimmerLibrary">
 			<HintPath>libs\ShimmerClosedLibraryRev0_5.dll</HintPath>
@@ -20,12 +19,11 @@
 		</Reference>
 	</ItemGroup>
 
-	<!-- Riferimento al progetto ShimmerAPI SOLO per Windows -->
 	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
 		<ProjectReference Include="..\..\ShimmerAPI\ShimmerAPI\ShimmerAPI.csproj" />
 	</ItemGroup>
 
-	<!-- Pacchetti NuGet aggiornati e coerenti -->
+	<!-- NuGet comuni -->
 	<ItemGroup>
 		<PackageReference Include="Google.Protobuf" Version="3.17.3" />
 		<PackageReference Include="MathNet.Numerics" Version="4.15.0" />
@@ -36,13 +34,20 @@
 		<PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
 	</ItemGroup>
 
-	<!-- Aggiunge net8.0-maccatalyst solo quando compili su Mac -->
+	<!-- MAC CATALYST -->
 	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
 		<TargetFrameworks>$(TargetFrameworks);net8.0-maccatalyst</TargetFrameworks>
 		<DefineConstants>$(DefineConstants);MACCATALYST</DefineConstants>
 	</PropertyGroup>
 
-	<!-- Abilita le API Mac Catalyst nella libreria -->
+	<!-- Quando stai proprio compilando il TFM maccatalyst -->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-maccatalyst'">
+		<DefineConstants>$(DefineConstants);MACCATALYST</DefineConstants>
+		<!-- Se vuoi, regola la min platform version (Catalyst 14 = macOS 13 / iOS 17 base approx) -->
+		<SupportedOSPlatformVersion>14.0</SupportedOSPlatformVersion>
+	</PropertyGroup>
+
+	<!-- FrameworkReference necessario per usare CoreBluetooth/CoreFoundation/Foundation -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-maccatalyst'">
 		<FrameworkReference Include="Microsoft.MacCatalyst" />
 	</ItemGroup>

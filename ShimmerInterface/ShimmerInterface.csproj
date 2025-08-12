@@ -52,6 +52,13 @@
 		<Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
 
+	<!-- ✨ ADD: PropertyGroup specifico Mac Catalyst per collegare gli entitlements -->
+	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-maccatalyst'">
+		<Entitlements>Platforms/MacCatalyst/Entitlements.plist</Entitlements>
+		<!-- facoltativo per distribuzione su App Store:
+    <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
+	</PropertyGroup>
+
 	<ItemGroup>
 		<!-- App Icon -->
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
