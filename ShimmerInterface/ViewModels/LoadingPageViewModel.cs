@@ -51,6 +51,8 @@ public partial class LoadingPageViewModel : ObservableObject
     this.connectingMessage = $"Connecting to {device.ShimmerName} on {device.Port1}...";
 #elif MACCATALYST
     this.connectingMessage = $"Connecting to {device.ShimmerName} via BLE...";
+#elif ANDROID
+    this.connectingMessage = $"Connecting to {device.ShimmerName} [{device.Port1}] via Bluetooth...";
 #else
         this.connectingMessage = $"Connecting to {device.ShimmerName}...";
 #endif
@@ -62,7 +64,7 @@ public partial class LoadingPageViewModel : ObservableObject
     /// Displays a loading spinner, handles timeout, and notifies the view when the result is ready.
     /// </summary>
     [RelayCommand]
-     public async Task StartConnectionAsync()
+    public async Task StartConnectionAsync()
     {
         if (IsConnecting) return;
 
@@ -155,13 +157,19 @@ public partial class LoadingPageViewModel : ObservableObject
                 EnableExtA15 = device.EnableExtA15
             };
 
-            // ⚠️ Qui l’unica differenza tra Windows e Mac:
-            // - Windows: Port1 = COMxx
-            // - Mac:     Port1 = BLE name hint (es. "Shimmer3")
+            // Nome dispositivo “logico” + endpoint piattaforma:
+            // - Windows: COMxx
+            // - Mac:     hint BLE name
+            // - Android: MAC address (es. "00:11:22:33:44:55")
+
 #if WINDOWS
-        shimmer.Configure("Shimmer3", device.Port1,
+    shimmer.Configure("Shimmer3", device.Port1,
+#elif MACCATALYST
+    shimmer.Configure("Shimmer3", device.Port1,
+#elif ANDROID
+    shimmer.Configure("Shimmer3", device.Port1, // Port1 = MAC paired
 #else
-            shimmer.Configure("Shimmer3", device.Port1,   // device.Port1 = hint nome BLE su Mac
+            shimmer.Configure("Shimmer3", device.Port1,
 #endif
                 device.EnableLowNoiseAccelerometer,
                 device.EnableWideRangeAccelerometer,
@@ -171,23 +179,30 @@ public partial class LoadingPageViewModel : ObservableObject
                 device.EnableBattery,
                 device.EnableExtA6,
                 device.EnableExtA7,
-                device.EnableExtA15);
+                device.EnableExtA15
+            ); // ← chiusura della Configure
 
+            // La libreria IMU smista la Connect al trasporto giusto:
+            // - Windows → SerialPort (COM)
+            // - Android → RFCOMM/SPP (BluetoothSocket) usando il MAC
             var connectTask = Task.Run(() => shimmer.Connect());
             var completedTask = await Task.WhenAny(connectTask, Task.Delay(30000));
 
-            if (completedTask != connectTask) return null;       // timeout
+            if (completedTask != connectTask) return null; // timeout
             if (connectTask.IsFaulted) return null;
             if (!shimmer.IsConnected()) return null;
 
             shimmer.StartStreaming();
             return shimmer;
         }
-        catch
+        catch (Exception ex)
         {
+            Debug.WriteLine($"ConnectAsync error: {ex.Message}");
             return null;
         }
-    }
 
+
+
+    }
 }
 

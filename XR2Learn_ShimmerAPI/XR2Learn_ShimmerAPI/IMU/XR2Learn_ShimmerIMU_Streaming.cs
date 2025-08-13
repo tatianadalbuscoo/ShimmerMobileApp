@@ -16,16 +16,28 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public void Connect()
         {
-#if WINDOWS
-            if (IsConnected()) return;
-            shimmer.Connect();
+#if ANDROID
+    // usa il MAC salvato da Configure(...)
+    var mac = _endpointMac ?? string.Empty;
+    // blocco breve, sei già su Task.Run(...) dal ViewModel
+    var ok = ConnectInternalAsync(mac).GetAwaiter().GetResult();
+    Android.Util.Log.Info("Shimmer", $"Android Connect() -> {ok}");
+    return;
+#elif WINDOWS
+    if (IsConnected()) return;
+    shimmer.Connect();
 #elif MACCATALYST
     if (IsConnectedMac()) return;
     ConnectMac();
 #else
-    Console.WriteLine("Connect() non supportato su questa piattaforma.");
+            Console.WriteLine("Connect() non supportato su questa piattaforma.");
 #endif
         }
+
+
+
+
+
 
         /// <summary>
         /// Disconnects from the Shimmer IMU device and clears the UI callback.
@@ -50,13 +62,16 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public async void StartStreaming()
         {
-#if WINDOWS
-            await DelayWork(1000);
-            shimmer.StartStreaming();
+#if ANDROID
+    await StartStreamingInternalAsync();
+    return;
+#elif WINDOWS
+    await DelayWork(1000);
+    shimmer.StartStreaming();
 #elif MACCATALYST
     await StartStreamingMacAsync();
 #else
-    Console.WriteLine("StartStreaming() non supportato su questa piattaforma.");
+            Console.WriteLine("StartStreaming() non supportato su questa piattaforma.");
 #endif
         }
 
@@ -66,13 +81,16 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public async void StopStreaming()
         {
-#if WINDOWS
-            shimmer.StopStreaming();
-            await DelayWork(1000);
+#if ANDROID
+    await StopInternalAsync();
+    return;
+#elif WINDOWS
+    shimmer.StopStreaming();
+    await DelayWork(1000);
 #elif MACCATALYST
     await StopStreamingMacAsync();
 #else
-    Console.WriteLine("StopStreaming() non supportato su questa piattaforma.");
+            Console.WriteLine("StopStreaming() non supportato su questa piattaforma.");
 #endif
         }
 
@@ -83,12 +101,15 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// <returns>True if connected; otherwise, false.</returns>
         public bool IsConnected()
         {
-#if WINDOWS
-            return shimmer.IsConnected();
+#if ANDROID
+    // delega all’istanza Android
+    return _shimAnd != null && _shimAnd.IsConnected();
+#elif WINDOWS
+    return shimmer.IsConnected();
 #elif MACCATALYST
     return IsConnectedMac();
 #else
-    return false;
+            return false;
 #endif
         }
 

@@ -137,6 +137,26 @@ namespace XR2Learn_ShimmerAPI.IMU
 
             // Register the data callback handler
             shimmer.UICallback += this.HandleEvent;
+
+#elif ANDROID
+    // --- ANDROID: memorizza i flag sensori e l'endpoint MAC ---
+    _enableLowNoiseAccelerometer = enableLowNoiseAcc;
+    _enableWideRangeAccelerometer = enableWideRangeAcc;
+    _enableGyroscope = enableGyro;
+    _enableMagnetometer = enableMag;
+    _enablePressureTemperature = enablePressureTemp;
+    _enableBattery = enableBattery;
+    _enableExtA6 = enableExtA6;
+    _enableExtA7 = enableExtA7;
+    _enableExtA15 = enableExtA15;
+
+    // deviceName logico e MAC endpoint (comPort contiene il MAC su Android)
+    _deviceId = deviceName;
+    _endpointMac = (comPort ?? string.Empty).Trim();
+
+    // Non creiamo qui l'istanza: la Connect() Android userà _endpointMac per aprire RFCOMM
+    Android.Util.Log.Info("Shimmer", $"Configure ANDROID: device={_deviceId}, mac={_endpointMac}");
+
 #elif MACCATALYST
     // memorizza i flag sensori come su Windows
     _enableLowNoiseAccelerometer = enableLowNoiseAcc;

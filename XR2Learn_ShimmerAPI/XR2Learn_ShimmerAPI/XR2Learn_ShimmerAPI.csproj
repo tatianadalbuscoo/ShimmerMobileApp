@@ -1,54 +1,65 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
-		<TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
+		<!-- Multitarget completo: Android, iOS, MacCatalyst, Windows, più net8.0 plain -->
+		<TargetFrameworks>
+			net8.0;net8.0-android;net8.0-ios;net8.0-maccatalyst;net8.0-windows10.0.19041.0
+		</TargetFrameworks>
 		<RootNamespace>XR2Learn_ShimmerAPI</RootNamespace>
 		<AssemblyName>XR2Learn_ShimmerAPI</AssemblyName>
-		<LangVersion>7.3</LangVersion>
+		<LangVersion>10.0</LangVersion>
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	</PropertyGroup>
 
-	<!-- WINDOWS -->
-	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
-		<DefineConstants>WINDOWS</DefineConstants>
-	</PropertyGroup>
+	<!-- Rimuovi di default i file *specifici piattaforma* -->
+	<ItemGroup>
+		<!-- Android-only -->
+		<Compile Remove="IMU\ShimmerLogAndStreamAndroidBluetooth.cs" />
+		<Compile Remove="IMU\XR2Learn_ShimmerIMU.Android.Rfcomm.cs" />
 
-	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
-		<Reference Include="ShimmerLibrary">
-			<HintPath>libs\ShimmerClosedLibraryRev0_5.dll</HintPath>
-			<Private>true</Private>
-		</Reference>
+		<!-- Windows-only -->
+		<Compile Remove="XR2Learn_SerialPortsManager.cs" />
 	</ItemGroup>
 
-	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('windows'))">
-		<ProjectReference Include="..\..\ShimmerAPI\ShimmerAPI\ShimmerAPI.csproj" />
+	<!-- Includi i file specifici SOLO nel TFM corretto -->
+	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-android'">
+		<Compile Include="IMU\ShimmerLogAndStreamAndroidBluetooth.cs" />
+		<Compile Include="IMU\XR2Learn_ShimmerIMU.Android.Rfcomm.cs" />
 	</ItemGroup>
 
-	<!-- NuGet comuni -->
+	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-windows10.0.19041.0'">
+		<Compile Include="XR2Learn_SerialPortsManager.cs" />
+	</ItemGroup>
+
+	<!-- ⚠️ NON rimuovere mai XR2Learn_ShimmerIMU_Streaming.cs:
+       deve essere presente in TUTTI i TFMs, così le firme esistono sempre. -->
+
+	<!-- Pacchetti comuni -->
 	<ItemGroup>
 		<PackageReference Include="Google.Protobuf" Version="3.17.3" />
 		<PackageReference Include="MathNet.Numerics" Version="4.15.0" />
-		<PackageReference Include="System.IO.Ports" Version="5.0.1" />
 		<PackageReference Include="System.Memory" Version="4.5.4" />
 		<PackageReference Include="System.Buffers" Version="4.5.1" />
 		<PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.5.3" />
 		<PackageReference Include="System.Numerics.Vectors" Version="4.4.0" />
 	</ItemGroup>
 
-	<!-- MAC CATALYST -->
-	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
-		<TargetFrameworks>$(TargetFrameworks);net8.0-maccatalyst</TargetFrameworks>
-		<DefineConstants>$(DefineConstants);MACCATALYST</DefineConstants>
-	</PropertyGroup>
+	<!-- Windows: seriali + ShimmerLibrary -->
+	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-windows10.0.19041.0'">
+		<PackageReference Include="System.IO.Ports" Version="5.0.1" />
+		<Reference Include="ShimmerLibrary">
+			<HintPath>libs\ShimmerClosedLibraryRev0_5.dll</HintPath>
+			<Private>true</Private>
+		</Reference>
+		<ProjectReference Include="..\..\ShimmerAPI\ShimmerAPI\ShimmerAPI.csproj" />
+	</ItemGroup>
 
-	<!-- Quando stai proprio compilando il TFM maccatalyst -->
-	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-maccatalyst'">
-		<DefineConstants>$(DefineConstants);MACCATALYST</DefineConstants>
-		<!-- Se vuoi, regola la min platform version (Catalyst 14 = macOS 13 / iOS 17 base approx) -->
-		<SupportedOSPlatformVersion>14.0</SupportedOSPlatformVersion>
-	</PropertyGroup>
+	<!-- Android dipende da ShimmerAPI -->
+	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-android'">
+		<ProjectReference Include="..\..\ShimmerAPI\ShimmerAPI\ShimmerAPI.csproj" />
+	</ItemGroup>
 
-	<!-- FrameworkReference necessario per usare CoreBluetooth/CoreFoundation/Foundation -->
-	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-maccatalyst'">
-		<FrameworkReference Include="Microsoft.MacCatalyst" />
+	<!-- iOS/MacCatalyst: se servono dipendenze aggiuntive, aggiungile qui -->
+	<ItemGroup Condition="'$(TargetFramework)'=='net8.0-ios' or '$(TargetFramework)'=='net8.0-maccatalyst'">
+		<ProjectReference Include="..\..\ShimmerAPI\ShimmerAPI\ShimmerAPI.csproj" />
 	</ItemGroup>
 </Project>

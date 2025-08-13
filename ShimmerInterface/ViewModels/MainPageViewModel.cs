@@ -87,43 +87,43 @@ public partial class MainPageViewModel : ObservableObject
         Console.WriteLine("=== LoadDevices() INIZIATO ===");
 
 #if WINDOWS
-        Console.WriteLine("Ramo WINDOWS");
-        AvailableDevices.Clear();
+    Console.WriteLine("Ramo WINDOWS");
+    AvailableDevices.Clear();
 
-        var ports = XR2Learn_SerialPortsManager
-            .GetAvailableSerialPortsNames()
-            .OrderBy(p => p)
-            .ToList();
+    var ports = XR2Learn_SerialPortsManager
+        .GetAvailableSerialPortsNames()
+        .OrderBy(p => p)
+        .ToList();
 
-        var shimmerNames = GetShimmerNamesFromWMI();
+    var shimmerNames = GetShimmerNamesFromWMI();
 
-        foreach (var port in ports)
+    foreach (var port in ports)
+    {
+        if (shimmerNames.TryGetValue(port, out string? shimmerName))
         {
-            if (shimmerNames.TryGetValue(port, out string? shimmerName))
+            if (shimmerName != "Unknown")
             {
-                if (shimmerName != "Unknown")
+                string displayName = $"Shimmer {shimmerName}";
+                AvailableDevices.Add(new ShimmerDevice
                 {
-                    string displayName = $"Shimmer {shimmerName}";
-                    AvailableDevices.Add(new ShimmerDevice
-                    {
-                        DisplayName = displayName,
-                        Port1 = port,
-                        IsSelected = false,
-                        ShimmerName = shimmerName,
-                        EnableLowNoiseAccelerometer = true,
-                        EnableWideRangeAccelerometer = true,
-                        EnableGyroscope = true,
-                        EnableMagnetometer = true,
-                        EnablePressureTemperature = true,
-                        EnableBattery = true,
-                        EnableExtA6 = true,
-                        EnableExtA7 = true,
-                        EnableExtA15 = true
-                    });
-                    Console.WriteLine($"Aggiunto device Windows: {displayName}");
-                }
+                    DisplayName = displayName,
+                    Port1 = port,
+                    IsSelected = false,
+                    ShimmerName = shimmerName,
+                    EnableLowNoiseAccelerometer = true,
+                    EnableWideRangeAccelerometer = true,
+                    EnableGyroscope = true,
+                    EnableMagnetometer = true,
+                    EnablePressureTemperature = true,
+                    EnableBattery = true,
+                    EnableExtA6 = true,
+                    EnableExtA7 = true,
+                    EnableExtA15 = true
+                });
+                Console.WriteLine($"Aggiunto device Windows: {displayName}");
             }
         }
+    }
 
 #elif MACCATALYST || IOS
         Console.WriteLine("Ramo MACCATALYST/IOS - BLE scan");
@@ -159,14 +159,12 @@ public partial class MainPageViewModel : ObservableObject
             {
                 foreach (var dev in found)
                 {
-                    // Estrai l’ID a 4 char se presente in stile "Shimmer3-XXXX"
                     string shimmerName = ExtractShimmerName(deviceId: string.Empty, friendlyName: dev.Name);
 
-                    // Usa il nome BLE come "Port1" (hint per la ConnectMac)
                     AvailableDevices.Add(new ShimmerDevice
                     {
-                        DisplayName = dev.Name,        // es. "Shimmer3-DDCE"
-                        Port1 = dev.Name,              // hint BLE name
+                        DisplayName = dev.Name,   // es. "Shimmer3-DDCE"
+                        Port1 = dev.Name,         // hint BLE name per ramo Mac
                         IsSelected = false,
                         ShimmerName = shimmerName,
 
@@ -197,7 +195,97 @@ public partial class MainPageViewModel : ObservableObject
             });
         }
 
+#elif ANDROID
+    Console.WriteLine("Ramo ANDROID - elenco dispositivi accoppiati (SPP)");
+    AvailableDevices.Clear();
 
+    try
+    {
+        var adapter = Android.Bluetooth.BluetoothAdapter.DefaultAdapter;
+        if (adapter == null)
+        {
+            AvailableDevices.Add(new ShimmerDevice
+            {
+                DisplayName = "Bluetooth non disponibile",
+                Port1 = "(no adapter)",
+                ShimmerName = "----",
+                IsSelected = false
+            });
+        }
+        else if (!adapter.IsEnabled)
+        {
+            AvailableDevices.Add(new ShimmerDevice
+            {
+                DisplayName = "Bluetooth disabilitato",
+                Port1 = "(abilitalo dalle impostazioni)",
+                ShimmerName = "----",
+                IsSelected = false
+            });
+        }
+        else
+        {
+            var bonded = adapter.BondedDevices;
+            var any = false;
+            foreach (var d in bonded)
+            {
+                // Filtra per Shimmer nel nome; togli il filtro se vuoi vedere tutto
+                var name = d?.Name ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(name)) continue;
+                if (!name.Contains("Shimmer", StringComparison.OrdinalIgnoreCase)) continue;
+
+                any = true;
+
+                // MAC address -> lo usiamo come Port1 per la Connect su Android
+                var mac = d!.Address;
+
+                // Prova a estrarre l'ID a 4 char tipo "Shimmer3-XXXX"
+                var shimmerName = ExtractShimmerName(deviceId: string.Empty, friendlyName: name);
+
+                AvailableDevices.Add(new ShimmerDevice
+                {
+                    DisplayName = name,  // es. "Shimmer3-DDCE"
+                    Port1 = mac,         // MAC (paired manuale) -> verrà passato alla Connect Android
+                    IsSelected = false,
+                    ShimmerName = shimmerName,
+
+                    // default ON come su Windows
+                    EnableLowNoiseAccelerometer = true,
+                    EnableWideRangeAccelerometer = true,
+                    EnableGyroscope = true,
+                    EnableMagnetometer = true,
+                    EnablePressureTemperature = true,
+                    EnableBattery = true,
+                    EnableExtA6 = true,
+                    EnableExtA7 = true,
+                    EnableExtA15 = true
+                });
+
+                Console.WriteLine($"Aggiunto device Android: {name} [{mac}]");
+            }
+
+            if (!any)
+            {
+                AvailableDevices.Add(new ShimmerDevice
+                {
+                    DisplayName = "Nessun Shimmer accoppiato",
+                    Port1 = "(fai il pairing in Impostazioni Bluetooth)",
+                    ShimmerName = "----",
+                    IsSelected = false
+                });
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Errore enumerazione BT: {ex.Message}");
+        AvailableDevices.Add(new ShimmerDevice
+        {
+            DisplayName = "Errore Bluetooth",
+            Port1 = ex.Message,
+            ShimmerName = "----",
+            IsSelected = false
+        });
+    }
 
 #else
     Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
@@ -206,6 +294,7 @@ public partial class MainPageViewModel : ObservableObject
 
         Console.WriteLine($"=== LoadDevices() COMPLETATO - Totale devices: {AvailableDevices.Count} ===");
     }
+
 
 
     /// <summary>
