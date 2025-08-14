@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 using Android.Bluetooth;
 using Android.Util;
 using Java.Util;
-using ShimmerAPI; // per PacketTypeShimmer2
+using ShimmerAPI;
+using ShimmerAPI.Utilities;
 
 namespace XR2Learn_ShimmerAPI.IMU
 {
@@ -14,11 +15,15 @@ namespace XR2Learn_ShimmerAPI.IMU
     {
         static readonly UUID SPP_UUID = UUID.FromString("00001101-0000-1000-8000-00805F9B34FB");
         const string Tag = "ShimmerBT";
-        private const byte CMD_START_STREAMING = 0x07;  // Start streaming
+
+        private readonly string _deviceId;
+        private readonly string _mac;
+
+        private readonly ShimmerBluetoothAndroid _core;
 
         public double SamplingRate { get; }
-        public string DeviceId { get; }
-        public string MacAddress { get; }
+        public string DeviceId => _deviceId;
+        public string MacAddress => _mac;
 
         private bool _connected = false;
         private bool _streaming = false;
@@ -36,23 +41,37 @@ namespace XR2Learn_ShimmerAPI.IMU
             int gyroRange, int magRange, byte[]? exg1, byte[]? exg2,
             bool internalExpPower)
         {
-            DeviceId = devId;
-            MacAddress = macAddress;
+            _deviceId = devId ?? string.Empty;
+            _mac = (macAddress ?? string.Empty).Trim();
             SamplingRate = samplingRate;
-            AccelRange = accelRange;
-            GsrRange = gsrRange;
-            EnableLowPowerAccel = enableLowPowerAccel;
-            EnableLowPowerGyro = enableLowPowerGyro;
-            EnableLowPowerMag = enableLowPowerMag;
-            GyroRange = gyroRange;
-            MagRange = magRange;
-            Exg1 = exg1;
-            Exg2 = exg2;
-            InternalExpPower = internalExpPower;
-            Log.Debug(Tag, $"Initialized for device {DeviceId} @ {MacAddress}");
+
+            Log.Debug(Tag, $"Initialized for device {_deviceId} @ {_mac}");
+
+            _core = new ShimmerBluetoothAndroid(
+                _deviceId,
+                () => _inputStream,
+                () => _outputStream,
+                () => _connected
+            );
+
+            _core.UICallback += (s, e) => UICallback?.Invoke(s, e);
         }
 
-        public void Connect() => ConnectAsync().GetAwaiter().GetResult();
+        // === RITORNA BOOL ===
+        public bool Connect()
+        {
+            try
+            {
+                ConnectAsync().GetAwaiter().GetResult();
+                return _connected;
+            }
+            catch (Exception ex)
+            {
+                Log.Error(Tag, $"Connect() error: {ex.Message}");
+                Disconnect();
+                return false;
+            }
+        }
 
         public async Task ConnectAsync()
         {
@@ -62,7 +81,7 @@ namespace XR2Learn_ShimmerAPI.IMU
                 var adapter = BluetoothAdapter.DefaultAdapter ?? throw new Exception("BluetoothAdapter non disponibile");
                 if (!adapter.IsEnabled) throw new Exception("Bluetooth disabilitato");
 
-                var device = adapter.GetRemoteDevice(MacAddress);
+                var device = adapter.GetRemoteDevice(_mac);
                 _socket = device.CreateRfcommSocketToServiceRecord(SPP_UUID);
                 if (adapter.IsDiscovering) adapter.CancelDiscovery();
 
@@ -71,12 +90,12 @@ namespace XR2Learn_ShimmerAPI.IMU
                 _outputStream = _socket.OutputStream;
                 _connected = true;
                 Log.Debug(Tag, "Socket connesso!");
-                UICallback?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
             {
                 Log.Error(Tag, $"Errore ConnectAsync: {ex.Message}");
                 Disconnect();
+                throw;
             }
         }
 
@@ -92,63 +111,45 @@ namespace XR2Learn_ShimmerAPI.IMU
             _inputStream = null;
             _outputStream = null;
             _socket = null;
-            UICallback?.Invoke(this, EventArgs.Empty);
         }
 
         public bool IsConnected() => _connected;
 
-        // 🔹 UNICA StartStreaming (niente duplicati)
         public async void StartStreaming()
         {
             Log.Debug(Tag, $"StartStreaming called. Connected? {_connected}");
             if (!_connected || _inputStream == null || _outputStream == null) return;
 
-            // TODO: inviare sampling rate + sensor bitmap come su Windows
             await ConfigureSamplingRateAndSensorsAsync();
 
-            // Comando ufficiale di start (uguale a Windows)
-            await WriteAsync(new byte[] { CMD_START_STREAMING });
-
+            await WriteAsync(new[] { (byte)ShimmerBluetooth.PacketTypeShimmer2.START_STREAMING_COMMAND });
 
             _streaming = true;
             _readCts = new CancellationTokenSource();
-            _ = Task.Run(() => ReadLoop(_readCts.Token));
-            Log.Debug(Tag, "Streaming started—UICallback");
-            UICallback?.Invoke(this, EventArgs.Empty);
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    _core.ReadData(); // parsing ShimmerAPI
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn(Tag, $"Core.ReadData() ended: {ex.Message}");
+                }
+            });
         }
 
-        public void StopStreaming()
+        public async void StopStreaming()
         {
             Log.Debug(Tag, "StopStreaming called.");
             _streaming = false;
             _readCts?.Cancel();
-            UICallback?.Invoke(this, EventArgs.Empty);
+
+            if (_connected && _outputStream != null)
+                await WriteAsync(new[] { (byte)ShimmerBluetooth.PacketTypeShimmer2.STOP_STREAMING_COMMAND });
         }
 
-        private async Task ReadLoop(CancellationToken token)
-        {
-            Log.Debug(Tag, "ReadLoop started.");
-            var buffer = new byte[512];
-            try
-            {
-                while (!token.IsCancellationRequested)
-                {
-                    int read = await _inputStream!.ReadAsync(buffer, 0, buffer.Length, token);
-                    if (read > 0)
-                        Log.Debug(Tag, $"ReadLoop received {read} bytes: {BitConverter.ToString(buffer, 0, Math.Min(8, read))}...");
-                    else
-                        break;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Warn(Tag, $"ReadLoop exception: {ex.Message}");
-                Disconnect();
-            }
-            Log.Debug(Tag, "ReadLoop terminated.");
-        }
-
-        // --- UTIL: scrittura RFCOMM
         private async Task<int> WriteAsync(byte[] data, int offset = 0, int? count = null)
         {
             if (!_connected || _outputStream == null) return 0;
@@ -159,26 +160,77 @@ namespace XR2Learn_ShimmerAPI.IMU
             return len;
         }
 
-        // --- TODO: inviare sampling rate & bitmap sensori (stub per ora)
         private Task ConfigureSamplingRateAndSensorsAsync()
         {
-            // In Windows qui si manda: SR + bitmap sensori + range ecc.
-            // Per il momento non inviamo niente: molti Shimmer partono comunque.
-            // Poi lo implementiamo copiando i comandi ShimmerAPI.
+            // TODO: inviare comandi configurazione se necessario
             return Task.CompletedTask;
         }
+    }
 
-        // Proprietà extra
-        public int AccelRange { get; }
-        public int GsrRange { get; }
-        public bool EnableLowPowerAccel { get; }
-        public bool EnableLowPowerGyro { get; }
-        public bool EnableLowPowerMag { get; }
-        public int GyroRange { get; }
-        public int MagRange { get; }
-        public byte[]? Exg1 { get; }
-        public byte[]? Exg2 { get; }
-        public bool InternalExpPower { get; }
+    // ====== Bridge verso ShimmerBluetooth (override completi) ======
+    internal class ShimmerBluetoothAndroid : ShimmerBluetooth
+    {
+        private readonly Func<Stream?> _getIn;
+        private readonly Func<Stream?> _getOut;
+        private readonly Func<bool> _isOpen;
+
+        public ShimmerBluetoothAndroid(
+            string deviceName,
+            Func<Stream?> inputStreamGetter,
+            Func<Stream?> outputStreamGetter,
+            Func<bool> isOpenGetter
+        )
+            : base(deviceName)
+        {
+            _getIn = inputStreamGetter;
+            _getOut = outputStreamGetter;
+            _isOpen = isOpenGetter;
+        }
+
+        protected override int ReadByte()
+        {
+            var s = _getIn();
+            if (s == null) throw new IOException("Input stream not available.");
+            int b = s.ReadByte();
+            if (b < 0) throw new IOException("End of stream.");
+            return b & 0xFF;
+        }
+
+        protected override void WriteBytes(byte[] buffer, int index, int length)
+        {
+            var s = _getOut();
+            if (s == null) throw new IOException("Output stream not available.");
+            s.Write(buffer, index, length);
+            s.Flush();
+        }
+
+        public override string GetShimmerAddress() => "ANDROID-BT";
+        public override void SetShimmerAddress(string address) { /* no-op su Android */ }
+
+        protected override bool IsConnectionOpen() => _isOpen();
+
+        protected override void OpenConnection() { /* gestita fuori (ConnectAsync) */ }
+        protected override void CloseConnection() { /* gestita fuori (Disconnect) */ }
+
+        protected override void FlushConnection()
+        {
+            // no-op: RFCOMM stream non ha flush esplicito separato qui
+        }
+
+        protected override void FlushInputConnection()
+        {
+            var s = _getIn();
+            if (s == null || !s.CanRead) return;
+            try
+            {
+                // best effort: svuota buffer se supportato
+                while (s.CanRead && s.Position < s.Length)
+                {
+                    if (s.ReadByte() < 0) break;
+                }
+            }
+            catch { /* ignore */ }
+        }
     }
 }
 #endif

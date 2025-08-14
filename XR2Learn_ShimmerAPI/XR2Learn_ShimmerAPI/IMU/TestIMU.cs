@@ -1,4 +1,4 @@
-﻿using System;
+﻿/*using System;
 using System.Threading;
 
 #if WINDOWS
@@ -174,4 +174,4 @@ namespace XR2Learn_ShimmerAPI
         }
 #endif
     }
-}
+}*/

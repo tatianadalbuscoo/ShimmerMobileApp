@@ -17,10 +17,9 @@ namespace XR2Learn_ShimmerAPI.IMU
         public void Connect()
         {
 #if ANDROID
-    // usa il MAC salvato da Configure(...)
-    var mac = _endpointMac ?? string.Empty;
-    // blocco breve, sei già su Task.Run(...) dal ViewModel
-    var ok = ConnectInternalAsync(mac).GetAwaiter().GetResult();
+    if (shimmerAndroid == null)
+        throw new InvalidOperationException("ConfigureAndroid non chiamata");
+    var ok = shimmerAndroid.Connect();
     Android.Util.Log.Info("Shimmer", $"Android Connect() -> {ok}");
     return;
 #elif WINDOWS
@@ -45,7 +44,12 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// </summary>
         public async void Disconnect()
         {
-#if WINDOWS
+#if ANDROID
+    shimmerAndroid?.StopStreaming();
+    shimmerAndroid?.Disconnect();
+    await DelayWork(200);
+    return;
+#elif WINDOWS
             shimmer.Disconnect();
             await DelayWork(1000);
             shimmer.UICallback = null;
@@ -63,7 +67,8 @@ namespace XR2Learn_ShimmerAPI.IMU
         public async void StartStreaming()
         {
 #if ANDROID
-    await StartStreamingInternalAsync();
+    shimmerAndroid?.StartStreaming();
+    await DelayWork(100); // opzionale
     return;
 #elif WINDOWS
     await DelayWork(1000);
@@ -82,7 +87,8 @@ namespace XR2Learn_ShimmerAPI.IMU
         public async void StopStreaming()
         {
 #if ANDROID
-    await StopInternalAsync();
+    shimmerAndroid?.StopStreaming();
+    await DelayWork(100); // opzionale
     return;
 #elif WINDOWS
     shimmer.StopStreaming();
@@ -102,8 +108,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         public bool IsConnected()
         {
 #if ANDROID
-    // delega all’istanza Android
-    return _shimAnd != null && _shimAnd.IsConnected();
+    return shimmerAndroid != null && shimmerAndroid.IsConnected();
 #elif WINDOWS
     return shimmer.IsConnected();
 #elif MACCATALYST

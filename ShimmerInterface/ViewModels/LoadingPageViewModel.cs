@@ -163,24 +163,34 @@ public partial class LoadingPageViewModel : ObservableObject
             // - Android: MAC address (es. "00:11:22:33:44:55")
 
 #if WINDOWS
-    shimmer.Configure("Shimmer3", device.Port1,
-#elif MACCATALYST
-    shimmer.Configure("Shimmer3", device.Port1,
-#elif ANDROID
-    shimmer.Configure("Shimmer3", device.Port1, // Port1 = MAC paired
-#else
-            shimmer.Configure("Shimmer3", device.Port1,
+    shimmer.ConfigureWindows("Shimmer3", device.Port1,
+        device.EnableLowNoiseAccelerometer,
+        device.EnableWideRangeAccelerometer,
+        device.EnableGyroscope,
+        device.EnableMagnetometer,
+        device.EnablePressureTemperature,
+        device.EnableBattery,
+        device.EnableExtA6,
+        device.EnableExtA7,
+        device.EnableExtA15
+    );
+    #endif
+#if ANDROID
+
+    shimmer.ConfigureAndroid("Shimmer3", device.Port1,
+        device.EnableLowNoiseAccelerometer,
+        device.EnableWideRangeAccelerometer,
+        device.EnableGyroscope,
+        device.EnableMagnetometer,
+        device.EnablePressureTemperature,
+        device.EnableBattery,
+        device.EnableExtA6,
+        device.EnableExtA7,
+        device.EnableExtA15
+    );
 #endif
-                device.EnableLowNoiseAccelerometer,
-                device.EnableWideRangeAccelerometer,
-                device.EnableGyroscope,
-                device.EnableMagnetometer,
-                device.EnablePressureTemperature,
-                device.EnableBattery,
-                device.EnableExtA6,
-                device.EnableExtA7,
-                device.EnableExtA15
-            ); // ← chiusura della Configure
+
+
 
             // La libreria IMU smista la Connect al trasporto giusto:
             // - Windows → SerialPort (COM)

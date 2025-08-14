@@ -1,4 +1,4 @@
-﻿#if WINDOWS
+﻿#if WINDOWS || ANDROID
 using ShimmerAPI;
 #endif
 
@@ -12,9 +12,9 @@ namespace XR2Learn_ShimmerAPI.IMU
     /// battery voltage, and external ADCs.
     /// </summary>
     public class XR2Learn_ShimmerIMUData
-    {
-#if WINDOWS
-        // Timestamp
+    { 
+#if WINDOWS || ANDROID
+    // Timestamp
         public readonly SensorData TimeStamp;
 
         // Low-noise accelerometer
