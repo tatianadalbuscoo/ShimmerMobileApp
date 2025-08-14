@@ -19,6 +19,13 @@ namespace XR2Learn_ShimmerAPI.IMU
         private readonly string _deviceId;
         private readonly string _mac;
 
+        private readonly int _accelRange, _gsrRange, _gyroRange, _magRange;
+        private readonly bool _lpAccel, _lpGyro, _lpMag;
+        private readonly byte[]? _exg1, _exg2;
+        private readonly bool _internalExpPower;
+        private readonly int _sensorBitmap;
+
+
         private readonly ShimmerBluetoothAndroid _core;
 
         public double SamplingRate { get; }
@@ -35,27 +42,34 @@ namespace XR2Learn_ShimmerAPI.IMU
         public event EventHandler? UICallback;
 
         public ShimmerLogAndStreamAndroidBluetooth(
-            string devId, string macAddress, double samplingRate,
-            int accelRange, int gsrRange, bool enableLowPowerAccel,
-            bool enableLowPowerGyro, bool enableLowPowerMag,
-            int gyroRange, int magRange, byte[]? exg1, byte[]? exg2,
-            bool internalExpPower)
-        {
-            _deviceId = devId ?? string.Empty;
-            _mac = (macAddress ?? string.Empty).Trim();
-            SamplingRate = samplingRate;
+        string devId, string macAddress, double samplingRate,
+        int accelRange, int gsrRange, bool enableLowPowerAccel,
+        bool enableLowPowerGyro, bool enableLowPowerMag,
+        int gyroRange, int magRange, byte[]? exg1, byte[]? exg2,
+        bool internalExpPower, int sensorBitmap)
+            {
+                _deviceId = devId ?? string.Empty;
+                _mac = (macAddress ?? string.Empty).Trim();
+                SamplingRate = samplingRate;
 
-            Log.Debug(Tag, $"Initialized for device {_deviceId} @ {_mac}");
+                _accelRange = accelRange; _gsrRange = gsrRange;
+                _gyroRange = gyroRange; _magRange = magRange;
+                _lpAccel = enableLowPowerAccel; _lpGyro = enableLowPowerGyro; _lpMag = enableLowPowerMag;
+                _exg1 = exg1; _exg2 = exg2;
+                _internalExpPower = internalExpPower;
+                _sensorBitmap = sensorBitmap;
 
-            _core = new ShimmerBluetoothAndroid(
-                _deviceId,
-                () => _inputStream,
-                () => _outputStream,
-                () => _connected
-            );
+                Log.Debug(Tag, $"Initialized for device {_deviceId} @ {_mac}");
 
-            _core.UICallback += (s, e) => UICallback?.Invoke(s, e);
-        }
+                _core = new ShimmerBluetoothAndroid(
+                    _deviceId,
+                    () => _inputStream,
+                    () => _outputStream,
+                    () => _connected
+                );
+                _core.UICallback += (s, e) => UICallback?.Invoke(s, e);
+            }
+
 
         // === RITORNA BOOL ===
         public bool Connect()
@@ -122,6 +136,7 @@ namespace XR2Learn_ShimmerAPI.IMU
 
             await ConfigureSamplingRateAndSensorsAsync();
 
+            Log.Debug(Tag, "Sending START_STREAMING...");
             await WriteAsync(new[] { (byte)ShimmerBluetooth.PacketTypeShimmer2.START_STREAMING_COMMAND });
 
             _streaming = true;
@@ -131,14 +146,18 @@ namespace XR2Learn_ShimmerAPI.IMU
             {
                 try
                 {
-                    _core.ReadData(); // parsing ShimmerAPI
+                    _core.ReadData();
                 }
                 catch (Exception ex)
                 {
-                    Log.Warn(Tag, $"Core.ReadData() ended: {ex.Message}");
+                    Android.Util.Log.Error("ShimmerBT", "Core.ReadData() ended with exception:");
+                    Android.Util.Log.Error("ShimmerBT", ex.ToString()); // stack completo
+                    System.Diagnostics.Debug.WriteLine(ex); // visibile anche in Output MAUI
                 }
             });
+
         }
+
 
         public async void StopStreaming()
         {
@@ -160,11 +179,43 @@ namespace XR2Learn_ShimmerAPI.IMU
             return len;
         }
 
-        private Task ConfigureSamplingRateAndSensorsAsync()
+        private async Task ConfigureSamplingRateAndSensorsAsync()
         {
-            // TODO: inviare comandi configurazione se necessario
-            return Task.CompletedTask;
+            // stop idempotente
+            await WriteAsync(new[] { (byte)ShimmerBluetooth.PacketTypeShimmer2.STOP_STREAMING_COMMAND });
+            await Task.Delay(50);
+
+            _core.Inquiry();
+            _core.EnsureFirmwareVersionString();
+            string fw = _core.GetFirmwareVersionFullName();
+            Log.Debug(Tag, $"Firmware rilevato: {fw}");
+            _core.ReadCalibrationParameters("All");
+            await Task.Delay(50);
+
+            // sampling + ranges
+            _core.WriteSamplingRate(SamplingRate);
+            _core.WriteAccelRange(_accelRange);
+            _core.WriteGSRRange(_gsrRange);
+            _core.WriteGyroRange(_gyroRange);
+            _core.WriteMagRange(_magRange);
+
+            // low-power & power
+            _core.SetLowPowerAccel(_lpAccel);
+            _core.SetLowPowerGyro(_lpGyro);
+            _core.SetLowPowerMag(_lpMag);
+            _core.WriteInternalExpPower(_internalExpPower ? 1 : 0);
+
+            // EXG (se presenti)
+            if (_exg1 != null && _exg2 != null)
+                _core.WriteEXGConfigurations(_exg1, _exg2);
+
+            // abilita sensori (alla fine!)
+            _core.WriteSensors(_sensorBitmap);
+
+            await Task.Delay(100);
+            Log.Debug(Tag, $"Configured SR={SamplingRate}, sensors=0x{_sensorBitmap:X}");
         }
+
     }
 
     // ====== Bridge verso ShimmerBluetooth (override completi) ======
@@ -186,6 +237,19 @@ namespace XR2Learn_ShimmerAPI.IMU
             _getOut = outputStreamGetter;
             _isOpen = isOpenGetter;
         }
+
+        public string GetFirmwareVersionFullName()
+        {
+            return FirmwareVersionFullName;
+        }
+
+        public void EnsureFirmwareVersionString()
+        {
+            // Evita NRE nella libreria se non abbiamo ancora letto la versione
+            if (FirmwareVersionFullName == null)
+                FirmwareVersionFullName = string.Empty;
+        }
+
 
         protected override int ReadByte()
         {
