@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Android.Bluetooth;
 using Android.Util;
 using Java.Util;
+using ShimmerAPI; // per PacketTypeShimmer2
 
 namespace XR2Learn_ShimmerAPI.IMU
 {
@@ -13,18 +14,17 @@ namespace XR2Learn_ShimmerAPI.IMU
     {
         static readonly UUID SPP_UUID = UUID.FromString("00001101-0000-1000-8000-00805F9B34FB");
         const string Tag = "ShimmerBT";
+        private const byte CMD_START_STREAMING = 0x07;  // Start streaming
 
-        public double SamplingRate { get; } // aggiungi questa proprietà
-
-
+        public double SamplingRate { get; }
         public string DeviceId { get; }
         public string MacAddress { get; }
-        // ... altri campi come prima ...
 
         private bool _connected = false;
         private bool _streaming = false;
         private BluetoothSocket? _socket;
         private Stream? _inputStream;
+        private Stream? _outputStream;
         private CancellationTokenSource? _readCts;
 
         public event EventHandler? UICallback;
@@ -52,36 +52,25 @@ namespace XR2Learn_ShimmerAPI.IMU
             Log.Debug(Tag, $"Initialized for device {DeviceId} @ {MacAddress}");
         }
 
-        public void Connect()
-        {
-            // Mantiene compatibilità col vecchio codice sincrono
-            ConnectAsync().GetAwaiter().GetResult();
-        }
-
+        public void Connect() => ConnectAsync().GetAwaiter().GetResult();
 
         public async Task ConnectAsync()
         {
             Log.Debug(Tag, "Attempting ConnectAsync...");
             try
             {
-                var adapter = BluetoothAdapter.DefaultAdapter;
-                if (adapter == null)
-                    throw new Exception("BluetoothAdapter non disponibile");
-                if (!adapter.IsEnabled)
-                    throw new Exception("Bluetooth disabilitato");
+                var adapter = BluetoothAdapter.DefaultAdapter ?? throw new Exception("BluetoothAdapter non disponibile");
+                if (!adapter.IsEnabled) throw new Exception("Bluetooth disabilitato");
 
-                Log.Debug(Tag, "Bluetooth adapter OK, resolving device...");
                 var device = adapter.GetRemoteDevice(MacAddress);
                 _socket = device.CreateRfcommSocketToServiceRecord(SPP_UUID);
-                Log.Debug(Tag, "Socket creata, canceling discovery...");
                 if (adapter.IsDiscovering) adapter.CancelDiscovery();
 
                 await _socket.ConnectAsync();
-                Log.Debug(Tag, "Socket connesso!");
-
                 _inputStream = _socket.InputStream;
+                _outputStream = _socket.OutputStream;
                 _connected = true;
-                Log.Debug(Tag, "Invoco UICallback (connected)");
+                Log.Debug(Tag, "Socket connesso!");
                 UICallback?.Invoke(this, EventArgs.Empty);
             }
             catch (Exception ex)
@@ -98,24 +87,32 @@ namespace XR2Learn_ShimmerAPI.IMU
             _connected = false;
             _readCts?.Cancel();
             try { _inputStream?.Close(); } catch { }
+            try { _outputStream?.Close(); } catch { }
             try { _socket?.Close(); } catch { }
             _inputStream = null;
+            _outputStream = null;
             _socket = null;
-            Log.Debug(Tag, "Handshake Disconnect done—invoking UICallback");
             UICallback?.Invoke(this, EventArgs.Empty);
         }
 
         public bool IsConnected() => _connected;
 
-        public void StartStreaming()
+        // 🔹 UNICA StartStreaming (niente duplicati)
+        public async void StartStreaming()
         {
             Log.Debug(Tag, $"StartStreaming called. Connected? {_connected}");
-            if (!_connected || _inputStream == null) return;
+            if (!_connected || _inputStream == null || _outputStream == null) return;
+
+            // TODO: inviare sampling rate + sensor bitmap come su Windows
+            await ConfigureSamplingRateAndSensorsAsync();
+
+            // Comando ufficiale di start (uguale a Windows)
+            await WriteAsync(new byte[] { CMD_START_STREAMING });
+
 
             _streaming = true;
             _readCts = new CancellationTokenSource();
-            Task.Run(() => ReadLoop(_readCts.Token));
-
+            _ = Task.Run(() => ReadLoop(_readCts.Token));
             Log.Debug(Tag, "Streaming started—UICallback");
             UICallback?.Invoke(this, EventArgs.Empty);
         }
@@ -138,14 +135,9 @@ namespace XR2Learn_ShimmerAPI.IMU
                 {
                     int read = await _inputStream!.ReadAsync(buffer, 0, buffer.Length, token);
                     if (read > 0)
-                    {
                         Log.Debug(Tag, $"ReadLoop received {read} bytes: {BitConverter.ToString(buffer, 0, Math.Min(8, read))}...");
-                    }
                     else
-                    {
-                        Log.Warn(Tag, "ReadLoop: no bytes read, breaking.");
                         break;
-                    }
                 }
             }
             catch (Exception ex)
@@ -156,7 +148,27 @@ namespace XR2Learn_ShimmerAPI.IMU
             Log.Debug(Tag, "ReadLoop terminated.");
         }
 
-        // Proprietà esistenti copiati...
+        // --- UTIL: scrittura RFCOMM
+        private async Task<int> WriteAsync(byte[] data, int offset = 0, int? count = null)
+        {
+            if (!_connected || _outputStream == null) return 0;
+            int len = count ?? data.Length;
+            await _outputStream.WriteAsync(data, offset, len);
+            await _outputStream.FlushAsync();
+            Log.Debug(Tag, $"WriteAsync: sent {len} bytes");
+            return len;
+        }
+
+        // --- TODO: inviare sampling rate & bitmap sensori (stub per ora)
+        private Task ConfigureSamplingRateAndSensorsAsync()
+        {
+            // In Windows qui si manda: SR + bitmap sensori + range ecc.
+            // Per il momento non inviamo niente: molti Shimmer partono comunque.
+            // Poi lo implementiamo copiando i comandi ShimmerAPI.
+            return Task.CompletedTask;
+        }
+
+        // Proprietà extra
         public int AccelRange { get; }
         public int GsrRange { get; }
         public bool EnableLowPowerAccel { get; }
