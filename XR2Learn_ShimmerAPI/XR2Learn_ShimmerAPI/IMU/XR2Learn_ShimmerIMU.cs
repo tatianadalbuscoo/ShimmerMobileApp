@@ -127,6 +127,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         {
             var eventArgs = (CustomEventArgs)args;
 
+
             if (eventArgs.getIndicator() == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
             {
                 ObjectCluster oc = (ObjectCluster)eventArgs.getObject();
@@ -246,10 +247,20 @@ namespace XR2Learn_ShimmerAPI.IMU
 
         private void HandleEventAndroid(object sender, EventArgs args)
         {
+            Android.Util.Log.Debug("ShimmerBT", 
+            $"HandleEventAndroid chiamato con args={args?.GetType().Name}");
             try
             {
-                var ev = args as CustomEventArgs;
-                if (ev == null) return;
+
+            var ev = args as CustomEventArgs;
+            if (ev == null)
+            {
+                Android.Util.Log.Warn("ShimmerBT", "Evento ricevuto ma non è CustomEventArgs");
+                return;
+            }
+
+            Android.Util.Log.Debug("ShimmerBT",
+                $"Indicator={ev.getIndicator()}  expected={(int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET}");
 
                 if (ev.getIndicator() != (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
                     return;
