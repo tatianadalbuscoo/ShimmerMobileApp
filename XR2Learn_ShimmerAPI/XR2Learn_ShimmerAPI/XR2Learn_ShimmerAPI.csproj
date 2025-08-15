@@ -19,7 +19,6 @@
 
   <!-- 2) Includi i file specifici SOLO nel TFM corretto -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
-    <Compile Include="IMU/ShimmerLogAndStreamAndroidBluetooth.cs" />
     <ProjectReference Include="..\..\ShimmerAPI\ShimmerAPI\ShimmerAPI.csproj" />
   </ItemGroup>
 

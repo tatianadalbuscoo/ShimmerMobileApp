@@ -3,6 +3,9 @@ using System.Threading;
 #if WINDOWS || ANDROID
 using ShimmerAPI;
 #endif
+#if ANDROID
+using XR2Learn_ShimmerAPI.IMU.Android; // per ShimmerLogAndStreamAndroidBluetoothV2
+#endif
 
 namespace XR2Learn_ShimmerAPI.IMU
 {
@@ -33,7 +36,8 @@ namespace XR2Learn_ShimmerAPI.IMU
 #endif
 
 #if ANDROID
-        private ShimmerLogAndStreamAndroidBluetooth shimmerAndroid;
+        // Wrapper Android V2 (trasporto BT, API identiche a Windows)
+        private ShimmerLogAndStreamAndroidBluetoothV2 shimmerAndroid;
         private bool firstDataPacketAndroid = true;
         private int indexTimeStamp;
         private int indexLowNoiseAccX;
@@ -54,6 +58,9 @@ namespace XR2Learn_ShimmerAPI.IMU
         private int indexExtA6;
         private int indexExtA7;
         private int indexExtA15;
+
+        // Bitmap sensori calcolato in ConfigureAndroid (speculare a Windows)
+        private int _androidEnabledSensors;
 #endif
 
         public XR2Learn_ShimmerIMUData LatestData { get; private set; }
@@ -127,7 +134,6 @@ namespace XR2Learn_ShimmerAPI.IMU
         {
             var eventArgs = (CustomEventArgs)args;
 
-
             if (eventArgs.getIndicator() == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
             {
                 ObjectCluster oc = (ObjectCluster)eventArgs.getObject();
@@ -196,7 +202,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             bool enableExtA7,
             bool enableExtA15)
         {
-            // 1) Salva flag
+            // 1) Salva flag (identico a Windows)
             _enableLowNoiseAccelerometer = enableLowNoiseAcc;
             _enableWideRangeAccelerometer = enableWideRangeAcc;
             _enableGyroscope = enableGyro;
@@ -207,175 +213,203 @@ namespace XR2Learn_ShimmerAPI.IMU
             _enableExtA7 = enableExtA7;
             _enableExtA15 = enableExtA15;
 
-            // 2) Valida MAC + log
+            // 2) Valida MAC + log (usa SEMPRE global::Android.* per evitare shadowing)
             mac = (mac ?? "").Trim();
-            if (!Android.Bluetooth.BluetoothAdapter.CheckBluetoothAddress(mac))
+            if (!global::Android.Bluetooth.BluetoothAdapter.CheckBluetoothAddress(mac))
                 throw new ArgumentException($"Invalid MAC '{mac}'");
-            Android.Util.Log.Debug("ShimmerBT", $"ConfigureAndroid: deviceId={deviceId}, mac={mac}");
+            global::Android.Util.Log.Debug("ShimmerBT", $"ConfigureAndroid: deviceId={deviceId}, mac={mac}");
 
-            // 3) Calcola bitmap sensori (Shimmer3)
+            // 2.5) Calcola bitmap sensori (speculare a Windows) e memorizzalo
             int sensors = 0;
             if (_enableLowNoiseAccelerometer) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
             if (_enableWideRangeAccelerometer) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
-            if (_enableGyroscope) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_MPU9150_GYRO;
-            if (_enableMagnetometer) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG;
-            if (_enablePressureTemperature) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
-            if (_enableBattery) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
-            if (_enableExtA6) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;
-            if (_enableExtA7) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A7;
-            if (_enableExtA15) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
+            if (_enableGyroscope)             sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_MPU9150_GYRO;
+            if (_enableMagnetometer)          sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG;
+            if (_enablePressureTemperature)   sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
+            if (_enableBattery)               sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
+            if (_enableExtA6)                 sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;
+            if (_enableExtA7)                 sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A7;
+            if (_enableExtA15)                sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
 
-            // 4) Crea il trasporto passando anche il bitmap
-            shimmerAndroid = new ShimmerLogAndStreamAndroidBluetooth(
-                deviceId, mac, _samplingRate,
-                0, 0, false, false, false, 0, 0,
-                null, null, false,
-                sensors // <--- nuovo parametro
-            );
+            _androidEnabledSensors = sensors;
 
+            // 3) Istanzia il wrapper V2 (trasporto BT, API identiche a Windows)
+            shimmerAndroid = new ShimmerLogAndStreamAndroidBluetoothV2(deviceId, mac);
+
+            // 4) Callback eventi: evita doppia sottoscrizione
+            shimmerAndroid.UICallback -= HandleEventAndroid;
             shimmerAndroid.UICallback += HandleEventAndroid;
         }
 
-
         public bool ConnectInternalAndroid()
-{
-    if (shimmerAndroid == null)
-        throw new InvalidOperationException("Shimmer Android non configurato. Chiama ConfigureAndroid() prima.");
+        {
+            if (shimmerAndroid == null)
+                throw new InvalidOperationException("Shimmer Android non configurato. Chiama ConfigureAndroid() prima.");
 
-    return shimmerAndroid.Connect();
-}
+            shimmerAndroid.Connect();
+            return shimmerAndroid.IsConnected();
+        }
 
         private void HandleEventAndroid(object sender, EventArgs args)
-{
-    const string TAG = "ShimmerBT";
-
-    Android.Util.Log.Debug(TAG, $"HandleEventAndroid chiamato con args={args?.GetType().Name}");
-    try
-    {
-        var ev = args as CustomEventArgs;
-        if (ev == null)
         {
-            Android.Util.Log.Warn(TAG, "Evento ricevuto ma non è CustomEventArgs");
-            return;
-        }
+            const string TAG = "ShimmerBT";
 
-        int indicator = ev.getIndicator();
-        Android.Util.Log.Debug(TAG, $"Indicator={indicator} (atteso={(int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET})");
-
-        // Consideriamo solo i pacchetti dati
-        if (indicator != (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
-            return;
-
-        var oc = ev.getObject() as ObjectCluster;
-        if (oc == null)
-        {
-            Android.Util.Log.Warn(TAG, "ObjectCluster null");
-            return;
-        }
-
-        // Helpers locali
-        int SafeIdx(ObjectCluster c, string name)
-        {
-            var i = c.GetIndex(name, ShimmerConfiguration.SignalFormats.CAL);
-            return i < 0 ? -1 : i;
-        }
-        SensorData SafeGet(ObjectCluster c, int idx) => idx >= 0 ? c.GetData(idx) : null;
-
-        string Val(SensorData s)
-        {
             try
             {
-                // Prova a leggere valore e unità se disponibili
-                var unit = (s?.Unit ?? "").ToString();
-                var data = (s == null) ? double.NaN : s.Data;
-                return double.IsNaN(data) ? "—" : (string.IsNullOrWhiteSpace(unit) ? $"{data:0.###}" : $"{data:0.###} {unit}");
+                if (args is not CustomEventArgs ev)
+                {
+                    global::Android.Util.Log.Warn(TAG, $"Evento sconosciuto: {args?.GetType().Name}");
+                    return;
+                }
+
+                int indicator = ev.getIndicator();
+
+                // helper locali
+                static int SafeIdx(ObjectCluster c, string name, string fmt)
+                {
+                    var i = c.GetIndex(name, fmt);
+                    return i < 0 ? -1 : i;
+                }
+                static SensorData SafeGet(ObjectCluster c, int idx) => idx >= 0 ? c.GetData(idx) : null;
+
+                static string Val(SensorData s)
+                {
+                    try
+                    {
+                        if (s == null) return "—";
+                        var u = (s.Unit ?? "").ToString();
+                        return string.IsNullOrWhiteSpace(u) ? $"{s.Data:0.###}" : $"{s.Data:0.###} {u}";
+                    }
+                    catch { return s?.ToString() ?? "—"; }
+                }
+
+                // log di servizio sugli indicator
+                switch (indicator)
+                {
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE:
+                        global::Android.Util.Log.Info(TAG, $"EVENT STATE_CHANGE ({indicator}) obj={ev.getObject()?.GetType().Name ?? "null"}");
+                        return;
+
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_NOTIFICATION_MESSAGE:
+                        global::Android.Util.Log.Info(TAG, $"EVENT NOTIFICATION ({indicator}) obj={ev.getObject() ?? "null"}");
+                        return;
+
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_PACKET_RECEPTION_RATE:
+                        global::Android.Util.Log.Info(TAG, $"EVENT PRR ({indicator}) value={ev.getObject() ?? "null"}");
+                        return;
+
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET:
+                        // gestito sotto
+                        break;
+
+                    default:
+                        global::Android.Util.Log.Info(TAG, $"EVENT {indicator} obj={ev.getObject()?.GetType().Name ?? "null"}");
+                        return;
+                }
+
+                // --- DATA_PACKET ---
+                var oc = ev.getObject() as ObjectCluster;
+                if (oc == null)
+                {
+                    global::Android.Util.Log.Warn(TAG, "ObjectCluster null su DATA_PACKET");
+                    return;
+                }
+
+                // mappa indici al primo pacchetto
+                if (firstDataPacketAndroid)
+                {
+                    indexTimeStamp         = SafeIdx(oc, ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, "CAL");
+                    indexLowNoiseAccX      = SafeIdx(oc, Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, "CAL");
+                    indexLowNoiseAccY      = SafeIdx(oc, Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y, "CAL");
+                    indexLowNoiseAccZ      = SafeIdx(oc, Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z, "CAL");
+                    indexWideAccX          = SafeIdx(oc, Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X, "CAL");
+                    indexWideAccY          = SafeIdx(oc, Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y, "CAL");
+                    indexWideAccZ          = SafeIdx(oc, Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z, "CAL");
+                    indexGyroX             = SafeIdx(oc, Shimmer3Configuration.SignalNames.GYROSCOPE_X, "CAL");
+                    indexGyroY             = SafeIdx(oc, Shimmer3Configuration.SignalNames.GYROSCOPE_Y, "CAL");
+                    indexGyroZ             = SafeIdx(oc, Shimmer3Configuration.SignalNames.GYROSCOPE_Z, "CAL");
+                    indexMagX              = SafeIdx(oc, Shimmer3Configuration.SignalNames.MAGNETOMETER_X, "CAL");
+                    indexMagY              = SafeIdx(oc, Shimmer3Configuration.SignalNames.MAGNETOMETER_Y, "CAL");
+                    indexMagZ              = SafeIdx(oc, Shimmer3Configuration.SignalNames.MAGNETOMETER_Z, "CAL");
+                    indexBMP180Temperature = SafeIdx(oc, Shimmer3Configuration.SignalNames.TEMPERATURE, "CAL");
+                    indexBMP180Pressure    = SafeIdx(oc, Shimmer3Configuration.SignalNames.PRESSURE, "CAL");
+                    indexBatteryVoltage    = SafeIdx(oc, Shimmer3Configuration.SignalNames.V_SENSE_BATT, "CAL");
+                    indexExtA6             = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6, "CAL");
+                    indexExtA7             = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7, "CAL");
+                    indexExtA15            = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15, "CAL");
+
+                    global::Android.Util.Log.Info(TAG, "Indici mappati (CAL) al primo pacchetto.");
+                    firstDataPacketAndroid = false;
+                }
+
+                // aggiorna LatestData (usa CAL)
+                LatestData = new XR2Learn_ShimmerIMUData(
+                    SafeGet(oc, indexTimeStamp),
+                    SafeGet(oc, indexLowNoiseAccX), SafeGet(oc, indexLowNoiseAccY), SafeGet(oc, indexLowNoiseAccZ),
+                    SafeGet(oc, indexWideAccX),    SafeGet(oc, indexWideAccY),    SafeGet(oc, indexWideAccZ),
+                    SafeGet(oc, indexGyroX),       SafeGet(oc, indexGyroY),       SafeGet(oc, indexGyroZ),
+                    SafeGet(oc, indexMagX),        SafeGet(oc, indexMagY),        SafeGet(oc, indexMagZ),
+                    SafeGet(oc, indexBMP180Temperature), SafeGet(oc, indexBMP180Pressure),
+                    SafeGet(oc, indexBatteryVoltage),
+                    SafeGet(oc, indexExtA6), SafeGet(oc, indexExtA7), SafeGet(oc, indexExtA15)
+                );
+
+                // riga sintetica compatta
+                string S(params SensorData[] ds) => string.Join(",", Array.ConvertAll(ds, Val));
+                global::Android.Util.Log.Info(TAG,
+                    $"DATA_PACKET(ts={Val(SafeGet(oc, indexTimeStamp))}) " +
+                    $"LNA=({S(SafeGet(oc, indexLowNoiseAccX), SafeGet(oc, indexLowNoiseAccY), SafeGet(oc, indexLowNoiseAccZ))}) " +
+                    $"WRA=({S(SafeGet(oc, indexWideAccX), SafeGet(oc, indexWideAccY), SafeGet(oc, indexWideAccZ))}) " +
+                    $"GYRO=({S(SafeGet(oc, indexGyroX), SafeGet(oc, indexGyroY), SafeGet(oc, indexGyroZ))}) " +
+                    $"MAG=({S(SafeGet(oc, indexMagX), SafeGet(oc, indexMagY), SafeGet(oc, indexMagZ))}) " +
+                    $"TEMP={Val(SafeGet(oc, indexBMP180Temperature))} " +
+                    $"PRESS={Val(SafeGet(oc, indexBMP180Pressure))} " +
+                    $"VBATT={Val(SafeGet(oc, indexBatteryVoltage))} " +
+                    $"EXT=({S(SafeGet(oc, indexExtA6), SafeGet(oc, indexExtA7), SafeGet(oc, indexExtA15))})"
+                );
+
+                // dump completo CAL/RAW dei segnali che ti interessano
+                void DumpOne(ObjectCluster c, string name)
+                {
+                    var iCal = SafeIdx(c, name, "CAL");
+                    if (iCal >= 0) global::Android.Util.Log.Info(TAG, $"{name} [CAL] = {Val(SafeGet(c, iCal))}");
+                    var iRaw = SafeIdx(c, name, "RAW");
+                    if (iRaw >= 0) global::Android.Util.Log.Info(TAG, $"{name} [RAW] = {Val(SafeGet(c, iRaw))}");
+                }
+
+                global::Android.Util.Log.Info(TAG, "---- FULL ObjectCluster DUMP (CAL/RAW) ----");
+                string[] names =
+                {
+                    ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP,
+                    Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X,
+                    Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y,
+                    Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z,
+                    Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X,
+                    Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y,
+                    Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z,
+                    Shimmer3Configuration.SignalNames.GYROSCOPE_X,
+                    Shimmer3Configuration.SignalNames.GYROSCOPE_Y,
+                    Shimmer3Configuration.SignalNames.GYROSCOPE_Z,
+                    Shimmer3Configuration.SignalNames.MAGNETOMETER_X,
+                    Shimmer3Configuration.SignalNames.MAGNETOMETER_Y,
+                    Shimmer3Configuration.SignalNames.MAGNETOMETER_Z,
+                    Shimmer3Configuration.SignalNames.TEMPERATURE,
+                    Shimmer3Configuration.SignalNames.PRESSURE,
+                    Shimmer3Configuration.SignalNames.V_SENSE_BATT,
+                    Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6,
+                    Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7,
+                    Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15
+                };
+                foreach (var n in names) DumpOne(oc, n);
+                global::Android.Util.Log.Info(TAG, "---- END ObjectCluster DUMP --------------");
             }
-            catch
+            catch (Exception ex)
             {
-                return s?.ToString() ?? "—";
+                global::Android.Util.Log.Error(TAG, "HandleEventAndroid error:");
+                global::Android.Util.Log.Error(TAG, ex.ToString());
+                System.Diagnostics.Debug.WriteLine(ex);
             }
         }
-
-        // La prima volta: mappa indici e log della mappatura
-        if (firstDataPacketAndroid)
-        {
-            indexTimeStamp        = SafeIdx(oc, ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP);
-            indexLowNoiseAccX     = SafeIdx(oc, Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X);
-            indexLowNoiseAccY     = SafeIdx(oc, Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y);
-            indexLowNoiseAccZ     = SafeIdx(oc, Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z);
-            indexWideAccX         = SafeIdx(oc, Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X);
-            indexWideAccY         = SafeIdx(oc, Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y);
-            indexWideAccZ         = SafeIdx(oc, Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z);
-            indexGyroX            = SafeIdx(oc, Shimmer3Configuration.SignalNames.GYROSCOPE_X);
-            indexGyroY            = SafeIdx(oc, Shimmer3Configuration.SignalNames.GYROSCOPE_Y);
-            indexGyroZ            = SafeIdx(oc, Shimmer3Configuration.SignalNames.GYROSCOPE_Z);
-            indexMagX             = SafeIdx(oc, Shimmer3Configuration.SignalNames.MAGNETOMETER_X);
-            indexMagY             = SafeIdx(oc, Shimmer3Configuration.SignalNames.MAGNETOMETER_Y);
-            indexMagZ             = SafeIdx(oc, Shimmer3Configuration.SignalNames.MAGNETOMETER_Z);
-            indexBMP180Temperature= SafeIdx(oc, Shimmer3Configuration.SignalNames.TEMPERATURE);
-            indexBMP180Pressure   = SafeIdx(oc, Shimmer3Configuration.SignalNames.PRESSURE);
-            indexBatteryVoltage   = SafeIdx(oc, Shimmer3Configuration.SignalNames.V_SENSE_BATT);
-            indexExtA6            = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6);
-            indexExtA7            = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7);
-            indexExtA15           = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15);
-
-            Android.Util.Log.Info(TAG, "=== Prima mappatura indici (CAL) ===");
-            Android.Util.Log.Info(TAG, $"TS={indexTimeStamp}, LNA=({indexLowNoiseAccX},{indexLowNoiseAccY},{indexLowNoiseAccZ}), WRA=({indexWideAccX},{indexWideAccY},{indexWideAccZ})");
-            Android.Util.Log.Info(TAG, $"GYRO=({indexGyroX},{indexGyroY},{indexGyroZ}), MAG=({indexMagX},{indexMagY},{indexMagZ})");
-            Android.Util.Log.Info(TAG, $"TEMP={indexBMP180Temperature}, PRESS={indexBMP180Pressure}, VBATT={indexBatteryVoltage}, EXTA6={indexExtA6}, EXTA7={indexExtA7}, EXTA15={indexExtA15}");
-            Android.Util.Log.Info(TAG, "====================================");
-
-            firstDataPacketAndroid = false;
-        }
-
-        // Aggiorna LatestData come facevi già
-        LatestData = new XR2Learn_ShimmerIMUData(
-            SafeGet(oc, indexTimeStamp),
-            SafeGet(oc, indexLowNoiseAccX), SafeGet(oc, indexLowNoiseAccY), SafeGet(oc, indexLowNoiseAccZ),
-            SafeGet(oc, indexWideAccX),    SafeGet(oc, indexWideAccY),    SafeGet(oc, indexWideAccZ),
-            SafeGet(oc, indexGyroX),       SafeGet(oc, indexGyroY),       SafeGet(oc, indexGyroZ),
-            SafeGet(oc, indexMagX),        SafeGet(oc, indexMagY),        SafeGet(oc, indexMagZ),
-            SafeGet(oc, indexBMP180Temperature), SafeGet(oc, indexBMP180Pressure),
-            SafeGet(oc, indexBatteryVoltage),
-            SafeGet(oc, indexExtA6), SafeGet(oc, indexExtA7), SafeGet(oc, indexExtA15)
-        );
-
-        // Log sintetico del pacchetto (una riga)
-        var ts   = Val(SafeGet(oc, indexTimeStamp));
-        var ax   = Val(SafeGet(oc, indexLowNoiseAccX));
-        var ay   = Val(SafeGet(oc, indexLowNoiseAccY));
-        var az   = Val(SafeGet(oc, indexLowNoiseAccZ));
-        var wrx  = Val(SafeGet(oc, indexWideAccX));
-        var wry  = Val(SafeGet(oc, indexWideAccY));
-        var wrz  = Val(SafeGet(oc, indexWideAccZ));
-        var gx   = Val(SafeGet(oc, indexGyroX));
-        var gy   = Val(SafeGet(oc, indexGyroY));
-        var gz   = Val(SafeGet(oc, indexGyroZ));
-        var mx   = Val(SafeGet(oc, indexMagX));
-        var my   = Val(SafeGet(oc, indexMagY));
-        var mz   = Val(SafeGet(oc, indexMagZ));
-        var t    = Val(SafeGet(oc, indexBMP180Temperature));
-        var p    = Val(SafeGet(oc, indexBMP180Pressure));
-        var vb   = Val(SafeGet(oc, indexBatteryVoltage));
-        var ea6  = Val(SafeGet(oc, indexExtA6));
-        var ea7  = Val(SafeGet(oc, indexExtA7));
-        var ea15 = Val(SafeGet(oc, indexExtA15));
-
-        Android.Util.Log.Info(TAG,
-            $"DATA_PACKET(ts={ts}) " +
-            $"LNA=({ax},{ay},{az}) WRA=({wrx},{wry},{wrz}) " +
-            $"GYRO=({gx},{gy},{gz}) MAG=({mx},{my},{mz}) " +
-            $"TEMP={t} PRESS={p} VBATT={vb} EXT=({ea6},{ea7},{ea15})");
-    }
-    catch (Exception ex)
-    {
-        Android.Util.Log.Error(TAG, "HandleEventAndroid error:");
-        Android.Util.Log.Error(TAG, ex.ToString());
-        System.Diagnostics.Debug.WriteLine(ex);
-    }
-}
-
-
 #endif
 
     }
