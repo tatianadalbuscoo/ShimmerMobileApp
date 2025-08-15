@@ -54,6 +54,10 @@ namespace XR2Learn_ShimmerAPI.IMU.Android
         public void StartStreaming() => _core.StartStreaming();
         public void StopStreaming()  => _core.StopStreaming();
 
+        // ===== NUOVO: forward per flush dei buffer =====
+        public void Flush()      => _core.Flush();
+        public void FlushInput() => _core.FlushInput();
+
         // Deleghe 1:1 al core (come Windows)
         public void WriteSensors(int bitmap) => _core.WriteSensors(bitmap);
         public void WriteAccelRange(int r) => _core.WriteAccelRange(r);

@@ -27,16 +27,20 @@ namespace XR2Learn_ShimmerAPI.IMU.Android
         protected override void FlushConnection() => _conn.Flush();
         protected override void FlushInputConnection() => _conn.FlushInput();
 
-        // >>> Implementazioni mancanti - indirizzo Shimmer <<< 
+        // >>> Implementazioni mancanti - indirizzo Shimmer <<<
         public override string GetShimmerAddress() => _address;
         public override void SetShimmerAddress(string address)
         {
             _address = string.IsNullOrWhiteSpace(address) ? "ANDROID-BT" : address.Trim();
         }
 
-        // ===== Accessor pubblici utili (espongono membri protetti del base) =====
-        public bool ConnectionOpen => IsConnectionOpen(); // espone lo stato connessione
-        public string FirmwareVersionFullNamePublic => FirmwareVersionFullName; // espone firmware
+        // ===== Accessor pubblici utili =====
+        public bool ConnectionOpen => IsConnectionOpen();                     // stato connessione
+        public string FirmwareVersionFullNamePublic => FirmwareVersionFullName; // firmware
+
+        // ===== Forward pubblici per Flush/FlushInput (servono al wrapper) =====
+        public void Flush() => FlushConnection();
+        public void FlushInput() => FlushInputConnection();
     }
 }
 #endif

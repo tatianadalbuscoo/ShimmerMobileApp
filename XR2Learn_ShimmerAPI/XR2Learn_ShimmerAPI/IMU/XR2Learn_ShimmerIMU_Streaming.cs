@@ -113,60 +113,66 @@ namespace XR2Learn_ShimmerAPI.IMU
 
 #if ANDROID
         // Sequenza Android resa analoga a Windows
-        private async Task StartStreamingAndroidSequenceAsync()
-        {
-            try
-            {
-                // 0) Stop idempotente
-                shimmerAndroid.StopStreaming();
-                await DelayWork(120);
+#if ANDROID
+private async Task StartStreamingAndroidSequenceAsync()
+{
+    try
+    {
+        // 0) Stop idempotente
+        shimmerAndroid.StopStreaming();
+        await DelayWork(150);
 
-                // 1) Inquiry + Calibrazione (serve per layout/scale corretti)
-                shimmerAndroid.Inquiry();
-                await DelayWork(250);
-                shimmerAndroid.ReadCalibrationParameters("All");
-                await DelayWork(250);
+        // 1) Svuota stato/ACK vecchi
+        shimmerAndroid.WriteSensors(0);
+        await DelayWork(100);
+        shimmerAndroid.Flush();
+        shimmerAndroid.FlushInput();
+        await DelayWork(120);
 
-                // 2) Applica bitmap calcolato in ConfigureAndroid (speculare a Windows)
-                var sensors = _androidEnabledSensors;
+        // 2) Sampling + ranges + low power (prima dei sensori)
+        int sr = (int)Math.Round(_samplingRate);
+        if (sr <= 0) sr = 51;
+        shimmerAndroid.WriteSamplingRate(sr);
+        await DelayWork(150);
 
-                // pulisci poi imposta
-                shimmerAndroid.WriteSensors(0);
-                await DelayWork(120);
-                shimmerAndroid.WriteSensors(sensors);
-                await DelayWork(120);
+        shimmerAndroid.WriteAccelRange(0);   // default
+        shimmerAndroid.WriteGyroRange(0);    // default
+        shimmerAndroid.WriteGSRRange(0);     // se non serve GSR, va bene lasciarlo 0
+        shimmerAndroid.SetLowPowerAccel(false);
+        shimmerAndroid.SetLowPowerGyro(false);
+        shimmerAndroid.WriteInternalExpPower(0);
+        await DelayWork(120);
 
-                // 3) Ranges / LowPower / ExpPower (placeholder finché non esponi impostazioni)
-                shimmerAndroid.WriteAccelRange(0);
-                shimmerAndroid.WriteGyroRange(0);
-                shimmerAndroid.WriteGSRRange(0);
-                shimmerAndroid.SetLowPowerAccel(false);
-                shimmerAndroid.SetLowPowerGyro(false);
-                shimmerAndroid.WriteInternalExpPower(0);
-                await DelayWork(120);
+        // 3) Applica la bitmap sensori calcolata in ConfigureAndroid
+        int sensors = _androidEnabledSensors;
+        shimmerAndroid.WriteSensors(sensors);
+        await DelayWork(150);
 
-                // 4) Sampling rate come Windows
-                int sr = (int)Math.Round(_samplingRate);
-                if (sr <= 0) sr = 51;
-                shimmerAndroid.WriteSamplingRate(sr);
-                await DelayWork(200);
+        // 4) Leggi calibrazioni DOPO ranges+bitmap
+        shimmerAndroid.ReadCalibrationParameters("All");
+        await DelayWork(250);
 
-                // 5) reset mapping al primo pacchetto
-                firstDataPacketAndroid = true;
+        // 5) Reset mapping e scarico residui
+        firstDataPacketAndroid = true;
+        shimmerAndroid.FlushInput();
+        await DelayWork(80);
 
-                // 6) Avvia streaming
-                shimmerAndroid.StartStreaming();
-                await DelayWork(100);
+        // 6) Avvio streaming
+        shimmerAndroid.StartStreaming();
+        await DelayWork(120);
 
-                global::Android.Util.Log.Info("Shimmer", $"Android StartStreaming OK (sensors=0x{sensors:X}, SR={sr})");
-            }
-            catch (Exception ex)
-            {
-                global::Android.Util.Log.Error("Shimmer", "StartStreamingAndroidSequenceAsync exception:");
-                global::Android.Util.Log.Error("Shimmer", ex.ToString());
-                System.Diagnostics.Debug.WriteLine(ex);
-            }
-        }
+        global::Android.Util.Log.Info("Shimmer", $"Android StartStreaming OK (sensors=0x{sensors:X}, SR={sr})");
+    }
+    catch (Exception ex)
+    {
+        global::Android.Util.Log.Error("Shimmer", "StartStreamingAndroidSequenceAsync exception:");
+        global::Android.Util.Log.Error("Shimmer", ex.ToString());
+        System.Diagnostics.Debug.WriteLine(ex);
+    }
+}
+#endif
+
+
 #endif
 
         /// <summary>
