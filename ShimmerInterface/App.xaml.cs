@@ -9,6 +9,9 @@ public partial class App : Application
         // Inizializza i componenti definiti in App.xaml (risorse globali)
         InitializeComponent();
 
+        // Forza sempre la Light Mode
+        Application.Current.UserAppTheme = AppTheme.Light;
+
         // Crea una pagina di navigazione con MainPage come pagina iniziale
         // e imposta i colori della barra superiore (Barra di Navigazione)
         var navigationPage = new NavigationPage(new MainPage())
