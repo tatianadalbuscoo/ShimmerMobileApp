@@ -24,8 +24,20 @@ namespace XR2Learn_ShimmerAPI.IMU
             global::Android.Util.Log.Info("Shimmer", $"Android Connect() -> {shimmerAndroid.IsConnected()}");
             return;
 #elif WINDOWS
-            if (IsConnected()) return;
-            shimmer.Connect();
+    if (IsConnected()) return;
+    shimmer.Connect();
+
+    // Applica sampling rate e bitmap sensori calcolata in ConfigureWindows(...)
+    var sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
+    shimmer.WriteSamplingRate(sr);
+    System.Threading.Thread.Sleep(150);
+
+    shimmer.WriteSensors(_winEnabledSensors);
+    System.Threading.Thread.Sleep(200);
+
+    // Aggiorna la mappa dei campi (nomi/indici) lato API
+    shimmer.Inquiry();
+    System.Threading.Thread.Sleep(200);
 #elif MACCATALYST
             if (IsConnectedMac()) return;
             ConnectMac();
@@ -203,3 +215,4 @@ private async System.Threading.Tasks.Task StartStreamingAndroidSequenceAsync()
         }
     }
 }
+

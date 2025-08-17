@@ -127,7 +127,6 @@ namespace XR2Learn_ShimmerAPI.IMU
             object extADC_A6 = null, object extADC_A7 = null, object extADC_A15 = null
         )
         {
-            // Questa versione non fa nulla - è solo per permettere la compilazione
         }
 #endif
     }

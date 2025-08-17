@@ -8,10 +8,20 @@ using ShimmerAPI;
 using XR2Learn_ShimmerAPI.IMU.Android; // per ShimmerLogAndStreamAndroidBluetoothV2
 #endif
 
+
 namespace XR2Learn_ShimmerAPI.IMU
 {
+
+
+
     public partial class XR2Learn_ShimmerIMU
     {
+
+#if WINDOWS
+private int _winEnabledSensors;
+#endif
+
+
 #if WINDOWS
         private ShimmerLogAndStreamSystemSerialPortV2 shimmer;
         private bool firstDataPacket = true;
@@ -131,9 +141,11 @@ namespace XR2Learn_ShimmerAPI.IMU
                 enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
 
             Thread.Sleep(500);
+            _winEnabledSensors = enabledSensors;
 
             shimmer = new ShimmerLogAndStreamSystemSerialPortV2(deviceName, comPort);
             shimmer.UICallback += this.HandleEvent;
+
         }
 
         private void HandleEvent(object sender, EventArgs args)
