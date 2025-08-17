@@ -112,68 +112,85 @@ namespace XR2Learn_ShimmerAPI.IMU
         }
 
 #if ANDROID
-        // Sequenza Android resa analoga a Windows
-#if ANDROID
-private async Task StartStreamingAndroidSequenceAsync()
+private async System.Threading.Tasks.Task StartStreamingAndroidSequenceAsync()
 {
     try
     {
-        // 0) Stop idempotente
+        if (shimmerAndroid == null)
+            throw new InvalidOperationException("Shimmer Android non configurato.");
+
+        // A) Assicurati che la connessione sia COMPLETATA (stato CONNECTED dall’API)
+        _androidConnectedTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+        if (shimmerAndroid.IsConnected())
+            _androidConnectedTcs.TrySetResult(true); // nel caso fossi già connected
+
+        var connectedReady = await System.Threading.Tasks.Task.WhenAny(_androidConnectedTcs.Task, System.Threading.Tasks.Task.Delay(5000));
+        if (connectedReady != _androidConnectedTcs.Task)
+            global::Android.Util.Log.Warn("Shimmer", "Timeout in attesa di CONNECTED (proseguo)");
+
+        // B) Stop idempotente e reset sensori (ma NIENTE FlushConnection!)
         shimmerAndroid.StopStreaming();
         await DelayWork(150);
-
-        // 1) Svuota stato/ACK vecchi
         shimmerAndroid.WriteSensors(0);
-        await DelayWork(100);
-        shimmerAndroid.Flush();
-        shimmerAndroid.FlushInput();
-        await DelayWork(120);
-
-        // 2) Sampling + ranges + low power (prima dei sensori)
-        int sr = (int)Math.Round(_samplingRate);
-        if (sr <= 0) sr = 51;
-        shimmerAndroid.WriteSamplingRate(sr);
         await DelayWork(150);
 
-        shimmerAndroid.WriteAccelRange(0);   // default
-        shimmerAndroid.WriteGyroRange(0);    // default
-        shimmerAndroid.WriteGSRRange(0);     // se non serve GSR, va bene lasciarlo 0
+        // C) Applica sampling + ranges + sensori (ordine importante)
+        int sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
+        shimmerAndroid.WriteSamplingRate(sr);
+        await DelayWork(180);
+
+        shimmerAndroid.WriteAccelRange(0);
+        shimmerAndroid.WriteGyroRange(0);
+        shimmerAndroid.WriteGSRRange(0);
         shimmerAndroid.SetLowPowerAccel(false);
         shimmerAndroid.SetLowPowerGyro(false);
         shimmerAndroid.WriteInternalExpPower(0);
-        await DelayWork(120);
-
-        // 3) Applica la bitmap sensori calcolata in ConfigureAndroid
-        int sensors = _androidEnabledSensors;
-        shimmerAndroid.WriteSensors(sensors);
         await DelayWork(150);
 
-        // 4) Leggi calibrazioni DOPO ranges+bitmap
+        int sensors = _androidEnabledSensors;
+        shimmerAndroid.WriteSensors(sensors);
+        await DelayWork(180);
+
+        // D) **QUI** fai l’Inquiry per aggiornare PacketSize/SignalNameArray in ShimmerAPI
+        shimmerAndroid.Inquiry();
+        await DelayWork(350);
+
+        // (Opzionale) calibrazioni generiche
         shimmerAndroid.ReadCalibrationParameters("All");
         await DelayWork(250);
 
-        // 5) Reset mapping e scarico residui
-        firstDataPacketAndroid = true;
-        shimmerAndroid.FlushInput();
-        await DelayWork(80);
+        // E) Prepara attese StartStreaming
+        _firstDataPacketAndroid = true;
+        _androidStreamingAckTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
+        _androidFirstPacketTcs  = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
 
-        // 6) Avvio streaming
+        // F) Start
         shimmerAndroid.StartStreaming();
-        await DelayWork(120);
 
-        global::Android.Util.Log.Info("Shimmer", $"Android StartStreaming OK (sensors=0x{sensors:X}, SR={sr})");
+        // G) Attendi stato STREAMING (ACK di start gestito dall’API → event STATE_CHANGE)
+        var ackReady = await System.Threading.Tasks.Task.WhenAny(_androidStreamingAckTcs.Task, System.Threading.Tasks.Task.Delay(2000));
+        if (ackReady != _androidStreamingAckTcs.Task)
+            global::Android.Util.Log.Warn("Shimmer", "Timeout in attesa di ACK/STREAMING (proseguo)");
+
+        // H) Attendi il primo pacchetto dati valido (allinea indici)
+        var firstReady = await System.Threading.Tasks.Task.WhenAny(_androidFirstPacketTcs.Task, System.Threading.Tasks.Task.Delay(2000));
+        if (firstReady != _androidFirstPacketTcs.Task)
+            global::Android.Util.Log.Warn("Shimmer", "Timeout in attesa del primo DATA_PACKET (proseguo)");
+
+        global::Android.Util.Log.Info("Shimmer", $"StartStreaming OK (sensors=0x{sensors:X}, SR={sr})");
     }
     catch (Exception ex)
     {
         global::Android.Util.Log.Error("Shimmer", "StartStreamingAndroidSequenceAsync exception:");
         global::Android.Util.Log.Error("Shimmer", ex.ToString());
         System.Diagnostics.Debug.WriteLine(ex);
+        throw;
     }
 }
 #endif
 
 
-#endif
+
 
         /// <summary>
         /// Asynchronously waits for the specified number of milliseconds.

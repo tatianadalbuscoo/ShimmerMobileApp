@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using System.Threading.Tasks;
 #if WINDOWS || ANDROID
 using ShimmerAPI;
 #endif
@@ -61,6 +62,11 @@ namespace XR2Learn_ShimmerAPI.IMU
 
         // Bitmap sensori calcolato in ConfigureAndroid (speculare a Windows)
         private int _androidEnabledSensors;
+
+        private System.Threading.Tasks.TaskCompletionSource<bool>? _androidConnectedTcs;
+        private System.Threading.Tasks.TaskCompletionSource<bool>? _androidStreamingAckTcs;
+        private System.Threading.Tasks.TaskCompletionSource<bool>? _androidFirstPacketTcs;
+        private bool _firstDataPacketAndroid = true;
 #endif
 
         public XR2Learn_ShimmerIMUData LatestData { get; private set; }
@@ -264,6 +270,35 @@ namespace XR2Learn_ShimmerAPI.IMU
 
                 int indicator = ev.getIndicator();
 
+
+                // Sblocca attese su ACK di start streaming e sul primo pacchetto dati
+                if (indicator == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE)
+                {
+                    // L'oggetto dell'evento è un Int32 con lo stato corrente
+                    if (ev.getObject() is int st && st == 3 /* SHIMMER_STATE_STREAMING */)
+                        _androidStreamingAckTcs?.TrySetResult(true);
+                }
+                else if (indicator == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
+                {
+                    _androidFirstPacketTcs?.TrySetResult(true);
+                }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                 // helper locali
                 static int SafeIdx(ObjectCluster c, string name, string fmt)
                 {
@@ -288,6 +323,13 @@ namespace XR2Learn_ShimmerAPI.IMU
                 {
                     case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE:
                         global::Android.Util.Log.Info(TAG, $"EVENT STATE_CHANGE ({indicator}) obj={ev.getObject()?.GetType().Name ?? "null"}");
+                        if (ev.getObject() is int st)
+                        {
+                            if (st == ShimmerBluetooth.SHIMMER_STATE_CONNECTED)
+                                _androidConnectedTcs?.TrySetResult(true);
+                            if (st == ShimmerBluetooth.SHIMMER_STATE_STREAMING)
+                                _androidStreamingAckTcs?.TrySetResult(true);
+                        }
                         return;
 
                     case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_NOTIFICATION_MESSAGE:
@@ -299,6 +341,8 @@ namespace XR2Learn_ShimmerAPI.IMU
                         return;
 
                     case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET:
+                    _androidFirstPacketTcs?.TrySetResult(true);
+
                         // gestito sotto
                         break;
 

@@ -13,8 +13,6 @@ namespace XR2Learn_ShimmerAPI.IMU.Android
     {
         private readonly ShimmerBluetoothTransport _core;
         private readonly string _mac;
-        private CancellationTokenSource? _readerCts;
-        private Task? _readerTask;
 
         public event EventHandler? UICallback
         {
@@ -32,24 +30,20 @@ namespace XR2Learn_ShimmerAPI.IMU.Android
 
         public bool IsConnected() => _core.ConnectionOpen;
 
+
         public void Connect()
         {
             _core.Connect();
-            _readerCts = new CancellationTokenSource();
-            _readerTask = Task.Run(() =>
-            {
-                try { _core.ReadData(); }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine(ex); }
-            }, _readerCts.Token);
         }
 
         public void Disconnect()
         {
             try { StopStreaming(); } catch { }
-            try { _readerCts?.Cancel(); } catch { }
             try { _core.Disconnect(); } catch { }
-            _readerTask = null; _readerCts = null;
         }
+
+
+
 
         public void StartStreaming() => _core.StartStreaming();
         public void StopStreaming()  => _core.StopStreaming();

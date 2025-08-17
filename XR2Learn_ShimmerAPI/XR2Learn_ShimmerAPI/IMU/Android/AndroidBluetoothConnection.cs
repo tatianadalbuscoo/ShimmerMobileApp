@@ -55,6 +55,8 @@ namespace XR2Learn_ShimmerAPI.IMU.Android
             var s = _in ?? throw new IOException("Input stream non disponibile");
             int b = s.ReadByte();
             if (b < 0) throw new IOException("End of stream");
+
+            //Console.WriteLine($"Byte letto: {b & 0xFF}");
             return b & 0xFF;
         }
 
