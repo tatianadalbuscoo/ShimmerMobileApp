@@ -268,7 +268,7 @@ public partial class MainPageViewModel : ObservableObject
                 AvailableDevices.Add(new ShimmerDevice
                 {
                     DisplayName = "Nessun Shimmer accoppiato",
-                    Port1 = "(fai il pairing in Impostazioni Bluetooth)",
+                    Port1 = "(Do the pairing in Bluetooth settings.)",
                     ShimmerName = "----",
                     IsSelected = false
                 });
