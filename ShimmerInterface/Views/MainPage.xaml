@@ -43,8 +43,7 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                                 <!-- Device display name -->
                                 <Label Text="{Binding DisplayName}" FontAttributes="Bold" FontSize="16" TextColor="Black" />
 
-                                <!-- Serial port associated with the device -->
-                                <Label Text="{Binding Port1, StringFormat='Port: {0}'}" FontSize="12" TextColor="Gray" />
+                                <Label Text="{Binding PortDisplay}" FontSize="12" TextColor="Gray" />
 
                                 <!-- Checkbox to select the device to connect -->
                                 <!-- Checkbox/Switch to select the device to connect -->

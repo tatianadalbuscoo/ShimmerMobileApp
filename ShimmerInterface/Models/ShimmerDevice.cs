@@ -59,5 +59,18 @@ namespace ShimmerInterface.Models
         // Enable external ADC channel A15 (default: true)
         [ObservableProperty]
         private bool enableExtA15 = true;
+
+
+        public string PortDisplay =>
+#if ANDROID
+    $"MAC: {Port1}";
+#elif WINDOWS
+            $"Port: {Port1}";
+#else
+    $"Port: {Port1}";
+#endif
+
+        partial void OnPort1Changed(string value) => OnPropertyChanged(nameof(PortDisplay));
+
     }
 }
