@@ -412,7 +412,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         }
 
         // Sync the input field texts to match new limits
-        UpdateTextProperties();
+        UpdateYAxisTextPropertiesOnly();
 
         // Clear any previous validation messages
         ValidationMessage = "";
@@ -743,19 +743,10 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         // If input is empty, reset to default value and clear data
         if (string.IsNullOrWhiteSpace(value))
         {
-            const int defaultTimeWindow = 20;
             ValidationMessage = "";
-            TimeWindowSeconds = defaultTimeWindow;
-            _lastValidTimeWindowSeconds = defaultTimeWindow;
-
-            // Clear data collections and reset counters/timestamps
-            ClearAllDataCollections();
-            ResetAllTimestamps();
-            ResetAllCounters();
-
-            UpdateChart();
             return;
         }
+
 
         // Try to parse user input as an integer
         if (TryParseInt(value, out int result))
@@ -1411,7 +1402,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 YAxisMax = _autoYAxisMax;
 
                 // Refresh the displayed text properties if needed
-                UpdateTextProperties();
+                UpdateYAxisTextPropertiesOnly();
             }
         }
     }
@@ -1743,6 +1734,13 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                double.TryParse(cleanInput, NumberStyles.Float, CultureInfo.CurrentCulture, out result);
     }
 
+    private void UpdateYAxisTextPropertiesOnly()
+    {
+        _yAxisMinText = YAxisMin.ToString(CultureInfo.InvariantCulture);
+        _yAxisMaxText = YAxisMax.ToString(CultureInfo.InvariantCulture);
+        OnPropertyChanged(nameof(YAxisMinText));
+        OnPropertyChanged(nameof(YAxisMaxText));
+    }
 
     /// <summary>
     /// Attempts to convert a string to a valid integer value.
