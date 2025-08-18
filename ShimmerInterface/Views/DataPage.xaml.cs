@@ -203,19 +203,25 @@ public partial class DataPage : ContentPage
         string cleanParameterName = CleanParameterName(viewModel.SelectedParameter);
         var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(cleanParameterName);
 
-        // If no valid data, display a placeholder message and exit
-        if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
+        // --- SNAPSHOT + GUARD-RAILS ---
+        var values = currentDataPoints.ToArray();     // <— congela le liste
+        var times = currentTimeStamps.ToArray();     // (ms)
+
+        int count = Math.Min(values.Length, times.Length);
+        if (count == 0 || values.All(v => v == -1 || v == 0))
         {
             DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
                 (int)(margin + graphHeight + 65)));
             return;
         }
 
-        // Find the earliest timestamp in seconds, for proper X normalization
-        var allTimes = currentTimeStamps.Select(t => t / 1000.0).ToList();
-        double minSampleTime = allTimes.Count > 0 ? allTimes.Min() : 0;
+        // min timestamp in secondi (calcolato sullo snapshot)
+        double minSampleTime = times.Length > 0 ? (times.Min() / 1000.0) : 0;
 
-        // Prepare the line paint for the curve
+        // protezioni contro 0
+        double safeYRange = yRange > 0 ? yRange : 1e-9;
+        double safeTimeRange = timeRange > 0 ? timeRange : 1e-9;
+
         using var linePaint = new SKPaint
         {
             Color = SKColors.Blue,
@@ -225,29 +231,22 @@ public partial class DataPage : ContentPage
         };
         using var path = new SKPath();
 
-        // Iterate through all data points and build the curve path
-        for (int i = 0; i < currentDataPoints.Count; i++)
+        for (int i = 0; i < count; i++)
         {
-
-            // Convert timestamp from ms to seconds, then normalize to visible time window
-            double sampleTime = currentTimeStamps[i] / 1000.0;
-            double normalizedX = (sampleTime - minSampleTime) / timeRange;
+            double sampleTime = times[i] / 1000.0;
+            double normalizedX = (sampleTime - minSampleTime) / safeTimeRange;
             var x = leftMargin + (float)(normalizedX * graphWidth);
 
-            // Normalize data value to chart Y coordinate
-            var normalizedValue = (currentDataPoints[i] - viewModel.YAxisMin) / yRange;
+            var normalizedValue = (values[i] - viewModel.YAxisMin) / safeYRange;
             var y = bottomY - (float)(normalizedValue * graphHeight);
             y = Math.Clamp(y, topY, bottomY);
 
-            // Move to first point or draw line to next
-            if (i == 0)
-                path.MoveTo(x, y);
-            else
-                path.LineTo(x, y);
+            if (i == 0) path.MoveTo(x, y);
+            else path.LineTo(x, y);
         }
 
-        // Draw the complete path on the canvas
         canvas.DrawPath(path, linePaint);
+
     }
 
 
@@ -273,11 +272,10 @@ public partial class DataPage : ContentPage
     float bottomY, float topY,
     double timeStart, double timeRange)
     {
-        // Get all sub-parameters to display (e.g., X, Y, Z axes)
+        // Sub-parameter (es. X/Y/Z)
         var subParameters = viewModel.GetCurrentSubParameters();
 
-        // Find the earliest timestamp among all sub-parameters
-        // This ensures all lines start aligned on the X axis
+        // Allinea l’asse X tra le serie
         double minSampleTime = subParameters
             .Select(p => viewModel.GetSeriesSnapshot(p).time)
             .Where(t => t.Count > 0)
@@ -285,23 +283,26 @@ public partial class DataPage : ContentPage
             .DefaultIfEmpty(0)
             .Min();
 
-        // Assign a color for each curve (red, green, blue by default)
         var colors = GetParameterColors(CleanParameterName(viewModel.SelectedParameter));
         bool hasData = false;
 
-        // Loop through each sub-parameter (e.g., X, Y, Z)
+        // Guard-rails
+        double safeYRange = yRange > 0 ? yRange : 1e-9;
+        double safeTimeRange = timeRange > 0 ? timeRange : 1e-9;
+
         for (int paramIndex = 0; paramIndex < subParameters.Count; paramIndex++)
         {
             var parameter = subParameters[paramIndex];
             var (currentDataPoints, currentTimeStamps) = viewModel.GetSeriesSnapshot(parameter);
 
-            // Skip if no valid data points
-            if (currentDataPoints.Count == 0 || currentDataPoints.All(v => v == -1 || v == 0))
+            // Snapshot immutabile per evitare race
+            var values = currentDataPoints.ToArray();
+            var times = currentTimeStamps.ToArray(); // ms
+
+            int count = Math.Min(values.Length, times.Length);
+            if (count == 0 || values.All(v => v == -1 || v == 0))
                 continue;
 
-            hasData = true;
-
-            // Set up paint for this sub-parameter line
             using var linePaint = new SKPaint
             {
                 Color = colors[paramIndex % colors.Length],
@@ -311,38 +312,31 @@ public partial class DataPage : ContentPage
             };
             using var path = new SKPath();
 
-            // Build the line path for this sub-parameter
-            for (int i = 0; i < currentDataPoints.Count; i++)
+            for (int i = 0; i < count; i++)
             {
-
-                // Convert timestamp to seconds, normalize for X axis
-                double sampleTime = currentTimeStamps[i] / 1000.0;
-                double normalizedX = (sampleTime - minSampleTime) / timeRange;
+                double sampleTime = times[i] / 1000.0;                   // s
+                double normalizedX = (sampleTime - minSampleTime) / safeTimeRange;
                 var x = leftMargin + (float)(normalizedX * graphWidth);
 
-                // Normalize value for Y axis
-                var normalizedValue = (currentDataPoints[i] - viewModel.YAxisMin) / yRange;
+                double normalizedValue = (values[i] - viewModel.YAxisMin) / safeYRange;
                 var y = bottomY - (float)(normalizedValue * graphHeight);
                 y = Math.Clamp(y, topY, bottomY);
 
-                // Move to first point, then draw lines to subsequent points
-                if (i == 0)
-                    path.MoveTo(x, y);
-                else
-                    path.LineTo(x, y);
+                if (i == 0) path.MoveTo(x, y); else path.LineTo(x, y);
             }
 
-            // Draw the current sub-parameter's line on the canvas
             canvas.DrawPath(path, linePaint);
+            hasData = true;
         }
 
-        // If no valid data found for any sub-parameter, show "No data" message
         if (!hasData)
         {
-            DrawNoDataMessage(canvas, new SKImageInfo((int)(leftMargin + graphWidth + 40),
+            DrawNoDataMessage(canvas, new SKImageInfo(
+                (int)(leftMargin + graphWidth + 40),
                 (int)(margin + graphHeight + 65)));
         }
     }
+
 
 
     /// <summary>
