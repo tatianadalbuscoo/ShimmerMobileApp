@@ -56,6 +56,7 @@ public partial class LoadingPageViewModel : ObservableObject
 #else
         this.connectingMessage = $"Connecting to {device.ShimmerName}...";
 #endif
+
     }
 
 

@@ -19,11 +19,13 @@ namespace XR2Learn_ShimmerAPI.IMU
 
 #if WINDOWS
 private int _winEnabledSensors;
+private ShimmerLogAndStreamSystemSerialPortV2? shimmer;
+private volatile bool _reconfigInProgress = false;
+
 #endif
 
 
 #if WINDOWS
-        private ShimmerLogAndStreamSystemSerialPortV2 shimmer;
         private bool firstDataPacket = true;
         private int indexTimeStamp;
         private int indexLowNoiseAccX;
@@ -109,101 +111,133 @@ private int _winEnabledSensors;
             bool enableExtA7,
             bool enableExtA15)
         {
-            int enabledSensors = 0;
-
-            _enableLowNoiseAccelerometer = enableLowNoiseAcc;
-            _enableWideRangeAccelerometer = enableWideRangeAcc;
-            _enableGyroscope = enableGyro;
-            _enableMagnetometer = enableMag;
-            _enablePressureTemperature = enablePressureTemp;
-            _enableBattery = enableBattery;
-            _enableExtA6 = enableExtA6;
-            _enableExtA7 = enableExtA7;
-            _enableExtA15 = enableExtA15;
-
-            if (_enableLowNoiseAccelerometer)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
-            if (_enableWideRangeAccelerometer)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
-            if (_enableGyroscope)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_MPU9150_GYRO;
-            if (_enableMagnetometer)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG;
-            if (_enablePressureTemperature)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
-            if (_enableBattery)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
-            if (_enableExtA6)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;
-            if (_enableExtA7)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A7;
-            if (_enableExtA15)
-                enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
-
-            Thread.Sleep(500);
-            _winEnabledSensors = enabledSensors;
-
-            shimmer = new ShimmerLogAndStreamSystemSerialPortV2(deviceName, comPort);
-            shimmer.UICallback += this.HandleEvent;
-
-        }
-
-        private void HandleEvent(object sender, EventArgs args)
-        {
-            var eventArgs = (CustomEventArgs)args;
-
-            if (eventArgs.getIndicator() == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
+            _reconfigInProgress = true;
+            try
             {
-                ObjectCluster oc = (ObjectCluster)eventArgs.getObject();
-
-                if (firstDataPacket)
+                // 1) Detach & cleanup eventuale istanza precedente per evitare handler duplicati
+                if (shimmer != null)
                 {
-                    indexTimeStamp = oc.GetIndex(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL);
-                    indexLowNoiseAccX = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
-                    indexLowNoiseAccY = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
-                    indexLowNoiseAccZ = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
-                    indexWideAccX = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
-                    indexWideAccY = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
-                    indexWideAccZ = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
-                    indexGyroX = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_X, ShimmerConfiguration.SignalFormats.CAL);
-                    indexGyroY = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Y, ShimmerConfiguration.SignalFormats.CAL);
-                    indexGyroZ = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Z, ShimmerConfiguration.SignalFormats.CAL);
-                    indexMagX = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_X, ShimmerConfiguration.SignalFormats.CAL);
-                    indexMagY = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
-                    indexMagZ = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
-                    indexBMP180Temperature = oc.GetIndex(Shimmer3Configuration.SignalNames.TEMPERATURE, ShimmerConfiguration.SignalFormats.CAL);
-                    indexBMP180Pressure = oc.GetIndex(Shimmer3Configuration.SignalNames.PRESSURE, ShimmerConfiguration.SignalFormats.CAL);
-                    indexBatteryVoltage = oc.GetIndex(Shimmer3Configuration.SignalNames.V_SENSE_BATT, ShimmerConfiguration.SignalFormats.CAL);
-                    indexExtA6 = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6, ShimmerConfiguration.SignalFormats.CAL);
-                    indexExtA7 = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7, ShimmerConfiguration.SignalFormats.CAL);
-                    indexExtA15 = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15, ShimmerConfiguration.SignalFormats.CAL);
-
-                    firstDataPacket = false;
+                    try { shimmer.UICallback -= this.HandleEvent; } catch { /* no-op */ }
+                    try { shimmer.StopStreaming(); } catch { /* no-op */ }
+                    try { shimmer.Disconnect(); } catch { /* no-op */ }
+                    shimmer = null;
                 }
 
-                LatestData = new XR2Learn_ShimmerIMUData(
-                    oc.GetData(indexTimeStamp),
-                    oc.GetData(indexLowNoiseAccX),
-                    oc.GetData(indexLowNoiseAccY),
-                    oc.GetData(indexLowNoiseAccZ),
-                    oc.GetData(indexWideAccX),
-                    oc.GetData(indexWideAccY),
-                    oc.GetData(indexWideAccZ),
-                    oc.GetData(indexGyroX),
-                    oc.GetData(indexGyroY),
-                    oc.GetData(indexGyroZ),
-                    oc.GetData(indexMagX),
-                    oc.GetData(indexMagY),
-                    oc.GetData(indexMagZ),
-                    oc.GetData(indexBMP180Temperature),
-                    oc.GetData(indexBMP180Pressure),
-                    oc.GetData(indexBatteryVoltage),
-                    oc.GetData(indexExtA6),
-                    oc.GetData(indexExtA7),
-                    oc.GetData(indexExtA15)
-                );
+                // 2) Memorizza i flag come già fai
+                _enableLowNoiseAccelerometer = enableLowNoiseAcc;
+                _enableWideRangeAccelerometer = enableWideRangeAcc;
+                _enableGyroscope = enableGyro;
+                _enableMagnetometer = enableMag;
+                _enablePressureTemperature = enablePressureTemp;
+                _enableBattery = enableBattery;
+                _enableExtA6 = enableExtA6;
+                _enableExtA7 = enableExtA7;
+                _enableExtA15 = enableExtA15;
+
+                // 3) Ricostruisci la bitmap sensori
+                int enabledSensors = 0;
+                if (_enableLowNoiseAccelerometer)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
+                if (_enableWideRangeAccelerometer)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
+                if (_enableGyroscope)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_MPU9150_GYRO;
+                if (_enableMagnetometer)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG;
+                if (_enablePressureTemperature)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
+                if (_enableBattery)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
+                if (_enableExtA6)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;
+                if (_enableExtA7)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A7;
+                if (_enableExtA15)
+                    enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A15;
+
+                _winEnabledSensors = enabledSensors;
+
+                // 4) Forza il ricalcolo degli indici al prossimo pacchetto
+                firstDataPacket = true;
+
+                // 5) Nuova istanza + sottoscrizione **senza duplicati**
+                shimmer = new ShimmerLogAndStreamSystemSerialPortV2(deviceName, comPort);
+                try { shimmer.UICallback -= this.HandleEvent; } catch { /* no-op */ }
+                shimmer.UICallback += this.HandleEvent;
+
+                // Se avevi un Thread.Sleep, non serve; se proprio ti è utile per il seriale:
+                // Thread.Sleep(100);
+            }
+            finally
+            {
+                _reconfigInProgress = false;
             }
         }
+
+
+        private static SensorData? GetSafe(ObjectCluster oc, int idx)
+        {
+            return idx >= 0 ? oc.GetData(idx) : null;
+        }
+
+    private void HandleEvent(object sender, EventArgs args)
+    {
+        if (_reconfigInProgress) return; // ignora eventi durante la reconfig
+
+        var eventArgs = (CustomEventArgs)args;
+
+        if (eventArgs.getIndicator() == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
+        {
+            ObjectCluster oc = (ObjectCluster)eventArgs.getObject();
+
+            if (firstDataPacket)
+            {
+                indexTimeStamp = oc.GetIndex(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL);
+                indexLowNoiseAccX = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
+                indexLowNoiseAccY = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
+                indexLowNoiseAccZ = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
+                indexWideAccX     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
+                indexWideAccY     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
+                indexWideAccZ     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
+                indexGyroX        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_X, ShimmerConfiguration.SignalFormats.CAL);
+                indexGyroY        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Y, ShimmerConfiguration.SignalFormats.CAL);
+                indexGyroZ        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Z, ShimmerConfiguration.SignalFormats.CAL);
+                indexMagX         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_X, ShimmerConfiguration.SignalFormats.CAL);
+                indexMagY         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
+                indexMagZ         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
+                indexBMP180Temperature = oc.GetIndex(Shimmer3Configuration.SignalNames.TEMPERATURE, ShimmerConfiguration.SignalFormats.CAL);
+                indexBMP180Pressure    = oc.GetIndex(Shimmer3Configuration.SignalNames.PRESSURE, ShimmerConfiguration.SignalFormats.CAL);
+                indexBatteryVoltage    = oc.GetIndex(Shimmer3Configuration.SignalNames.V_SENSE_BATT, ShimmerConfiguration.SignalFormats.CAL);
+                indexExtA6             = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6, ShimmerConfiguration.SignalFormats.CAL);
+                indexExtA7             = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7, ShimmerConfiguration.SignalFormats.CAL);
+                indexExtA15            = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15, ShimmerConfiguration.SignalFormats.CAL);
+
+                firstDataPacket = false;
+            }
+
+            LatestData = new XR2Learn_ShimmerIMUData(
+                GetSafe(oc, indexTimeStamp),
+                GetSafe(oc, indexLowNoiseAccX),
+                GetSafe(oc, indexLowNoiseAccY),
+                GetSafe(oc, indexLowNoiseAccZ),
+                GetSafe(oc, indexWideAccX),
+                GetSafe(oc, indexWideAccY),
+                GetSafe(oc, indexWideAccZ),
+                GetSafe(oc, indexGyroX),
+                GetSafe(oc, indexGyroY),
+                GetSafe(oc, indexGyroZ),
+                GetSafe(oc, indexMagX),
+                GetSafe(oc, indexMagY),
+                GetSafe(oc, indexMagZ),
+                GetSafe(oc, indexBMP180Temperature),
+                GetSafe(oc, indexBMP180Pressure),
+                GetSafe(oc, indexBatteryVoltage),
+                GetSafe(oc, indexExtA6),
+                GetSafe(oc, indexExtA7),
+                GetSafe(oc, indexExtA15)
+            );
+        }
+    }
 #endif
 
 #if ANDROID

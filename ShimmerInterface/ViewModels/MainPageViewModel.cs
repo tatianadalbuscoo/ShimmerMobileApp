@@ -84,10 +84,8 @@ public partial class MainPageViewModel : ObservableObject
     /// </summary>
     private void LoadDevices()
     {
-        Console.WriteLine("=== LoadDevices() INIZIATO ===");
 
 #if WINDOWS
-    Console.WriteLine("Ramo WINDOWS");
     AvailableDevices.Clear();
 
     var ports = XR2Learn_SerialPortsManager
@@ -120,7 +118,6 @@ public partial class MainPageViewModel : ObservableObject
                     EnableExtA7 = true,
                     EnableExtA15 = true
                 });
-                Console.WriteLine($"Aggiunto device Windows: {displayName}");
             }
         }
     }
@@ -196,7 +193,6 @@ public partial class MainPageViewModel : ObservableObject
         }
 
 #elif ANDROID
-    Console.WriteLine("Ramo ANDROID - elenco dispositivi accoppiati (SPP)");
     AvailableDevices.Clear();
 
     try
@@ -206,7 +202,7 @@ public partial class MainPageViewModel : ObservableObject
         {
             AvailableDevices.Add(new ShimmerDevice
             {
-                DisplayName = "Bluetooth non disponibile",
+                DisplayName = "Bluetooth not available",
                 Port1 = "(no adapter)",
                 ShimmerName = "----",
                 IsSelected = false
@@ -216,8 +212,8 @@ public partial class MainPageViewModel : ObservableObject
         {
             AvailableDevices.Add(new ShimmerDevice
             {
-                DisplayName = "Bluetooth disabilitato",
-                Port1 = "(abilitalo dalle impostazioni)",
+                DisplayName = "Bluetooth disabled\r\n",
+                Port1 = "(enable it from settings)",
                 ShimmerName = "----",
                 IsSelected = false
             });
@@ -228,7 +224,7 @@ public partial class MainPageViewModel : ObservableObject
             var any = false;
             foreach (var d in bonded)
             {
-                // Filtra per Shimmer nel nome; togli il filtro se vuoi vedere tutto
+
                 var name = d?.Name ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(name)) continue;
                 if (!name.Contains("Shimmer", StringComparison.OrdinalIgnoreCase)) continue;
@@ -243,12 +239,11 @@ public partial class MainPageViewModel : ObservableObject
 
                 AvailableDevices.Add(new ShimmerDevice
                 {
-                    DisplayName = name,  // es. "Shimmer3-DDCE"
-                    Port1 = mac,         // MAC (paired manuale) -> verrà passato alla Connect Android
+                    DisplayName = name,  
+                    Port1 = mac,         
                     IsSelected = false,
                     ShimmerName = shimmerName,
 
-                    // default ON come su Windows
                     EnableLowNoiseAccelerometer = true,
                     EnableWideRangeAccelerometer = true,
                     EnableGyroscope = true,
@@ -260,14 +255,13 @@ public partial class MainPageViewModel : ObservableObject
                     EnableExtA15 = true
                 });
 
-                Console.WriteLine($"Aggiunto device Android: {name} [{mac}]");
             }
 
             if (!any)
             {
                 AvailableDevices.Add(new ShimmerDevice
                 {
-                    DisplayName = "Nessun Shimmer accoppiato",
+                    DisplayName = "No Shimmer paired",
                     Port1 = "(Do the pairing in Bluetooth settings.)",
                     ShimmerName = "----",
                     IsSelected = false
@@ -277,10 +271,9 @@ public partial class MainPageViewModel : ObservableObject
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Errore enumerazione BT: {ex.Message}");
         AvailableDevices.Add(new ShimmerDevice
         {
-            DisplayName = "Errore Bluetooth",
+            DisplayName = "Bluetooth Error\r\n",
             Port1 = ex.Message,
             ShimmerName = "----",
             IsSelected = false
@@ -288,11 +281,9 @@ public partial class MainPageViewModel : ObservableObject
     }
 
 #else
-    Console.WriteLine("Ramo ELSE - nessuna piattaforma supportata");
-    // altri OS: nulla
+    Console.WriteLine("ELSE branch - no supported platforms");
 #endif
 
-        Console.WriteLine($"=== LoadDevices() COMPLETATO - Totale devices: {AvailableDevices.Count} ===");
     }
 
 
