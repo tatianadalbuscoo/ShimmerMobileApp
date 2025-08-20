@@ -337,6 +337,11 @@ public partial class DataPage : ContentPage
         }
     }
 
+    private void OnSamplingRateCompleted(object sender, EventArgs e)
+    {
+        if (BindingContext is DataPageViewModel vm)
+            vm.ApplySamplingRateNow();
+    }
 
 
     /// <summary>
@@ -626,36 +631,19 @@ public partial class DataPage : ContentPage
         });
     }
 
-
-    /// <summary>
-    /// Invoked when the page appears. Starts real-time chart updates and subscribes to update events.
-    /// </summary>
-    protected override void OnAppearing()
+    private void OnSamplingRateApplyClicked(object sender, EventArgs e)
     {
-        base.OnAppearing();
-
-        // Start the timer for real-time chart updates
-        viewModel.StartTimer();
-
-        // Subscribe to chart update notifications
-        viewModel.ChartUpdateRequested += OnChartUpdateRequested;
+        if (BindingContext is DataPageViewModel vm)
+            vm.ApplySamplingRateNow();
     }
 
 
-    /// <summary>
-    /// Invoked when the page is about to disappear. Stops chart updates and unsubscribes from events.
-    /// </summary>
     protected override void OnDisappearing()
     {
-
-        // Stop the timer for chart updates
-        viewModel.StopTimer();
-
-        // Unsubscribe from update notifications to prevent memory leaks
+        // niente timer qui
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
-
+        viewModel.Dispose(); // rilascia SampleReceived + pulizia buffer
         base.OnDisappearing();
-
     }
 
 }

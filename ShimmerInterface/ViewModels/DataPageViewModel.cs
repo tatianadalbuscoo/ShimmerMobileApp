@@ -3,6 +3,9 @@ using XR2Learn_ShimmerAPI.IMU;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using ShimmerInterface.Models;
+using System.Linq;
+using System.Collections.Generic;
+
 
 namespace ShimmerInterface.ViewModels;
 
@@ -42,7 +45,6 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
     // ==== Device references and internal timer for periodic updates ====
     private readonly XR2Learn_ShimmerIMU shimmer; // Reference to the connected Shimmer device
-    private System.Timers.Timer? timer;
     private bool _disposed = false;
 
     // ==== Data storage for real-time series ====
@@ -168,12 +170,11 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         get => _samplingRateText;
         set
         {
-            if (SetProperty(ref _samplingRateText, value))
-            {
-                ValidateAndUpdateSamplingRate(value);
-            }
+            // solo aggiorna il testo; niente apply finché non premi Enter
+            SetProperty(ref _samplingRateText, value);
         }
     }
+
 
 
     /// <summary>
@@ -247,31 +248,29 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     // ==== IDisposable implementation ====
 
 
-    /// <summary>
-    /// Releases all resources used by this ViewModel, including timers and event handlers.
-    /// </summary>
+    // ==== IDisposable implementation ====
+
     public void Dispose()
     {
         Dispose(true);
         GC.SuppressFinalize(this);
     }
 
-
-    /// <summary>
-    /// Performs the actual resource cleanup.
-    /// Stops timers, clears data collections, and unsubscribes events.
-    /// </summary>
-    /// <param name="disposing">True if called from Dispose; false if called from the finalizer.</param>
     protected virtual void Dispose(bool disposing)
     {
-        if (!_disposed && disposing)
+        if (_disposed) return;
+
+        if (disposing)
         {
-            StopTimer();                         // Stop the periodic update timer
-            ChartUpdateRequested = null;         // Unsubscribe all chart update event handlers
-            ClearAllDataCollections();           // Clear all sensor data buffers
+            // sgancia eventi e pulisci risorse gestite
+            shimmer.SampleReceived -= OnSampleReceived;
+            ChartUpdateRequested = null;
+            ClearAllDataCollections();
         }
+
         _disposed = true;
     }
+
 
 
     /// <summary>
@@ -284,6 +283,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     public DataPageViewModel(XR2Learn_ShimmerIMU shimmerDevice, ShimmerDevice config)
     {
         shimmer = shimmerDevice;
+        shimmer.SampleReceived += OnSampleReceived;
 
         // Store which sensors are enabled for this session
         enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
@@ -328,6 +328,36 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         // Sync UI entry fields to current state
         UpdateTextProperties();
     }
+
+    private void OnSampleReceived(object? sender, dynamic sample)
+    {
+        // Incrementa il contatore e calcola il tempo corrente
+        sampleCounter++;
+        double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
+
+        // Aggiorna strutture e grafico (riusi le tue funzioni attuali)
+        UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
+        UpdateChart();
+    }
+
+    public void ApplySamplingRateNow()
+    {
+        if (TryParseDouble(SamplingRateText, out var req))
+        {
+            if (req > MAX_SAMPLING_RATE) { ValidationMessage = $"Sampling rate too high. Maximum {MAX_SAMPLING_RATE} Hz."; ResetSamplingRateText(); return; }
+            if (req < MIN_SAMPLING_RATE) { ValidationMessage = $"Sampling rate too low. Minimum {MIN_SAMPLING_RATE} Hz."; ResetSamplingRateText(); return; }
+
+            ValidationMessage = "";
+            UpdateSamplingRateAndRestart(req);
+        }
+        else
+        {
+            ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
+            ResetSamplingRateText();
+        }
+    }
+
+
 
 
     /// <summary>
@@ -674,61 +704,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         }
     }
 
-
-    /// <summary>
-    /// Validates and updates the sampling rate for the device based on user input.
-    /// Ensures the new value is within defined min/max limits and restarts sampling if valid.
-    /// Shows validation messages for invalid inputs.
-    /// </summary>
-    private void ValidateAndUpdateSamplingRate(string value)
-    {
-
-        // If empty, use the default sampling rate
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            const double defaultRate = 51.2;
-            UpdateSamplingRateAndRestart(defaultRate);
-            ValidationMessage = "";
-            return;
-        }
-
-        // Allow partial input (e.g. just "-" or "+") during typing
-        if (value.Trim() == "-" || value.Trim() == "+")
-        {
-            ValidationMessage = "";
-            return;
-        }
-
-        // Try to parse the string as a double value
-        if (TryParseDouble(value, out double result))
-        {
-
-            // Ensure the sampling rate is within allowed limits
-            if (result > MAX_SAMPLING_RATE)
-            {
-                ValidationMessage = $"Sampling rate too high. Maximum {MAX_SAMPLING_RATE} Hz.";
-                ResetSamplingRateText();
-                return;
-            }
-            if (result < MIN_SAMPLING_RATE)
-            {
-                ValidationMessage = $"Sampling rate too low. Minimum {MIN_SAMPLING_RATE} Hz.";
-                ResetSamplingRateText();
-                return;
-            }
-
-            // Valid input: update and restart sampling, clear error
-            UpdateSamplingRateAndRestart(result);
-            ValidationMessage = "";
-        }
-        else
-        {
-
-            // Invalid input: show error, revert text field
-            ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
-            ResetSamplingRateText();
-        }
-    }
+   
 
 
     /// <summary>
@@ -843,36 +819,40 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         }
     }
 
-
-    /// <summary>
-    /// Updates the device sampling rate and restarts the data acquisition logic.
-    /// Stops the current timer, clears all existing data, resets counters,
-    /// restarts the timer with the new sampling interval, and refreshes the chart.
-    /// </summary>
-    /// <param name="newRate">The new sampling rate to set (in Hz).</param>
     private void UpdateSamplingRateAndRestart(double newRate)
     {
+        try
+        {
+            // 1) Prova sempre a fermare lo streaming (se era già fermo, nessun problema)
+            try { shimmer.StopStreaming(); } catch { /* già fermo o metodo non operativo */ }
 
-        // Stop the current timer (avoid double timers running)
-        StopTimer();
+            // 2) Scrivi nel firmware col “nearest”
+            double applied = shimmer.SetFirmwareSamplingRateNearest(newRate);
 
-        // Set the new sampling rate for the Shimmer device
-        shimmer.SamplingRate = newRate;
-        SamplingRateDisplay = newRate;
-        _lastValidSamplingRate = newRate;
+            // 3) Prova sempre a riavviare lo streaming
+            try { shimmer.StartStreaming(); } catch { /* gestito altrove se serve */ }
 
-        // Clear all data collections (old data is now invalid due to new rate)
-        ClearAllDataCollections();
+            // 4) Allinea UI allo “snap” realmente applicato
+            SamplingRateDisplay = applied;
+            _lastValidSamplingRate = applied;
+            _samplingRateText = applied.ToString(CultureInfo.InvariantCulture);
+            OnPropertyChanged(nameof(SamplingRateText));
 
-        // Reset the sample counter to zero (new acquisition window)
-        ResetAllCounters();
-
-        // Start the timer with the new sampling interval
-        StartTimer();
-
-        // Notify UI/chart to redraw (shows "Waiting for data..." until new samples arrive)
-        UpdateChart();
+            // 5) Pulisci buffer e aggiorna grafico
+            ClearAllDataCollections();
+            ResetAllCounters();
+            ValidationMessage = "";
+            UpdateChart();
+        }
+        catch (Exception ex)
+        {
+            ValidationMessage = $"Impossibile applicare il sampling rate: {ex.Message}";
+            ResetSamplingRateText();
+        }
     }
+
+
+
 
 
     /// <summary>
@@ -1196,82 +1176,6 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
-    /// <summary>
-    /// Starts the timer that periodically reads and updates data at intervals
-    /// based on the current sampling rate. If a timer is already running, it is stopped and replaced.
-    /// </summary>
-    public void StartTimer()
-    {
-
-        // Stop any existing timer before starting a new one
-        StopTimer();
-
-        // Calculate the timer interval based on the sampling rate (in milliseconds)
-        double intervalMs = 1000.0 / shimmer.SamplingRate;
-
-        // Ensure the interval is within a reasonable range
-        intervalMs = Math.Max(intervalMs, 10);    // Minimum interval: 10ms (maximum 100Hz)
-        intervalMs = Math.Min(intervalMs, 1000);  // Maximum interval: 1000ms (minimum 1Hz)
-
-        // Create and start the timer with the computed interval
-        timer = new System.Timers.Timer(intervalMs);
-        timer.Elapsed += OnTimerElapsed;
-        timer.Start();
-    }
-
-
-    /// <summary>
-    /// Stops and disposes the timer if it is running, ensuring no further periodic updates occur.
-    /// This method is safe to call even if the timer is already stopped or null.
-    /// </summary>
-    public void StopTimer()
-    {
-        if (timer != null)
-        {
-
-            // Stop the timer and detach the event handler
-            timer.Stop();
-            timer.Elapsed -= OnTimerElapsed;
-
-            // Release the timer resources
-            timer.Dispose();
-            timer = null;
-        }
-    }
-
-
-    /// <summary>
-    /// Called each time the timer elapses; retrieves the latest data sample from the Shimmer device,
-    /// updates internal data collections and the chart. Handles errors gracefully to avoid breaking the timer loop.
-    /// </summary>
-    /// <param name="sender">The source of the timer event (the timer itself).</param>
-    /// <param name="e">Event arguments containing timer event data.</param>
-    private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
-    {
-        try
-        {
-
-            // Retrieve the most recent sample from the Shimmer device
-            var sample = shimmer.LatestData;
-            if (sample == null) return;
-
-            // Increment the sample counter
-            sampleCounter++;
-
-            // Calculate the current timestamp in seconds based on the sampling rate
-            double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
-
-            // Update the collections with the new data sample and its timestamp
-            UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
-
-            // Refresh the chart to display the new data
-            UpdateChart();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"Error in OnTimerElapsed: {ex.Message}");
-        }
-    }
 
 
     /// <summary>

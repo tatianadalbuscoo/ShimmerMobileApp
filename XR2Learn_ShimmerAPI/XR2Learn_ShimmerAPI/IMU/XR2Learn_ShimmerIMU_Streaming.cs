@@ -172,7 +172,6 @@ private async System.Threading.Tasks.Task StartStreamingAndroidSequenceAsync()
         await DelayWork(250);
 
         // E) Prepara attese StartStreaming
-        _firstDataPacketAndroid = true;
         _androidStreamingAckTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
         _androidFirstPacketTcs  = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
 

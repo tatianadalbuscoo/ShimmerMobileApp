@@ -16,6 +16,8 @@ namespace XR2Learn_ShimmerAPI.IMU
 
     public partial class XR2Learn_ShimmerIMU
     {
+        public event EventHandler<dynamic>? SampleReceived;
+
 
 #if WINDOWS
 private int _winEnabledSensors;
@@ -75,10 +77,11 @@ private volatile bool _reconfigInProgress = false;
         // Bitmap sensori calcolato in ConfigureAndroid (speculare a Windows)
         private int _androidEnabledSensors;
 
+        private volatile bool _androidIsStreaming = false;
+
         private System.Threading.Tasks.TaskCompletionSource<bool>? _androidConnectedTcs;
         private System.Threading.Tasks.TaskCompletionSource<bool>? _androidStreamingAckTcs;
         private System.Threading.Tasks.TaskCompletionSource<bool>? _androidFirstPacketTcs;
-        private bool _firstDataPacketAndroid = true;
 #endif
 
         public XR2Learn_ShimmerIMUData LatestData { get; private set; }
@@ -95,6 +98,43 @@ private volatile bool _reconfigInProgress = false;
             _enableExtA6 = true;
             _enableExtA7 = true;
             _enableExtA15 = true;
+        }
+
+        /// <summary>
+        /// Imposta nel firmware la frequenza più vicina rappresentabile dall’hardware
+        /// e restituisce il valore effettivamente applicato (es. 51.2 Hz).
+        /// </summary>
+        public double SetFirmwareSamplingRateNearest(double requestedHz)
+        {
+            if (requestedHz <= 0) throw new ArgumentOutOfRangeException(nameof(requestedHz));
+
+            // Shimmer3 usa clock 32768 Hz, Shimmer2 1024 Hz
+            double clock = 32768.0;
+#if WINDOWS
+            try
+            {
+                if (shimmer != null && !shimmer.isShimmer3withUpdatedSensors())
+                    clock = 1024.0;
+            }
+            catch { /* fallback 32768 */ }
+#endif
+            // quantizzazione al più vicino: clock / round(clock / f_desiderata)
+            int divider = Math.Max(1, (int)Math.Round(clock / requestedHz, MidpointRounding.AwayFromZero));
+            double applied = clock / divider;
+
+            // Scrittura nel firmware
+#if WINDOWS
+            shimmer?.WriteSamplingRate(applied);
+#elif ANDROID
+            // allineato a Windows: passa un double, non fare cast a int
+            shimmerAndroid?.WriteSamplingRate(divider);
+            //shimmerAndroid?.WriteSamplingRate((int)Math.Round(applied, MidpointRounding.AwayFromZero));
+
+#endif
+
+            // Allinea la proprietà esposta dal wrapper (se la usi altrove)
+            SamplingRate = applied;
+            return applied;
         }
 
 #if WINDOWS
@@ -236,6 +276,10 @@ private volatile bool _reconfigInProgress = false;
                 GetSafe(oc, indexExtA7),
                 GetSafe(oc, indexExtA15)
             );
+
+            if (LatestData != null)
+            SampleReceived?.Invoke(this, LatestData);
+
         }
     }
 #endif
@@ -291,6 +335,16 @@ private volatile bool _reconfigInProgress = false;
             // 4) Callback eventi: evita doppia sottoscrizione
             shimmerAndroid.UICallback -= HandleEventAndroid;
             shimmerAndroid.UICallback += HandleEventAndroid;
+
+            // Forza la rimappatura degli indici al prossimo DATA_PACKET
+            firstDataPacketAndroid = true;
+            indexTimeStamp = indexLowNoiseAccX = indexLowNoiseAccY = indexLowNoiseAccZ =
+            indexWideAccX = indexWideAccY = indexWideAccZ =
+            indexGyroX = indexGyroY = indexGyroZ =
+            indexMagX = indexMagY = indexMagZ =
+            indexBMP180Temperature = indexBMP180Pressure =
+            indexBatteryVoltage = indexExtA6 = indexExtA7 = indexExtA15 = -1;
+
         }
 
         public bool ConnectInternalAndroid()
@@ -301,6 +355,67 @@ private volatile bool _reconfigInProgress = false;
             shimmerAndroid.Connect();
             return shimmerAndroid.IsConnected();
         }
+
+        public async Task<double> ApplySamplingRateWithSafeRestartAsync(double requestedHz)
+{
+    if (requestedHz <= 0) throw new ArgumentOutOfRangeException(nameof(requestedHz));
+    if (shimmerAndroid == null) throw new InvalidOperationException("ConfigureAndroid non chiamata");
+
+    var wasStreaming = _androidIsStreaming;
+
+    // se stava streammando → fermo
+    if (wasStreaming)
+    {
+        shimmerAndroid.StopStreaming();
+        await Task.Delay(150);
+        _androidIsStreaming = false;
+    }
+
+    // metto sensori a 0 per evitare pacchetti “a metà”
+    shimmerAndroid.WriteSensors(0);
+    await Task.Delay(150);
+
+    // applico SR nel FW (come fai su Windows)
+    var applied = SetFirmwareSamplingRateNearest(requestedHz);
+    await Task.Delay(180);
+
+    // (facoltativo ma sicuro) riallineo ranges/power
+    shimmerAndroid.WriteAccelRange(0);
+    shimmerAndroid.WriteGyroRange(0);
+    shimmerAndroid.WriteGSRRange(0);
+    shimmerAndroid.SetLowPowerAccel(false);
+    shimmerAndroid.SetLowPowerGyro(false);
+    shimmerAndroid.WriteInternalExpPower(0);
+    await Task.Delay(150);
+
+    // riattivo i sensori selezionati e aggiorno la mappa nomi/indici
+    shimmerAndroid.WriteSensors(_androidEnabledSensors);
+    await Task.Delay(180);
+
+    shimmerAndroid.Inquiry();
+    await Task.Delay(350);
+
+    // (opzionale) ricarico le calibrazioni
+    shimmerAndroid.ReadCalibrationParameters("All");
+    await Task.Delay(250);
+
+    // se prima streammava → riparto e attendo ACK + 1° pacchetto
+    if (wasStreaming)
+    {
+        _androidStreamingAckTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _androidFirstPacketTcs  = new System.Threading.Tasks.TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        firstDataPacketAndroid = true;
+        shimmerAndroid.StartStreaming();
+
+        await Task.WhenAny(_androidStreamingAckTcs.Task, Task.Delay(2000));
+        await Task.WhenAny(_androidFirstPacketTcs.Task,  Task.Delay(2000));
+    }
+
+    return SamplingRate; // valore effettivo applicato (quantizzato)
+}
+
+
 
         private void HandleEventAndroid(object sender, EventArgs args)
         {
@@ -324,23 +439,6 @@ private volatile bool _reconfigInProgress = false;
                     if (ev.getObject() is int st && st == 3 /* SHIMMER_STATE_STREAMING */)
                         _androidStreamingAckTcs?.TrySetResult(true);
                 }
-                else if (indicator == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
-                {
-                    _androidFirstPacketTcs?.TrySetResult(true);
-                }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -367,16 +465,29 @@ private volatile bool _reconfigInProgress = false;
                 // log di servizio sugli indicator
                 switch (indicator)
                 {
-                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE:
+                   case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE:
                         global::Android.Util.Log.Info(TAG, $"EVENT STATE_CHANGE ({indicator}) obj={ev.getObject()?.GetType().Name ?? "null"}");
                         if (ev.getObject() is int st)
                         {
                             if (st == ShimmerBluetooth.SHIMMER_STATE_CONNECTED)
+                            {
                                 _androidConnectedTcs?.TrySetResult(true);
-                            if (st == ShimmerBluetooth.SHIMMER_STATE_STREAMING)
+                                _androidIsStreaming = false; // connesso ma non streamma
+                            }
+                            else if (st == ShimmerBluetooth.SHIMMER_STATE_STREAMING)
+                            {
                                 _androidStreamingAckTcs?.TrySetResult(true);
+                                _androidIsStreaming = true;
+                                // quando riparte lo stream, rifai mappatura al primo pacchetto
+                                firstDataPacketAndroid = true;
+                            }
+                            else
+                            {
+                                _androidIsStreaming = false; // ogni altro stato = non streaming
+                            }
                         }
                         return;
+
 
                     case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_NOTIFICATION_MESSAGE:
                         global::Android.Util.Log.Info(TAG, $"EVENT NOTIFICATION ({indicator}) obj={ev.getObject() ?? "null"}");
@@ -443,6 +554,10 @@ private volatile bool _reconfigInProgress = false;
                     SafeGet(oc, indexBatteryVoltage),
                     SafeGet(oc, indexExtA6), SafeGet(oc, indexExtA7), SafeGet(oc, indexExtA15)
                 );
+
+                try { SampleReceived?.Invoke(this, LatestData); } catch {  }
+
+
 
                 // riga sintetica compatta
                 string S(params SensorData[] ds) => string.Join(",", Array.ConvertAll(ds, Val));
