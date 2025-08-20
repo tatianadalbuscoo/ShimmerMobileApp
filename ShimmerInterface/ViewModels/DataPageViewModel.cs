@@ -5,6 +5,9 @@ using System.Globalization;
 using ShimmerInterface.Models;
 using System.Linq;
 using System.Collections.Generic;
+using CommunityToolkit.Mvvm.Input;
+using System.Threading.Tasks;
+
 
 
 namespace ShimmerInterface.ViewModels;
@@ -138,6 +141,18 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private ChartDisplayMode chartDisplayMode = ChartDisplayMode.Single;
+
+    // AVVISO/STATO durante la scrittura del sampling rate
+    [ObservableProperty] private bool isApplyingSamplingRate;
+
+    public event EventHandler<string>? ShowBusyRequested;
+    public event EventHandler? HideBusyRequested;
+    public event EventHandler<string>? ShowAlertRequested;
+
+
+    // Command da bindare al bottone ✓
+    public IAsyncRelayCommand ApplySamplingRateCommand { get; }
+
 
     // ==== Public properties and events ====
 
@@ -325,6 +340,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         _lastValidTimeWindowSeconds = TimeWindowSeconds;
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
 
+        ApplySamplingRateCommand = new AsyncRelayCommand(ApplySamplingRateAsync, () => !IsApplyingSamplingRate);
+
+
         // Sync UI entry fields to current state
         UpdateTextProperties();
     }
@@ -356,6 +374,50 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             ResetSamplingRateText();
         }
     }
+
+    partial void OnIsApplyingSamplingRateChanged(bool value)
+    {
+        (ApplySamplingRateCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    private async Task ApplySamplingRateAsync()
+    {
+        // validazione IDENTICA alla tua ApplySamplingRateNow()
+        if (!TryParseDouble(SamplingRateText, out var req))
+        {
+            ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
+            ResetSamplingRateText();
+            return;
+        }
+        if (req > MAX_SAMPLING_RATE) { ValidationMessage = $"Sampling rate too high. Maximum {MAX_SAMPLING_RATE} Hz."; ResetSamplingRateText(); return; }
+        if (req < MIN_SAMPLING_RATE) { ValidationMessage = $"Sampling rate too low. Minimum {MIN_SAMPLING_RATE} Hz."; ResetSamplingRateText(); return; }
+
+        ValidationMessage = "";
+        IsApplyingSamplingRate = true;
+
+        // WARNING in inglese mentre scrive
+        ShowBusyRequested?.Invoke(this, "Writing sampling rate to device…\nPlease wait.");
+
+        try
+        {
+            // eseguo l’apply senza bloccare la UI
+            await Task.Run(() => UpdateSamplingRateAndRestart(req));
+
+            // conferma finale con OK (inglese, vale anche su Windows)
+            ShowAlertRequested?.Invoke(this, $"Sampling rate set to {shimmer.SamplingRate:0.###} Hz.\nClick OK to continue.");
+        }
+        catch (Exception ex)
+        {
+            ShowAlertRequested?.Invoke(this, $"Failed to apply sampling rate.\n{ex.Message}");
+            ResetSamplingRateText();
+        }
+        finally
+        {
+            IsApplyingSamplingRate = false;
+            HideBusyRequested?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
 
 
 

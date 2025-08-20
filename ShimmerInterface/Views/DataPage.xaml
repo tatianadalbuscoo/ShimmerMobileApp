@@ -10,325 +10,346 @@ It includes configuration controls, parameter selection, and a dynamically updat
              x:Class="ShimmerInterface.Views.DataPage"
              BackgroundColor="{StaticResource PageBackground}">
 
-    <!-- 
-    Main scrollable layout container. 
-    Allows vertical scrolling of all controls and chart content.
-    -->
-    <ScrollView>
-        <VerticalStackLayout Padding="20" Spacing="12">
+    <!-- Root layout: content + busy overlay -->
+    <Grid>
 
-            <!-- Section title -->
-            <Label Text="Live Data from Your Shimmer Sensor"
-                Style="{StaticResource TitleLabel}" />
+        <!-- 
+        Main scrollable layout container. 
+        Allows vertical scrolling of all controls and chart content.
+        -->
+        <ScrollView>
+            <VerticalStackLayout Padding="20" Spacing="12">
 
-            <!-- Horizontal separator -->
-            <BoxView HeightRequest="1"
-                     BackgroundColor="{StaticResource Gray200}"
-                     Margin="0,10" />
+                <!-- Section title -->
+                <Label Text="Live Data from Your Shimmer Sensor"
+                       Style="{StaticResource TitleLabel}" />
 
-            <!-- Section title: Chart Configuration -->
-            <Label Text="Chart Configuration"
-                   Style="{StaticResource TitleLabel}" />
+                <!-- Horizontal separator -->
+                <BoxView HeightRequest="1"
+                         BackgroundColor="{StaticResource Gray200}"
+                         Margin="0,10" />
 
-            <!-- Grid of parameter and chart options -->
-            <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto" 
-                  ColumnSpacing="10" RowSpacing="10">
+                <!-- Section title: Chart Configuration -->
+                <Label Text="Chart Configuration"
+                       Style="{StaticResource TitleLabel}" />
 
-                <!-- Parameter selection -->
-                <Label Grid.Row="0" Grid.Column="0" 
-                       Text="Parameter:" 
-                       VerticalOptions="Center" 
-                       FontSize="16" 
-                       FontAttributes="Bold" />
-                <Picker Grid.Row="0" Grid.Column="1"
-                        ItemsSource="{Binding AvailableParameters}"
-                        SelectedItem="{Binding SelectedParameter}"
-                        FontSize="16"
-                        BackgroundColor="White" />
+                <!-- Grid of parameter and chart options -->
+                <Grid ColumnDefinitions="*, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto" 
+                      ColumnSpacing="10" RowSpacing="10">
 
-                <!-- Chart display mode: Single or Multi -->
-                <Label Grid.Row="1" Grid.Column="0" 
-                       Text="Chart Mode:" 
-                       VerticalOptions="Center" 
-                       FontSize="16" 
-                       FontAttributes="Bold" />
-                <Label Grid.Row="1" Grid.Column="1"
-                       VerticalOptions="Center" 
-                       FontSize="16"
-                       TextColor="{StaticResource Primary}"
-                       Text="Single Parameter">
+                    <!-- Parameter selection -->
+                    <Label Grid.Row="0" Grid.Column="0" 
+                           Text="Parameter:" 
+                           VerticalOptions="Center" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Picker Grid.Row="0" Grid.Column="1"
+                            ItemsSource="{Binding AvailableParameters}"
+                            SelectedItem="{Binding SelectedParameter}"
+                            FontSize="16"
+                            BackgroundColor="White" />
 
-                    <!-- Dynamically change label based on chart mode -->
+                    <!-- Chart display mode: Single or Multi -->
+                    <Label Grid.Row="1" Grid.Column="0" 
+                           Text="Chart Mode:" 
+                           VerticalOptions="Center" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Label Grid.Row="1" Grid.Column="1"
+                           VerticalOptions="Center" 
+                           FontSize="16"
+                           TextColor="{StaticResource Primary}"
+                           Text="Single Parameter">
+
+                        <!-- Dynamically change label based on chart mode -->
+                        <Label.Triggers>
+                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Single">
+                                <Setter Property="Text" Value="Single Parameter" />
+                            </DataTrigger>
+                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Multi">
+                                <Setter Property="Text" Value="Multi Parameter (X,Y,Z)" />
+                            </DataTrigger>
+                        </Label.Triggers>
+                    </Label>
+
+                    <!-- Auto Y-axis toggle -->
+                    <Label Grid.Row="2" Grid.Column="0" 
+                           Text="Auto Y-Axis:" 
+                           VerticalOptions="Center" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Switch Grid.Row="2" Grid.Column="1" 
+                            IsToggled="{Binding AutoYAxis}" 
+                            VerticalOptions="Center" />
+
+                    <!-- Manual Y-axis min -->
+                    <Label Grid.Row="3" Grid.Column="0" 
+                           Text="Y Min:" 
+                           VerticalOptions="Center" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Entry Grid.Row="3" Grid.Column="1"
+                           Text="{Binding YAxisMinText}"
+                           Keyboard="Numeric"
+                           FontSize="16"
+                           BackgroundColor="White"
+                           IsEnabled="{Binding IsYAxisManualEnabled}" />
+
+                    <!-- Manual Y-axis max -->
+                    <Label Grid.Row="4" Grid.Column="0" 
+                           Text="Y Max:" 
+                           VerticalOptions="Center" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Entry Grid.Row="4" Grid.Column="1"
+                           Text="{Binding YAxisMaxText}"
+                           Keyboard="Numeric"
+                           FontSize="16"
+                           BackgroundColor="White"
+                           IsEnabled="{Binding IsYAxisManualEnabled}" />
+
+                    <!-- Time window for visible data -->
+                    <Label Grid.Row="5" Grid.Column="0" 
+                           Text="Time Window (s):" 
+                           VerticalOptions="Center" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Entry Grid.Row="5" Grid.Column="1"
+                           Text="{Binding TimeWindowSecondsText}"
+                           Keyboard="Numeric"
+                           FontSize="16"
+                           BackgroundColor="White" />
+
+                    <!-- Interval between X-axis labels -->
+                    <Label Grid.Row="6" Grid.Column="0" 
+                           Text="X Labels every (s):" 
+                           VerticalOptions="Center" 
+                           FontSize="16" 
+                           FontAttributes="Bold" />
+                    <Entry Grid.Row="6" Grid.Column="1"
+                           Text="{Binding XAxisLabelIntervalText}"
+                           IsEnabled="{Binding IsXAxisLabelIntervalEnabled}"
+                           Keyboard="Numeric"
+                           FontSize="16"
+                           BackgroundColor="White" />
+
+                    <!-- Sensor sampling rate -->
+                    <Label Grid.Row="7" Grid.Column="0"
+                           Text="Sampling Rate (Hz):"
+                           VerticalOptions="Center"
+                           FontSize="16"
+                           FontAttributes="Bold" />
+
+                    <Grid Grid.Row="7" Grid.Column="1"
+                          ColumnDefinitions="*, Auto"
+                          ColumnSpacing="8">
+                        <Entry Grid.Column="0"
+                               Text="{Binding SamplingRateText}"
+                               Keyboard="Numeric"
+                               ReturnType="Done"
+                               BackgroundColor="White"
+                               FontSize="16" />
+
+                        <!-- Il tuo “Enter”/Applica accanto all’Entry -->
+                        <Button Grid.Column="1"
+                                Text="✓"
+                                WidthRequest="44"
+                                HeightRequest="44"
+                                Command="{Binding ApplySamplingRateCommand}" />
+                    </Grid>
+
+                </Grid>
+
+                <!-- Grid visibility toggle -->
+                <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
+                    <Label Text="Show Grid" VerticalOptions="Center" FontSize="14" />
+                    <Switch IsToggled="{Binding ShowGrid}" />
+                </HorizontalStackLayout>
+
+                <!-- Real-time validation feedback -->
+                <Label Text="{Binding ValidationMessage}"
+                       TextColor="Red"
+                       FontSize="14">
                     <Label.Triggers>
-                        <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Single">
-                            <Setter Property="Text" Value="Single Parameter" />
+                        <DataTrigger TargetType="Label" Binding="{Binding ValidationMessage}" Value="">
+                            <Setter Property="IsVisible" Value="False" />
                         </DataTrigger>
-                        <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Multi">
-                            <Setter Property="Text" Value="Multi Parameter (X,Y,Z)" />
+                        <DataTrigger TargetType="Label" Binding="{Binding ValidationMessage}" Value="{x:Null}">
+                            <Setter Property="IsVisible" Value="False" />
                         </DataTrigger>
                     </Label.Triggers>
                 </Label>
 
-                <!-- Auto Y-axis toggle -->
-                <Label Grid.Row="2" Grid.Column="0" 
-                       Text="Auto Y-Axis:" 
-                       VerticalOptions="Center" 
-                       FontSize="16" 
-                       FontAttributes="Bold" />
-                <Switch Grid.Row="2" Grid.Column="1" 
-                        IsToggled="{Binding AutoYAxis}" 
-                        VerticalOptions="Center" />
+                <!-- Horizontal separator -->
+                <BoxView HeightRequest="1"
+                         BackgroundColor="{StaticResource Gray200}"
+                         Margin="0,10" />
 
-                <!-- Manual Y-axis min -->
-                <Label Grid.Row="3" Grid.Column="0" 
-                       Text="Y Min:" 
-                       VerticalOptions="Center" 
-                       FontSize="16" 
-                       FontAttributes="Bold" />
-                <Entry Grid.Row="3" Grid.Column="1"
-                       Text="{Binding YAxisMinText}"
-                       Keyboard="Numeric"
-                       FontSize="16"
-                       BackgroundColor="White"
-                       IsEnabled="{Binding IsYAxisManualEnabled}" />
+                <!-- Section title: Real-time chart -->
+                <Label Text="Real-time Chart"
+                       Style="{StaticResource TitleLabel}" />
 
-                <!-- Manual Y-axis max -->
-                <Label Grid.Row="4" Grid.Column="0" 
-                       Text="Y Max:" 
-                       VerticalOptions="Center" 
-                       FontSize="16" 
-                       FontAttributes="Bold" />
-                <Entry Grid.Row="4" Grid.Column="1"
-                       Text="{Binding YAxisMaxText}"
-                       Keyboard="Numeric"
-                       FontSize="16"
-                       BackgroundColor="White"
-                       IsEnabled="{Binding IsYAxisManualEnabled}" />
+                <!-- Chart legend based on selected parameter -->
+                <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
 
-                <!-- Time window for visible data -->
-                <Label Grid.Row="5" Grid.Column="0" 
-                       Text="Time Window (s):" 
-                       VerticalOptions="Center" 
-                       FontSize="16" 
-                       FontAttributes="Bold" />
-                <Entry Grid.Row="5" Grid.Column="1"
-                       Text="{Binding TimeWindowSecondsText}"
-                       Keyboard="Numeric"
-                       FontSize="16"
-                       BackgroundColor="White" />
+                    <!-- Hide legend when in Single mode -->
+                    <StackLayout.Triggers>
+                        <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Single">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </StackLayout.Triggers>
 
-                <!-- Interval between X-axis labels -->
-                <Label Grid.Row="6" Grid.Column="0" 
-                       Text="X Labels every (s):" 
-                       VerticalOptions="Center" 
-                       FontSize="16" 
-                       FontAttributes="Bold" />
-                <Entry Grid.Row="6" Grid.Column="1"
-                       Text="{Binding XAxisLabelIntervalText}"
-                       IsEnabled="{Binding IsXAxisLabelIntervalEnabled}"
-                       Keyboard="Numeric"
-                       FontSize="16"
-                       BackgroundColor="White" />
+                    <!-- X axis legend -->
+                    <HorizontalStackLayout Spacing="5">
+                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Red" VerticalOptions="Center" />
+                        <Label Text="X" FontSize="12" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
 
-                <!-- Sensor sampling rate -->
-                <Label Grid.Row="7" Grid.Column="0"
-                   Text="Sampling Rate (Hz):"
-                   VerticalOptions="Center"
-                   FontSize="16"
-                   FontAttributes="Bold" />
+                    <!-- Y axis legend -->
+                    <HorizontalStackLayout Spacing="5">
+                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Green" VerticalOptions="Center" />
+                        <Label Text="Y" FontSize="12" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
 
-                            <Grid Grid.Row="7" Grid.Column="1"
-                  ColumnDefinitions="*, Auto"
-                  ColumnSpacing="8">
-                                <Entry Grid.Column="0"
-                       Text="{Binding SamplingRateText}"
-                       Keyboard="Numeric"
-                       ReturnType="Done"
-                       Completed="OnSamplingRateCompleted"
-                       BackgroundColor="White"
-                       FontSize="16" />
+                    <!-- Z axis legend -->
+                    <HorizontalStackLayout Spacing="5">
+                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Blue" VerticalOptions="Center" />
+                        <Label Text="Z" FontSize="12" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
 
-                                <!-- Il tuo “Enter”/Applica accanto all’Entry -->
-                                <Button Grid.Column="1"
-                        Text="✓"
-                        WidthRequest="44"
-                        HeightRequest="44"
-                        Clicked="OnSamplingRateApplyClicked" />
-                </Grid>
+                </StackLayout>
 
-            </Grid>
+                <!-- Chart display area (SkiaSharp canvas) -->
+                <Border BackgroundColor="White"
+                        Stroke="{StaticResource Gray200}"
+                        StrokeThickness="1"
+                        Padding="5"
+                        HeightRequest="300">
+                    <skia:SKCanvasView x:Name="canvasView"
+                                       HeightRequest="290"
+                                       PaintSurface="OnCanvasViewPaintSurface" />
+                </Border>
 
-            <!-- Grid visibility toggle -->
-            <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
-                <Label Text="Show Grid" VerticalOptions="Center" FontSize="14" />
-                <Switch IsToggled="{Binding ShowGrid}" />
-            </HorizontalStackLayout>
+                <!-- Shows the current settings and chart parameters in a compact list -->
+                <Frame BackgroundColor="{StaticResource Gray100}" 
+                       Padding="15" 
+                       Margin="0,10">
 
-            <!-- Real-time validation feedback -->
-            <Label Text="{Binding ValidationMessage}"
-                   TextColor="Red"
-                   FontSize="14">
-                <Label.Triggers>
-                    <DataTrigger TargetType="Label" Binding="{Binding ValidationMessage}" Value="">
-                        <Setter Property="IsVisible" Value="False" />
-                    </DataTrigger>
-                    <DataTrigger TargetType="Label" Binding="{Binding ValidationMessage}" Value="{x:Null}">
-                        <Setter Property="IsVisible" Value="False" />
-                    </DataTrigger>
-                </Label.Triggers>
-            </Label>
+                    <VerticalStackLayout>
 
-            <!-- Horizontal separator -->
-            <BoxView HeightRequest="1"
-                     BackgroundColor="{StaticResource Gray200}"
-                     Margin="0,10" />
+                        <!-- Current Parameter Title -->
+                        <Label FontSize="20" FontAttributes="Bold" Margin="0,0,0,6">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Current Parameter:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding YAxisLabel}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-            <!-- Section title: Real-time chart -->
-            <Label Text="Real-time Chart"
-                   Style="{StaticResource TitleLabel}" />
+                        <!-- Display mode (Single/Multi) -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Display Mode:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding ChartDisplayMode}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-            <!-- Chart legend based on selected parameter -->
-            <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
+                        <!-- Measuring parameter (e.g. Accelerometer) -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Measuring:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding YAxisLabel}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-                <!-- Hide legend when in Single mode -->
-                <StackLayout.Triggers>
-                    <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Single">
-                        <Setter Property="IsVisible" Value="False" />
-                    </DataTrigger>
-                </StackLayout.Triggers>
+                        <!-- Display unit (e.g. m/s², V, deg/s) -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Unit:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding YAxisUnit}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-                <!-- X axis legend -->
-                <HorizontalStackLayout Spacing="5">
-                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Red" VerticalOptions="Center" />
-                    <Label Text="X" FontSize="12" VerticalOptions="Center" />
-                </HorizontalStackLayout>
+                        <!-- Current Y axis range (min-max) -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Y Range: " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding YAxisMin}" TextColor="Black"/>
+                                    <Span Text=" - " TextColor="Black"/>
+                                    <Span Text="{Binding YAxisMax}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-                <!-- Y axis legend -->
-                <HorizontalStackLayout Spacing="5">
-                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Green" VerticalOptions="Center" />
-                    <Label Text="Y" FontSize="12" VerticalOptions="Center" />
-                </HorizontalStackLayout>
+                        <!-- Current time window for chart data (seconds) -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Time Window:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding TimeWindowSeconds, StringFormat='{}{0}s'}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-                <!-- Z axis legend -->
-                <HorizontalStackLayout Spacing="5">
-                    <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Blue" VerticalOptions="Center" />
-                    <Label Text="Z" FontSize="12" VerticalOptions="Center" />
-                </HorizontalStackLayout>
+                        <!-- Current interval between X axis labels (seconds) -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="X Labels every:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding XAxisLabelInterval, StringFormat='{}{0}s'}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-            </StackLayout>
+                        <!-- Current sampling rate in Hz -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Sample Rate:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding SamplingRateDisplay, StringFormat='{}{0:F1} Hz'}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
 
-            <!-- Chart display area (SkiaSharp canvas) -->
-            <Border BackgroundColor="White"
-                    Stroke="{StaticResource Gray200}"
-                    StrokeThickness="1"
-                    Padding="5"
-                    HeightRequest="300">
-                <skia:SKCanvasView x:Name="canvasView"
-                                   HeightRequest="290"
-                                   PaintSurface="OnCanvasViewPaintSurface" />
-            </Border>
+                        <!-- Whether the chart grid is shown -->
+                        <Label FontSize="16" Margin="0,0,0,2">
+                            <Label.FormattedText>
+                                <FormattedString>
+                                    <Span Text="Show Grid:  " TextColor="{StaticResource Primary}"/>
+                                    <Span Text="{Binding ShowGrid}" TextColor="Black"/>
+                                </FormattedString>
+                            </Label.FormattedText>
+                        </Label>
+                    </VerticalStackLayout>
+                </Frame>
+            </VerticalStackLayout>
+        </ScrollView>
 
-            <!-- Shows the current settings and chart parameters in a compact list -->
-            <Frame BackgroundColor="{StaticResource Gray100}" 
-                   Padding="15" 
-                   Margin="0,10">
+        <!-- Busy overlay shown while writing sampling rate -->
+        <Grid x:Name="BusyOverlay"
+              BackgroundColor="#80000000"
+              IsVisible="False">
+            <VerticalStackLayout HorizontalOptions="Center"
+                                 VerticalOptions="Center"
+                                 Spacing="12">
+                <ActivityIndicator IsRunning="True"
+                                   WidthRequest="48"
+                                   HeightRequest="48"/>
+                <Label x:Name="BusyLabel"
+                       Text="Writing sampling rate to device… Please wait."
+                       TextColor="White"
+                       HorizontalTextAlignment="Center"
+                       FontSize="16"/>
+            </VerticalStackLayout>
+        </Grid>
 
-                <VerticalStackLayout>
-
-                    <!-- Current Parameter Title -->
-                    <Label FontSize="20" FontAttributes="Bold" Margin="0,0,0,6">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Current Parameter:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding YAxisLabel}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Display mode (Single/Multi) -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Display Mode:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding ChartDisplayMode}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Measuring parameter (e.g. Accelerometer) -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Measuring:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding YAxisLabel}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Display unit (e.g. m/s², V, deg/s) -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Unit:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding YAxisUnit}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Current Y axis range (min-max) -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Y Range: " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding YAxisMin}" TextColor="Black"/>
-                                <Span Text=" - " TextColor="Black"/>
-                                <Span Text="{Binding YAxisMax}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Current time window for chart data (seconds) -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Time Window:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding TimeWindowSeconds, StringFormat='{}{0}s'}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Current interval between X axis labels (seconds) -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="X Labels every:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding XAxisLabelInterval, StringFormat='{}{0}s'}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Current sampling rate in Hz -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Sample Rate:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding SamplingRateDisplay, StringFormat='{}{0:F1} Hz'}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-
-                    <!-- Whether the chart grid is shown -->
-                    <Label FontSize="16" Margin="0,0,0,2">
-                        <Label.FormattedText>
-                            <FormattedString>
-                                <Span Text="Show Grid:  " TextColor="{StaticResource Primary}"/>
-                                <Span Text="{Binding ShowGrid}" TextColor="Black"/>
-                            </FormattedString>
-                        </Label.FormattedText>
-                    </Label>
-                </VerticalStackLayout>
-            </Frame>
-        </VerticalStackLayout>
-    </ScrollView>
+    </Grid>
 </ContentPage>
-    
