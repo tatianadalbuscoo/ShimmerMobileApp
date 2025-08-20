@@ -94,6 +94,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private static readonly string[] EnvSensors = [ "Temperature_BMP180", "Pressure_BMP180" ];
     private static readonly string[] BatteryParams = [ "BatteryVoltage", "BatteryPercent" ];
 
+    private double timeBaselineSeconds = 0;
 
     // ==== MVVM Bindable Properties ====
     // These properties are observable and used for data binding in the UI
@@ -173,7 +174,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Gets the current elapsed time in seconds since data collection started.
     /// </summary>
-    public double CurrentTimeInSeconds => sampleCounter / shimmer.SamplingRate;
+    public double CurrentTimeInSeconds
+    => Math.Max(0, (sampleCounter / shimmer.SamplingRate) - timeBaselineSeconds);
+
 
 
     /// <summary>
@@ -351,12 +354,35 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     {
         // Incrementa il contatore e calcola il tempo corrente
         sampleCounter++;
-        double currentTimeSeconds = sampleCounter / shimmer.SamplingRate;
+        double currentTimeSeconds = CurrentTimeInSeconds; 
 
         // Aggiorna strutture e grafico (riusi le tue funzioni attuali)
         UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
         UpdateChart();
     }
+
+    /// <summary>
+    /// Imposta il baseline dell'asse X alla prima apertura della pagina.
+    /// Se clearBuffers=true, azzera anche dati e contatori, così la traccia parte vuota da 0.
+    /// </summary>
+    public void MarkFirstOpenBaseline(bool clearBuffers = true)
+    {
+        if (clearBuffers)
+        {
+            // partenza "pulita"
+            timeBaselineSeconds = 0;
+            ClearAllDataCollections();
+            ResetAllCounters();
+            UpdateChart();
+        }
+        else
+        {
+            // solo ri-baseline senza perdere i dati
+            timeBaselineSeconds = sampleCounter / shimmer.SamplingRate;
+            UpdateChart();
+        }
+    }
+
 
     public void ApplySamplingRateNow()
     {
@@ -374,6 +400,26 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             ResetSamplingRateText();
         }
     }
+
+    public void AttachToDevice()
+    {
+        try
+        {
+            shimmer.SampleReceived -= OnSampleReceived; // evita doppia sub
+            shimmer.SampleReceived += OnSampleReceived;
+        }
+        catch { /* no-op */ }
+    }
+
+    public void DetachFromDevice()
+    {
+        try
+        {
+            shimmer.SampleReceived -= OnSampleReceived;
+        }
+        catch { /* no-op */ }
+    }
+
 
     partial void OnIsApplyingSamplingRateChanged(bool value)
     {

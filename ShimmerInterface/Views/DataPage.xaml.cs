@@ -17,6 +17,9 @@ public partial class DataPage : ContentPage
     // The ViewModel associated with this page
     private readonly DataPageViewModel viewModel;
 
+    private bool _firstOpen = true;
+
+
     /// <summary>
     /// Initializes the DataPage, sets up the UI, binds the ViewModel,
     /// and subscribes to chart update events.
@@ -510,12 +513,48 @@ public partial class DataPage : ContentPage
     {
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
 
-        // Unsubscribe overlay/alert
         viewModel.ShowBusyRequested -= OnShowBusyRequested;
         viewModel.HideBusyRequested -= OnHideBusyRequested;
         viewModel.ShowAlertRequested -= OnShowAlertRequested;
 
-        viewModel.Dispose(); // rilascia SampleReceived + pulizia buffer
+        viewModel.DetachFromDevice();
+
         base.OnDisappearing();
     }
+
+
+    protected override void OnAppearing()
+    {
+        base.OnAppearing();
+
+        // (ri)aggancia eventi UI se necessario, come già fai:
+        viewModel.ChartUpdateRequested -= OnChartUpdateRequested;
+        viewModel.ChartUpdateRequested += OnChartUpdateRequested;
+
+        viewModel.ShowBusyRequested -= OnShowBusyRequested;
+        viewModel.ShowBusyRequested += OnShowBusyRequested;
+
+        viewModel.HideBusyRequested -= OnHideBusyRequested;
+        viewModel.HideBusyRequested += OnHideBusyRequested;
+
+        viewModel.ShowAlertRequested -= OnShowAlertRequested;
+        viewModel.ShowAlertRequested += OnShowAlertRequested;
+
+        // riattacca al device
+        viewModel.AttachToDevice();
+
+        // SOLO alla primissima apertura di questa pagina:
+        if (_firstOpen)
+        {
+            // true = pulisco i buffer e riparto da 0 con il grafico vuoto
+            // usa false se vuoi tenere eventuali dati ma far partire l’asse X da 0
+            viewModel.MarkFirstOpenBaseline(clearBuffers: true);
+            _firstOpen = false;
+        }
+
+        canvasView.InvalidateSurface();
+    }
+
+
+
 }
