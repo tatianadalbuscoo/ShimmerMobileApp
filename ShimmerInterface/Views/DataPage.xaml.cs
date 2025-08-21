@@ -323,9 +323,11 @@ public partial class DataPage : ContentPage
     }
 
     /// <summary>Draws the X and Y axis labels, axis units, and the chart title on the canvas.</summary>
-    private void DrawAxesAndTitle(SKCanvas canvas, SKImageInfo info, float leftMargin,
-                                 float margin, float graphWidth, float graphHeight,
-                                 double yRange, float bottomY, double timeStart)
+    private void DrawAxesAndTitle(
+     SKCanvas canvas, SKImageInfo info, float leftMargin,
+     float margin, float graphWidth, float graphHeight,
+     double yRange, float bottomY, double timeStart,
+     string? titleOverride = null) // <— nuovo parametro opzionale
     {
         using var textPaint = new SKPaint
         {
@@ -334,8 +336,11 @@ public partial class DataPage : ContentPage
             IsAntialias = true
         };
 
-        int numDivisions = viewModel.TimeWindowSeconds;
-        int labelInterval = viewModel.IsXAxisLabelIntervalEnabled ? viewModel.XAxisLabelInterval : 1;
+        // Etichette asse X (tempo)
+        int numDivisions = Math.Max(1, viewModel.TimeWindowSeconds);
+        int labelInterval = viewModel.IsXAxisLabelIntervalEnabled
+            ? Math.Max(1, viewModel.XAxisLabelInterval)
+            : 1;
 
         for (int i = 0; i <= numDivisions; i++)
         {
@@ -349,10 +354,12 @@ public partial class DataPage : ContentPage
             canvas.DrawText(label, x - textWidth / 2, bottomY + 20, textPaint);
         }
 
+        // Etichette numeriche asse Y
+        double safeYRange = Math.Abs(yRange) < 1e-12 ? 1e-12 : yRange;
         for (int i = 0; i <= 4; i++)
         {
             var value = viewModel.YAxisMin + (yRange * i / 4);
-            var y = bottomY - (float)((value - viewModel.YAxisMin) / yRange * graphHeight);
+            var y = bottomY - (float)(((value - viewModel.YAxisMin) / safeYRange) * graphHeight);
             var label = value.ToString("F3");
             canvas.DrawText(label, leftMargin - 72, y + 6, textPaint);
         }
@@ -365,6 +372,7 @@ public partial class DataPage : ContentPage
             FakeBoldText = true
         };
 
+        // Nomi degli assi
         string xAxisLabel = "Time [s]";
         var labelX = (info.Width - axisLabelPaint.MeasureText(xAxisLabel)) / 2;
         var labelY = info.Height - 8;
@@ -377,6 +385,7 @@ public partial class DataPage : ContentPage
         canvas.DrawText(yAxisLabelText, 0, 0, axisLabelPaint);
         canvas.Restore();
 
+        // Titolo (con possibile override, es. "… — Axis X")
         using var titlePaint = new SKPaint
         {
             Color = SKColors.Black,
@@ -385,9 +394,11 @@ public partial class DataPage : ContentPage
             FakeBoldText = true
         };
 
-        var titleWidth = titlePaint.MeasureText(viewModel.ChartTitle);
-        canvas.DrawText(viewModel.ChartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
+        var chartTitle = titleOverride ?? viewModel.ChartTitle;
+        var titleWidth = titlePaint.MeasureText(chartTitle);
+        canvas.DrawText(chartTitle, (info.Width - titleWidth) / 2, 25, titlePaint);
     }
+
 
     /// <summary>Draws a placeholder message indicating no valid data is available.</summary>
     private void DrawNoDataMessage(SKCanvas canvas, SKImageInfo info)
@@ -446,14 +457,8 @@ public partial class DataPage : ContentPage
     }
 
     /// <summary>Removes formatting prefix from a parameter display name.</summary>
-    private string CleanParameterName(string displayName)
-    {
-        if (displayName.StartsWith("    → "))
-        {
-            return displayName.Substring(6);
-        }
-        return displayName;
-    }
+    private static string CleanParameterName(string displayName)
+        => DataPageViewModel.CleanParameterName(displayName);
 
     /// <summary>Returns colors for grouped sensor parameters (X/Y/Z).</summary>
     private SKColor[] GetParameterColors(string groupParameter)
@@ -474,9 +479,124 @@ public partial class DataPage : ContentPage
     {
         MainThread.BeginInvokeOnMainThread(() =>
         {
-            canvasView.InvalidateSurface();
+            if (viewModel.ChartDisplayMode == ChartDisplayMode.Split)
+            {
+                canvasX?.InvalidateSurface();
+                canvasY?.InvalidateSurface();
+                canvasZ?.InvalidateSurface();
+            }
+            else
+            {
+                canvasView?.InvalidateSurface();
+            }
         });
     }
+
+
+    // ===== Split view paint handlers (one canvas per axis) =====
+    private void OnCanvasXPaintSurface(object sender, SKPaintSurfaceEventArgs e) => DrawSplitAxis(e, 0); // X
+    private void OnCanvasYPaintSurface(object sender, SKPaintSurfaceEventArgs e) => DrawSplitAxis(e, 1); // Y
+    private void OnCanvasZPaintSurface(object sender, SKPaintSurfaceEventArgs e) => DrawSplitAxis(e, 2); // Z
+
+    // Draw a single axis (X=0, Y=1, Z=2) of the current group in Split mode
+    private void DrawSplitAxis(SKPaintSurfaceEventArgs e, int axisIndex)
+    {
+        var canvas = e.Surface.Canvas;
+        var info = e.Info;
+        canvas.Clear(SKColors.White);
+
+        // Guard: if Split is not active, nothing to draw here
+        if (viewModel.ChartDisplayMode != ChartDisplayMode.Split)
+            return;
+
+        // Resolve current group (e.g., Gyroscope, Magnetometer, ...)
+        var group = CleanParameterName(viewModel.SelectedParameter);
+        if (!IsGroupEnabled(group))
+        {
+            DrawNoDataMessage(canvas, info);
+            return;
+        }
+
+        // Chart layout (same margins as the unified chart)
+        float margin = 40f, bottomMargin = 65f, leftMargin = 120f;
+        float w = info.Width - leftMargin - margin;
+        float h = info.Height - margin - bottomMargin;
+
+        using (var border = new SKPaint { Color = SKColors.LightGray, Style = SKPaintStyle.Stroke, StrokeWidth = 2 })
+            canvas.DrawRect(leftMargin, margin, w, h, border);
+
+        if (viewModel.ShowGrid)
+            DrawOscilloscopeGrid(canvas, leftMargin, margin, w, h);
+
+        // Ranges and time window
+        double yRange = viewModel.YAxisMax - viewModel.YAxisMin;
+        float bottomY = margin + h, topY = margin;
+        double currentTime = GetCurrentTimeInSeconds();
+        double timeStart = Math.Max(0, currentTime - viewModel.TimeWindowSeconds);
+        double timeRange = viewModel.TimeWindowSeconds;
+
+        // Pick X/Y/Z key
+        var trio = DataPageViewModel.GetSubParameters(group);
+        if (trio.Count < 3) { DrawNoDataMessage(canvas, info); return; }
+        var key = trio[axisIndex];
+
+        var (data, timeMs) = viewModel.GetSeriesSnapshot(key);
+        int count = Math.Min(data.Count, timeMs.Count);
+        if (count == 0 || data.All(v => v == -1 || v == 0))
+        {
+            DrawNoDataMessage(canvas, info);
+            return;
+        }
+
+        double minSampleTime = timeMs.Min() / 1000.0;
+        double safeY = yRange > 0 ? yRange : 1e-9;
+        double safeT = timeRange > 0 ? timeRange : 1e-9;
+
+        // Colori standard: X=Rosso, Y=Verde, Z=Blu
+        var axisColors = new[] { SKColors.Red, SKColors.Green, SKColors.Blue };
+        using var paint = new SKPaint
+        {
+            Color = axisColors[axisIndex],
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 2,
+            IsAntialias = true
+        };
+
+        using var path = new SKPath();
+
+        for (int i = 0; i < count; i++)
+        {
+            double t = timeMs[i] / 1000.0;
+            float x = leftMargin + (float)(((t - minSampleTime) / safeT) * w);
+
+            float y = bottomY - (float)(((data[i] - viewModel.YAxisMin) / safeY) * h);
+            y = Math.Clamp(y, topY, bottomY);
+
+            if (i == 0) path.MoveTo(x, y); else path.LineTo(x, y);
+        }
+
+        canvas.DrawPath(path, paint);
+
+
+
+        // Axes and title
+        string axisLetter = axisIndex == 0 ? "X" : axisIndex == 1 ? "Y" : "Z";
+        string baseTitle = $"Real-time {group}";          // niente (X,Y,Z)
+        string splitTitle = $"{baseTitle} — Axis {axisLetter}";
+        DrawAxesAndTitle(canvas, info, leftMargin, margin, w, h, yRange, bottomY, timeStart, splitTitle);
+
+    }
+
+    // Helper: check if the whole group is enabled
+    private bool IsGroupEnabled(string group) => group switch
+    {
+        "Low-Noise Accelerometer" => viewModel.GetCurrentSensorConfiguration().EnableLowNoiseAccelerometer,
+        "Wide-Range Accelerometer" => viewModel.GetCurrentSensorConfiguration().EnableWideRangeAccelerometer,
+        "Gyroscope" => viewModel.GetCurrentSensorConfiguration().EnableGyroscope,
+        "Magnetometer" => viewModel.GetCurrentSensorConfiguration().EnableMagnetometer,
+        _ => false
+    };
+
 
     // ============== NUOVI HANDLER PER WARNING OVERLAY + ALERT ==============
 
@@ -552,7 +672,18 @@ public partial class DataPage : ContentPage
             _firstOpen = false;
         }
 
-        canvasView.InvalidateSurface();
+        // Invalidate the proper canvases based on the current display mode
+        if (viewModel.ChartDisplayMode == ChartDisplayMode.Split)
+        {
+            canvasX?.InvalidateSurface();
+            canvasY?.InvalidateSurface();
+            canvasZ?.InvalidateSurface();
+        }
+        else
+        {
+            canvasView?.InvalidateSurface();
+        }
+
     }
 
 

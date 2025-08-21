@@ -51,7 +51,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             FontSize="16"
                             BackgroundColor="White" />
 
-                    <!-- Chart display mode: Single or Multi -->
+                    <!-- Chart display mode: Single / Multi / Split -->
                     <Label Grid.Row="1" Grid.Column="0"
                            Text="Chart Mode:"
                            VerticalOptions="Center"
@@ -69,6 +69,9 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </DataTrigger>
                             <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Multi">
                                 <Setter Property="Text" Value="Multi Parameter (X,Y,Z)" />
+                            </DataTrigger>
+                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Split">
+                                <Setter Property="Text" Value="Split (three separate charts)" />
                             </DataTrigger>
                         </Label.Triggers>
                     </Label>
@@ -208,11 +211,14 @@ It includes configuration controls, parameter selection, and a dynamically updat
                 <Label Text="Real-time Chart"
                        Style="{StaticResource TitleLabel}" />
 
-                <!-- Chart legend based on selected parameter -->
+                <!-- Chart legend (show only in Multi mode where lines are overlaid) -->
                 <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
-                    <!-- Hide legend when in Single mode -->
                     <StackLayout.Triggers>
+                        <!-- Hide legend when Single OR Split -->
                         <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Single">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                        <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Split">
                             <Setter Property="IsVisible" Value="False" />
                         </DataTrigger>
                     </StackLayout.Triggers>
@@ -236,16 +242,71 @@ It includes configuration controls, parameter selection, and a dynamically updat
                     </HorizontalStackLayout>
                 </StackLayout>
 
-                <!-- Chart display area (SkiaSharp canvas) -->
-                <Border BackgroundColor="White"
+                <!-- Unified chart (Single/Multi). Hidden when Split. -->
+                <Border x:Name="UnifiedChartBorder"
+                        BackgroundColor="White"
                         Stroke="{StaticResource Gray200}"
                         StrokeThickness="1"
                         Padding="5"
                         HeightRequest="300">
+                    <Border.Triggers>
+                        <DataTrigger TargetType="Border" Binding="{Binding ChartDisplayMode}" Value="Split">
+                            <Setter Property="IsVisible" Value="False" />
+                        </DataTrigger>
+                    </Border.Triggers>
+
                     <skia:SKCanvasView x:Name="canvasView"
                                        HeightRequest="290"
                                        PaintSurface="OnCanvasViewPaintSurface" />
                 </Border>
+
+                <!-- Split charts (X, Y, Z). Visible only when ChartDisplayMode == Split -->
+                <VerticalStackLayout x:Name="SplitCharts"
+                                     Spacing="10"
+                                     IsVisible="False">
+                    <VerticalStackLayout.Triggers>
+                        <DataTrigger TargetType="VerticalStackLayout"
+                                     Binding="{Binding ChartDisplayMode}" Value="Split">
+                            <Setter Property="IsVisible" Value="True" />
+                        </DataTrigger>
+                    </VerticalStackLayout.Triggers>
+
+                    <!-- X chart -->
+                    <Border BackgroundColor="White"
+                            Stroke="{StaticResource Gray200}"
+                            StrokeThickness="1"
+                            Padding="5"
+                            HeightRequest="220">
+                        <!-- One dedicated canvas for X axis -->
+                        <skia:SKCanvasView x:Name="canvasX"
+                                           HeightRequest="210"
+                                           PaintSurface="OnCanvasXPaintSurface" />
+                    </Border>
+
+                    <!-- Y chart -->
+                    <Border BackgroundColor="White"
+                            Stroke="{StaticResource Gray200}"
+                            StrokeThickness="1"
+                            Padding="5"
+                            HeightRequest="220">
+                        <!-- One dedicated canvas for Y axis -->
+                        <skia:SKCanvasView x:Name="canvasY"
+                                           HeightRequest="210"
+                                           PaintSurface="OnCanvasYPaintSurface" />
+                    </Border>
+
+                    <!-- Z chart -->
+                    <Border BackgroundColor="White"
+                            Stroke="{StaticResource Gray200}"
+                            StrokeThickness="1"
+                            Padding="5"
+                            HeightRequest="220">
+                        <!-- One dedicated canvas for Z axis -->
+                        <skia:SKCanvasView x:Name="canvasZ"
+                                           HeightRequest="210"
+                                           PaintSurface="OnCanvasZPaintSurface" />
+                    </Border>
+                </VerticalStackLayout>
 
                 <!-- Compact summary of current settings -->
                 <Frame BackgroundColor="{StaticResource Gray100}"

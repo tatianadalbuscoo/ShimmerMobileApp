@@ -17,11 +17,7 @@ namespace ShimmerInterface.ViewModels;
 /// Specifies the chart visualization mode: either a single parameter (e.g., only X),
 /// or multiple parameters (e.g., X, Y, Z on the same chart).
 /// </summary>
-public enum ChartDisplayMode
-{
-    Single,
-    Multi
-}
+public enum ChartDisplayMode { Single, Multi, Split }
 
 
 /// <summary>
@@ -1151,36 +1147,28 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         if (enableLowNoiseAccelerometer)
         {
             AvailableParameters.Add("Low-Noise Accelerometer");
-            AvailableParameters.Add("    → Low-Noise AccelerometerX");
-            AvailableParameters.Add("    → Low-Noise AccelerometerY");
-            AvailableParameters.Add("    → Low-Noise AccelerometerZ");
+            AvailableParameters.Add("    → Low-Noise Accelerometer — separate charts (X·Y·Z)");
         }
 
         // Add Wide-Range Accelerometer group and its X/Y/Z axes if enabled
         if (enableWideRangeAccelerometer)
         {
             AvailableParameters.Add("Wide-Range Accelerometer");
-            AvailableParameters.Add("    → Wide-Range AccelerometerX");
-            AvailableParameters.Add("    → Wide-Range AccelerometerY");
-            AvailableParameters.Add("    → Wide-Range AccelerometerZ");
+            AvailableParameters.Add("    → Wide-Range Accelerometer — separate charts (X·Y·Z)");
         }
 
         // Add Gyroscope group and its X/Y/Z axes if enabled
         if (enableGyroscope)
         {
             AvailableParameters.Add("Gyroscope");
-            AvailableParameters.Add("    → GyroscopeX");
-            AvailableParameters.Add("    → GyroscopeY");
-            AvailableParameters.Add("    → GyroscopeZ");
+            AvailableParameters.Add("    → Gyroscope — separate charts (X·Y·Z)");
         }
 
         // Add Magnetometer group and its X/Y/Z axes if enabled
         if (enableMagnetometer)
         {
             AvailableParameters.Add("Magnetometer");
-            AvailableParameters.Add("    → MagnetometerX");
-            AvailableParameters.Add("    → MagnetometerY");
-            AvailableParameters.Add("    → MagnetometerZ");
+            AvailableParameters.Add("    → Magnetometer — separate charts (X·Y·Z)");
         }
 
         // Add BatteryVoltage and BatteryPercent if battery monitoring is enabled (no group header)
@@ -1213,21 +1201,21 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
-    /// <summary>
-    /// Removes formatting/indentation (such as arrow and spaces) from a parameter display name,
-    /// returning only the raw parameter name.
-    /// Used to map UI selections to internal parameter keys.
-    /// </summary>
-    /// <param name="displayName">The display name as shown in the UI (may include "    → ").</param>
-    /// <returns>The clean, unformatted parameter name.</returns>
     public static string CleanParameterName(string displayName)
     {
-        if (displayName.StartsWith("    → "))
-        {
-            return displayName[6..];   // Remove "    → " prefix
-        }
+        if (displayName.StartsWith("    → ")) displayName = displayName[6..];
+
+        // elimina il suffisso della variante split (usa più pattern per robustezza)
+        displayName = displayName.Replace(" — separate charts (X·Y·Z)", "")
+                                 .Replace(" - separate charts (X·Y·Z)", "")
+                                 .Replace(" (separate charts)", "")
+                                 .Trim();
         return displayName;
     }
+
+    private static bool IsSplitVariantLabel(string displayName) =>
+    displayName.Contains("separate charts", StringComparison.OrdinalIgnoreCase)
+ || displayName.Contains("split", StringComparison.OrdinalIgnoreCase);
 
 
     /// <summary>
@@ -1441,17 +1429,22 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
 
             // For each available parameter, add the new value and timestamp (if present in the extracted values)
-            var parametersSnapshot = AvailableParameters.ToList();
-            foreach (var parameter in parametersSnapshot)
+            foreach (var kv in values)
             {
-                string cleanName = CleanParameterName(parameter);
-                if (values.TryGetValue(cleanName, out var v))
+                var key = kv.Key;    // es.: "Low-Noise AccelerometerX"
+                var v = kv.Value;
+
+                if (!dataPointsCollections.ContainsKey(key))
                 {
-                    dataPointsCollections[cleanName].Add(v);
-                    timeStampsCollections[cleanName].Add(timestampMs);
-                    TrimCollection(cleanName, maxPoints);
+                    dataPointsCollections[key] = new List<float>();
+                    timeStampsCollections[key] = new List<int>();
                 }
+
+                dataPointsCollections[key].Add(v);
+                timeStampsCollections[key].Add(timestampMs);
+                TrimCollection(key, maxPoints);
             }
+
         }
 
         // If Y-axis is set to automatic mode, recalculate its range and update properties if necessary
@@ -1516,17 +1509,15 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// <param name="value">The newly selected parameter name.</param>
     partial void OnSelectedParameterChanged(string value)
     {
-
-        // Clean up the parameter name for internal checks
+        bool split = IsSplitVariantLabel(value);
         string cleanName = CleanParameterName(value);
 
-        // Set the chart display mode based on whether the parameter is multi-channel
-        ChartDisplayMode = IsMultiChart(cleanName) ? ChartDisplayMode.Multi : ChartDisplayMode.Single;
+        ChartDisplayMode = split
+            ? ChartDisplayMode.Split
+            : (IsMultiChart(cleanName) ? ChartDisplayMode.Multi : ChartDisplayMode.Single);
 
-        // Update the Y-axis settings for the new parameter
-        UpdateYAxisSettings(value);
+        UpdateYAxisSettings(cleanName);
 
-        // If auto-scaling is enabled, recalculate the Y-axis range
         if (AutoYAxis)
         {
             CalculateAutoYAxisRange();
@@ -1534,19 +1525,13 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             YAxisMax = _autoYAxisMax;
         }
 
-        // Store the last valid Y-axis range for possible validation or rollback
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
-
-        // Update any text properties related to the Y-axis or chart labels
         UpdateTextProperties();
-
-        // Clear any validation messages
         ValidationMessage = "";
-
-        // Notify chart subscribers to update the display
         UpdateChart();
     }
+
 
 
     /// <summary>
