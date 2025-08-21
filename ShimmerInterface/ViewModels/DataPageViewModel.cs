@@ -150,6 +150,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     public event EventHandler? HideBusyRequested;
     public event EventHandler<string>? ShowAlertRequested;
 
+    public IRelayCommand ApplyYMinCommand { get; }
+    public IRelayCommand ApplyYMaxCommand { get; }
+
 
     // Command da bindare al bottone ✓
     public IAsyncRelayCommand ApplySamplingRateCommand { get; }
@@ -204,10 +207,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         get => _yAxisMinText;
         set
         {
-            if (SetProperty(ref _yAxisMinText, value))
-            {
-                ValidateAndUpdateYAxisMin(value);
-            }
+            // Just update the text. Do NOT validate here.
+            SetProperty(ref _yAxisMinText, value);
         }
     }
 
@@ -221,10 +222,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         get => _yAxisMaxText;
         set
         {
-            if (SetProperty(ref _yAxisMaxText, value))
-            {
-                ValidateAndUpdateYAxisMax(value);
-            }
+            // Just update the text. Do NOT validate here.
+            SetProperty(ref _yAxisMaxText, value);
         }
     }
 
@@ -344,10 +343,31 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
 
         ApplySamplingRateCommand = new AsyncRelayCommand(ApplySamplingRateAsync, () => !IsApplyingSamplingRate);
+        ApplyYMinCommand = new RelayCommand(() => ApplyYMin(), () => IsYAxisManualEnabled);
+        ApplyYMaxCommand = new RelayCommand(() => ApplyYMax(), () => IsYAxisManualEnabled);
 
 
         // Sync UI entry fields to current state
         UpdateTextProperties();
+    }
+
+    partial void OnIsYAxisManualEnabledChanged(bool value)
+    {
+        (ApplyYMinCommand as RelayCommand)?.NotifyCanExecuteChanged();
+        (ApplyYMaxCommand as RelayCommand)?.NotifyCanExecuteChanged();
+    }
+
+    private void ApplyYMin()
+    {
+        // Riusa la stessa validazione dell'Entry
+        ValidateAndUpdateYAxisMin(YAxisMinText);
+    }
+
+
+    private void ApplyYMax()
+    {
+        // Riusa la stessa validazione dell'Entry
+        ValidateAndUpdateYAxisMax(YAxisMaxText);
     }
 
     private void OnSampleReceived(object? sender, dynamic sample)
@@ -984,64 +1004,96 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
-    /// <summary>
-    /// Returns the default minimum Y-axis value for a given sensor parameter.
-    /// </summary>
-    /// <param name="parameter">The name of the sensor parameter (e.g., "GyroscopeX").</param>
-    /// <returns>Default minimum value for the parameter's Y axis.</returns>
     private static double GetDefaultYAxisMin(string parameter)
     {
         return parameter switch
         {
+            // === Gruppi (visualizzazione Multi: X,Y,Z) ===
+            // Accelerometri (m/s²): range largo per vedere variazioni su tutte le componenti
+            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" => -20,
+            // Giroscopio (deg/s)
+            "Gyroscope" => -250,
+            // Magnetometro (unità relative/local_flux*)
+            "Magnetometer" => -5,
+
+            // === Singole componenti/parametri ===
+            // Accelerometri (m/s²)
             "Low-Noise AccelerometerX" => -5,
             "Low-Noise AccelerometerY" => -5,
-            "Low-Noise AccelerometerZ" => -15,
+            "Low-Noise AccelerometerZ" => -15,   // Z spesso include gravità: range più ampio
             "Wide-Range AccelerometerX" => -5,
             "Wide-Range AccelerometerY" => -5,
             "Wide-Range AccelerometerZ" => -15,
+
+            // Giroscopio (deg/s)
             "GyroscopeX" => -250,
             "GyroscopeY" => -250,
             "GyroscopeZ" => -250,
+
+            // Magnetometro (unità relative/local_flux*)
             "MagnetometerX" => -5,
             "MagnetometerY" => -5,
             "MagnetometerZ" => -5,
-            "Temperature_BMP180" => 15,
-            "Pressure_BMP180" => 90,
-            "BatteryVoltage" => 3.3,
-            "BatteryPercent" => 0,
+
+            // Sensori ambientali
+            "Temperature_BMP180" => 15,  // °C
+            "Pressure_BMP180" => 90,  // kPa
+
+            // Batteria
+            "BatteryVoltage" => 3.3,   // V
+            "BatteryPercent" => 0,     // %
+
+            // ADC esterni (V)
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
-            _ => 0  // Default fallback for unknown parameter
+
+            // Fallback generico
+            _ => 0
         };
     }
 
 
-    /// <summary>
-    /// Returns the default maximum Y-axis value for a given sensor parameter.
-    /// </summary>
-    /// <param name="parameter">The name of the sensor parameter (e.g., "GyroscopeX").</param>
-    /// <returns>Default maximum value for the parameter's Y axis.</returns>
+
     private static double GetDefaultYAxisMax(string parameter)
     {
         return parameter switch
         {
+            // === Gruppi (visualizzazione Multi: X,Y,Z) ===
+            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" => 20,  // m/s²
+            "Gyroscope" => 250,                                             // deg/s
+            "Magnetometer" => 5,                                            // unità relative/local_flux*
+
+            // === Singole componenti/parametri ===
+            // Accelerometri (m/s²)
             "Low-Noise AccelerometerX" => 5,
             "Low-Noise AccelerometerY" => 5,
             "Low-Noise AccelerometerZ" => 15,
             "Wide-Range AccelerometerX" => 5,
             "Wide-Range AccelerometerY" => 5,
             "Wide-Range AccelerometerZ" => 15,
+
+            // Giroscopio (deg/s)
             "GyroscopeX" => 250,
             "GyroscopeY" => 250,
             "GyroscopeZ" => 250,
+
+            // Magnetometro (unità relative/local_flux*)
             "MagnetometerX" => 5,
             "MagnetometerY" => 5,
             "MagnetometerZ" => 5,
-            "Temperature_BMP180" => 40,
-            "Pressure_BMP180" => 110,
-            "BatteryVoltage" => 4.2,
-            "BatteryPercent" => 100,
+
+            // Sensori ambientali
+            "Temperature_BMP180" => 40,   // °C
+            "Pressure_BMP180" => 110,  // kPa
+
+            // Batteria
+            "BatteryVoltage" => 4.2,   // V
+            "BatteryPercent" => 100,   // %
+
+            // ADC esterni (V)
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3.3,
-            _ => 1   // Default fallback for unknown parameter
+
+            // Fallback generico
+            _ => 1
         };
     }
 
