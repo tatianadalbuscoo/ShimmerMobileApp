@@ -8,13 +8,6 @@ using XR2Learn_ShimmerAPI;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
-#if MACCATALYST || IOS
-using CoreBluetooth;
-using Foundation;
-using System.Collections.Concurrent;
-using System.Threading;
-using CoreFoundation;
-#endif
 
 
 
@@ -123,74 +116,26 @@ public partial class MainPageViewModel : ObservableObject
     }
 
 #elif MACCATALYST || IOS
-        Console.WriteLine("Ramo MACCATALYST/IOS - BLE scan");
+        // Bridge mode: su iOS/Mac avviamo direttamente DataPage dall'App.
+        // MainPage non viene usata; lasciamo uno stub per evitare problemi se aperta per sbaglio.
         AvailableDevices.Clear();
-
-        try
+        AvailableDevices.Add(new ShimmerDevice
         {
-            // Scansiona per ~3 secondi i dispositivi BLE
-            var found = MacBleScanner.Scan(TimeSpan.FromSeconds(3));
+            DisplayName = "Bridge mode (iOS/Mac) — apri DataPage",
+            Port1 = "(gestito da App → DataPage)",
+            ShimmerName = "Bridge",
+            IsSelected = false,
 
-            if (found.Count == 0)
-            {
-                // Nessuno trovato → mostra una card informativa
-                AvailableDevices.Add(new ShimmerDevice
-                {
-                    DisplayName = "Nessun Shimmer trovato (BLE)",
-                    Port1 = "(BLE non rilevato)",
-                    ShimmerName = "----",
-                    IsSelected = false,
-
-                    EnableLowNoiseAccelerometer = true,
-                    EnableWideRangeAccelerometer = true,
-                    EnableGyroscope = true,
-                    EnableMagnetometer = true,
-                    EnablePressureTemperature = true,
-                    EnableBattery = true,
-                    EnableExtA6 = true,
-                    EnableExtA7 = true,
-                    EnableExtA15 = true
-                });
-            }
-            else
-            {
-                foreach (var dev in found)
-                {
-                    string shimmerName = ExtractShimmerName(deviceId: string.Empty, friendlyName: dev.Name);
-
-                    AvailableDevices.Add(new ShimmerDevice
-                    {
-                        DisplayName = dev.Name,   // es. "Shimmer3-DDCE"
-                        Port1 = dev.Name,         // hint BLE name per ramo Mac
-                        IsSelected = false,
-                        ShimmerName = shimmerName,
-
-                        EnableLowNoiseAccelerometer = true,
-                        EnableWideRangeAccelerometer = true,
-                        EnableGyroscope = true,
-                        EnableMagnetometer = true,
-                        EnablePressureTemperature = true,
-                        EnableBattery = true,
-                        EnableExtA6 = true,
-                        EnableExtA7 = true,
-                        EnableExtA15 = true
-                    });
-
-                    Console.WriteLine($"Aggiunto device Mac BLE: {dev.Name} ({dev.Identifier})");
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Errore scan BLE: {ex.Message}");
-            AvailableDevices.Add(new ShimmerDevice
-            {
-                DisplayName = "Errore scansione BLE",
-                Port1 = ex.Message,
-                ShimmerName = "----",
-                IsSelected = false
-            });
-        }
+            EnableLowNoiseAccelerometer = true,
+            EnableWideRangeAccelerometer = true,
+            EnableGyroscope = true,
+            EnableMagnetometer = true,
+            EnablePressureTemperature = true,
+            EnableBattery = true,
+            EnableExtA6 = true,
+            EnableExtA7 = true,
+            EnableExtA15 = true
+        });
 
 #elif ANDROID
     AvailableDevices.Clear();
@@ -537,73 +482,3 @@ public partial class MainPageViewModel : ObservableObject
 
 }
 
-#if MACCATALYST || IOS
-internal sealed class MacBleScanner
-{
-    private sealed class ScanDelegate : CBCentralManagerDelegate
-    {
-        public volatile bool PoweredOn = false;
-        public readonly ConcurrentDictionary<string, (string Name, string Identifier)> Found = new();
-
-        public override void UpdatedState(CBCentralManager central)
-        {
-            PoweredOn = central.State == CBManagerState.PoweredOn;
-        }
-
-        public override void DiscoveredPeripheral(
-            CBCentralManager central, CBPeripheral peripheral, NSDictionary advertisementData, NSNumber RSSI)
-        {
-            // Ricava il nome: preferisci peripheral.Name, fallback a local name in adv
-            var name = peripheral?.Name;
-            if (string.IsNullOrWhiteSpace(name) && advertisementData != null)
-            {
-                var localNameKey = new NSString("kCBAdvDataLocalName");
-                if (advertisementData.ContainsKey(localNameKey))
-                    name = advertisementData[localNameKey]?.ToString();
-            }
-
-            if (string.IsNullOrWhiteSpace(name))
-                return;
-
-            // Filtra per Shimmer (puoi allargare se serve)
-            if (!name.StartsWith("Shimmer", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            var id = peripheral.Identifier?.AsString() ?? Guid.NewGuid().ToString();
-            Found[id] = (name, id);
-        }
-    }
-
-    /// <summary>
-    /// Esegue una breve scansione BLE bloccante (timeout suggerito: 3–5s).
-    /// </summary>
-    public static List<(string Name, string Identifier)> Scan(TimeSpan timeout)
-    {
-        var del = new ScanDelegate();
-
-        // Inizializza il central sul main thread/queue
-        using var central = new CBCentralManager(del, DispatchQueue.MainQueue);
-
-        var sw = Stopwatch.StartNew();
-
-        // Attendi PowerOn (max 5s)
-        while (!del.PoweredOn && sw.Elapsed < TimeSpan.FromSeconds(5))
-            Thread.Sleep(50);
-
-        if (!del.PoweredOn)
-            return new(); // Bluetooth non attivo o non disponibile
-
-        // Avvia la scansione (nessun filtro → tutti i servizi)
-        central.ScanForPeripherals((CBUUID[])null);
-
-        // Attendi timeout raccolta
-        var waitMs = (int)Math.Max(0, timeout.TotalMilliseconds);
-        Thread.Sleep(waitMs);
-
-        // Stop scan
-        central.StopScan();
-
-        return del.Found.Values.Distinct().OrderBy(x => x.Name).ToList();
-    }
-}
-#endif

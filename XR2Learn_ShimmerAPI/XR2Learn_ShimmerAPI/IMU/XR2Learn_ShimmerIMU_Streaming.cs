@@ -38,11 +38,8 @@ namespace XR2Learn_ShimmerAPI.IMU
     // Aggiorna la mappa dei campi (nomi/indici) lato API
     shimmer.Inquiry();
     System.Threading.Thread.Sleep(200);
-#elif MACCATALYST
-            if (IsConnectedMac()) return;
-            ConnectMac();
-#else
-            Console.WriteLine("Connect() non supportato su questa piattaforma.");
+#elif MACCATALYST || IOS
+return;
 #endif
         }
 
@@ -61,10 +58,8 @@ namespace XR2Learn_ShimmerAPI.IMU
             shimmer.Disconnect();
             await DelayWork(1000);
             shimmer.UICallback = null;
-#elif MACCATALYST
-            await DisconnectMacAsync();
-#else
-            Console.WriteLine("Disconnect() non supportato su questa piattaforma.");
+#elif MACCATALYST || IOS
+    await DisconnectMacAsync();
 #endif
         }
 
@@ -80,10 +75,8 @@ namespace XR2Learn_ShimmerAPI.IMU
 #elif WINDOWS
             await DelayWork(1000);
             shimmer.StartStreaming();
-#elif MACCATALYST
-            await StartStreamingMacAsync();
-#else
-            Console.WriteLine("StartStreaming() non supportato su questa piattaforma.");
+#elif MACCATALYST || IOS
+    await StartStreamingMacAsync();
 #endif
         }
 
@@ -99,10 +92,8 @@ namespace XR2Learn_ShimmerAPI.IMU
 #elif WINDOWS
             shimmer.StopStreaming();
             await DelayWork(1000);
-#elif MACCATALYST
-            await StopStreamingMacAsync();
-#else
-            Console.WriteLine("StopStreaming() non supportato su questa piattaforma.");
+#elif MACCATALYST || IOS
+    await StopStreamingMacAsync();
 #endif
         }
 
@@ -116,8 +107,8 @@ namespace XR2Learn_ShimmerAPI.IMU
             return shimmerAndroid != null && shimmerAndroid.IsConnected();
 #elif WINDOWS
             return shimmer.IsConnected();
-#elif MACCATALYST
-            return IsConnectedMac();
+#elif MACCATALYST || IOS
+    return IsConnectedMac();
 #else
             return false;
 #endif

@@ -5,6 +5,7 @@ using SkiaSharp;
 using ShimmerInterface.Models;
 using System.Linq; // <— necessario per Select/Where/Min/All/ToArray
 using Microsoft.Maui.ApplicationModel; // per MainThread
+using System.Threading.Tasks;
 
 namespace ShimmerInterface.Views;
 
@@ -18,6 +19,7 @@ public partial class DataPage : ContentPage
     private readonly DataPageViewModel viewModel;
 
     private bool _firstOpen = true;
+    private readonly XR2Learn_ShimmerIMU _imu;
 
 
     /// <summary>
@@ -30,6 +32,7 @@ public partial class DataPage : ContentPage
     {
         InitializeComponent();
         NavigationPage.SetHasBackButton(this, false);
+        _imu = shimmer;
         viewModel = new DataPageViewModel(shimmer, sensorConfig);
         BindingContext = viewModel;
 
@@ -643,9 +646,29 @@ public partial class DataPage : ContentPage
     }
 
 
-    protected override void OnAppearing()
+    protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+
+
+#if IOS || MACCATALYST
+        try
+        {
+            if (!_imu.IsConnected())
+            {
+                _imu.Connect();        // apre la WebSocket verso BridgeHost:BridgePort
+                await Task.Delay(100); // piccolo respiro
+            }
+            _imu.StartStreaming();     // manda "start"
+        }
+        catch (Exception ex)
+        {
+            await MainThread.InvokeOnMainThreadAsync(() =>
+                DisplayAlert("Bridge", $"Connection to bridge failed:\n{ex.Message}", "OK"));
+        }
+#endif
+
 
         // (ri)aggancia eventi UI se necessario, come già fai:
         viewModel.ChartUpdateRequested -= OnChartUpdateRequested;

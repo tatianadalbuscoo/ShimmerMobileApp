@@ -111,6 +111,10 @@
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
 		<AndroidLinkMode>SdkOnly</AndroidLinkMode>
 	</PropertyGroup>
+	<PropertyGroup Condition="'$(TargetFramework)'=='net8.0-ios'">
+	  <CodesignKey>Apple Development: Tatiana Dal Busco (GN7A92C8B6)</CodesignKey>
+	  <CodesignProvision>VS: WildCard Development</CodesignProvision>
+	</PropertyGroup>
 
 	<ItemGroup>
 		<ProjectReference Include="..\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI.csproj" />

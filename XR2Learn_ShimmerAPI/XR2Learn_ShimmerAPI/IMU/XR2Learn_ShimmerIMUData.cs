@@ -12,7 +12,7 @@ namespace XR2Learn_ShimmerAPI.IMU
     /// battery voltage, and external ADCs.
     /// </summary>
     public class XR2Learn_ShimmerIMUData
-    { 
+    {
 #if WINDOWS || ANDROID
     // Timestamp
         public readonly SensorData TimeStamp;
@@ -92,7 +92,8 @@ namespace XR2Learn_ShimmerAPI.IMU
             ExtADC_A15 = extADC_A15;
         }
 #else
-        // Versione stub per piattaforme non-Windows - usa object invece di SensorData
+        // Versione per piattaforme non-Windows/Android (iOS/MacCatalyst):
+        // usa 'object' per non dipendere da SensorData.
         public readonly object TimeStamp;
         public readonly object LowNoiseAccelerometerX;
         public readonly object LowNoiseAccelerometerY;
@@ -114,7 +115,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         public readonly object ExtADC_A15;
 
         /// <summary>
-        /// Stub constructor per piattaforme non-Windows
+        /// Costruttore per iOS/MacCatalyst: assegna i parametri ai campi.
         /// </summary>
         public XR2Learn_ShimmerIMUData(
             object timeStamp = null,
@@ -127,7 +128,34 @@ namespace XR2Learn_ShimmerAPI.IMU
             object extADC_A6 = null, object extADC_A7 = null, object extADC_A15 = null
         )
         {
+            TimeStamp = timeStamp;
+
+            LowNoiseAccelerometerX = accelerometerX;
+            LowNoiseAccelerometerY = accelerometerY;
+            LowNoiseAccelerometerZ = accelerometerZ;
+
+            WideRangeAccelerometerX = wideAccelerometerX;
+            WideRangeAccelerometerY = wideAccelerometerY;
+            WideRangeAccelerometerZ = wideAccelerometerZ;
+
+            GyroscopeX = gyroscopeX;
+            GyroscopeY = gyroscopeY;
+            GyroscopeZ = gyroscopeZ;
+
+            MagnetometerX = magnetometerX;
+            MagnetometerY = magnetometerY;
+            MagnetometerZ = magnetometerZ;
+
+            Temperature_BMP180 = temperatureBMP180;
+            Pressure_BMP180 = pressureBMP180;
+
+            BatteryVoltage = batteryVoltage;
+
+            ExtADC_A6 = extADC_A6;
+            ExtADC_A7 = extADC_A7;
+            ExtADC_A15 = extADC_A15;
         }
 #endif
+
     }
 }

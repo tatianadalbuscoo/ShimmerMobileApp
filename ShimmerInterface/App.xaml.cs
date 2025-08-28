@@ -1,4 +1,8 @@
 ﻿using ShimmerInterface.Views;
+#if IOS || MACCATALYST
+using XR2Learn_ShimmerAPI.IMU;
+using ShimmerInterface.Models;
+#endif
 
 namespace ShimmerInterface;
 
@@ -6,35 +10,77 @@ public partial class App : Application
 {
     public App()
     {
-        // Inizializza i componenti definiti in App.xaml (risorse globali)
         InitializeComponent();
 
-        // Forza sempre la Light Mode
+        // Forza Light mode (come prima)
         Application.Current.UserAppTheme = AppTheme.Light;
 
-        // Crea una pagina di navigazione con MainPage come pagina iniziale
-        // e imposta i colori della barra superiore (Barra di Navigazione)
-        var navigationPage = new NavigationPage(new MainPage())
+#if IOS || MACCATALYST
+        // 1) IMU configurata per il bridge WebSocket
+        var imu = new XR2Learn_ShimmerIMU
         {
-            BarBackgroundColor = Color.FromArgb("#F0E5D8"), // Champagne
-            BarTextColor = Color.FromArgb("#6D4C41")        // Marrone intenso
+            // Flag sensori (come già avevi)
+            EnableLowNoiseAccelerometer = true,
+            EnableWideRangeAccelerometer = true,
+            EnableGyroscope = true,
+            EnableMagnetometer = true,
+            EnablePressureTemperature = true,
+            EnableBattery = true,
+            EnableExtA6 = true,
+            EnableExtA7 = true,
+            EnableExtA15 = true,
+
+            // Endpoint del bridge (HOTSPOT iPhone → IP del telefono/tablet Android con WsBridgeManager)
+            BridgeHost = "172.20.10.2",
+            BridgePort = 8787,
+            BridgePath = "/",
+            BridgeTargetMac = "00:06:66:80:E1:23"  // MAC RN-42 reale
         };
 
-        // Imposta la NavigationPage come pagina principale dell'app
-        MainPage = navigationPage;
+        // 2) Config “visuale” per la DataPage (mostriamo l’endpoint a schermo, ecc.)
+        var cfg = new ShimmerDevice
+        {
+            ShimmerName = "Shimmer via Bridge",
+            Port1 = $"ws://{imu.BridgeHost}:{imu.BridgePort}{imu.BridgePath}",
+            EnableLowNoiseAccelerometer = true,
+            EnableWideRangeAccelerometer = true,
+            EnableGyroscope = true,
+            EnableMagnetometer = true,
+            EnablePressureTemperature = true,
+            EnableBattery = true,
+            EnableExtA6 = true,
+            EnableExtA7 = true,
+            EnableExtA15 = true
+        };
 
-        // Registra un gestore globale per le eccezioni non gestite del dominio (es. crash non previsti)
+        // 3) Vai direttamente su DataPage (overload iOS/Mac che accetta imu+cfg)
+        var navigationPage = new NavigationPage(new DataPage(imu, cfg))
+        {
+            BarBackgroundColor = Color.FromArgb("#F0E5D8"),
+            BarTextColor = Color.FromArgb("#6D4C41")
+        };
+        MainPage = navigationPage;
+#else
+        // FLUSSO ORIGINALE (Windows/Android): apri MainPage
+        var navigationPage = new NavigationPage(new MainPage())
+        {
+            BarBackgroundColor = Color.FromArgb("#F0E5D8"),
+            BarTextColor = Color.FromArgb("#6D4C41")
+        };
+        MainPage = navigationPage;
+#endif
+
+        // Handlers globali errori (come prima)
         AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
         {
             var ex = e.ExceptionObject as Exception;
             Console.WriteLine($"[UNHANDLED] {ex?.Message}");
         };
 
-        // Registra un gestore per eccezioni non osservate nei task asincroni (es. await dimenticati)
         TaskScheduler.UnobservedTaskException += (sender, e) =>
         {
             Console.WriteLine($"[TASK ERROR] {e.Exception?.Message}");
-            e.SetObserved(); // Segnala che l'eccezione è stata gestita
+            e.SetObserved();
         };
     }
 }
