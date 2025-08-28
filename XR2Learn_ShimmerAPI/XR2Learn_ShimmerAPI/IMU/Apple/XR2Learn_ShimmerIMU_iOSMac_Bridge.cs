@@ -150,7 +150,16 @@ namespace XR2Learn_ShimmerAPI.IMU
             // open (hard)
             _tcsOpen = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             await SendJsonAsync(new { type = "open", mac = BridgeTargetMac }).ConfigureAwait(false);
-            await WaitOrThrow(_tcsOpen, "open_ack", 8000).ConfigureAwait(false);
+            // open (soft): non blocchiamo il flusso se l'ACK si perde
+            _tcsOpen = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            D($"CMD → open {BridgeTargetMac}");
+            await SendJsonAsync(new { type = "open", mac = BridgeTargetMac }).ConfigureAwait(false);
+
+            // aspetta "gentilmente" 2 secondi, poi prosegue comunque
+            var gotOpen = await WaitSoft(_tcsOpen, 2000).ConfigureAwait(false);
+            if (!gotOpen)
+                D("open_ack non ricevuto entro 2s → proseguo comunque");
+
 
             // piccola pausa per permettere l’apertura SPP completa
             await Task.Delay(200).ConfigureAwait(false);
@@ -185,7 +194,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             _tcsStart = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             D("CMD → start");
             await SendJsonAsync(new { type = "start" }).ConfigureAwait(false);
-            await WaitOrThrow(_tcsStart, "start_ack", 4000).ConfigureAwait(false);
+            await WaitOrThrow(_tcsStart, "start_ack", 12000).ConfigureAwait(false);
 
             _isStreaming = true;
         }
