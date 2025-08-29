@@ -42,6 +42,7 @@ namespace XR2Learn_ShimmerAPI.IMU
 
         // ===== ACK TCS =====
         private TaskCompletionSource<bool>? _tcsHello, _tcsOpen, _tcsConfig, _tcsStart;
+        private TaskCompletionSource<double>? _tcsSetSR;
 
         // ===== DEBUG =====
         private bool _debug = true;
@@ -220,6 +221,35 @@ namespace XR2Learn_ShimmerAPI.IMU
             _isStreaming = false;
         }
 
+
+        // Implementazione bridge
+        public async Task<double> SetFirmwareSamplingRateNearestAsync(double desiredHz)
+        {
+            if (desiredHz <= 0) throw new ArgumentOutOfRangeException(nameof(desiredHz));
+            if (string.IsNullOrWhiteSpace(BridgeTargetMac)) throw new InvalidOperationException("BridgeTargetMac non impostato");
+
+            // assicurati che il WS sia connesso e la sessione sia "open/subscribed"
+            await EnsureWebSocketAsync().ConfigureAwait(false);
+            await EnsureSubscribedAsync().ConfigureAwait(false);
+
+            _tcsSetSR = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            // invia il comando al bridge
+            await SendJsonAsync(new { type = "set_sampling_rate", mac = BridgeTargetMac, sr = desiredHz }).ConfigureAwait(false);
+
+            // attende l'ACK (timeout 6s)
+            var done = await Task.WhenAny(_tcsSetSR.Task, Task.Delay(6000)).ConfigureAwait(false);
+            if (done != _tcsSetSR.Task) throw new TimeoutException("set_sampling_rate timeout");
+
+            double applied = _tcsSetSR.Task.Result;
+            if (applied <= 0) throw new InvalidOperationException("set_sampling_rate failed");
+
+            // sincronizza il modello locale e restituisci lo "snap" realmente applicato
+            SamplingRate = applied;
+            return applied;
+        }
+
+
         private async Task DisconnectMacAsync()
         {
             await StopStreamingMacAsync().ConfigureAwait(false);
@@ -309,6 +339,16 @@ namespace XR2Learn_ShimmerAPI.IMU
                         break;
                     }
 
+                    case "set_sampling_rate_ack":
+                    {
+                        bool ok = root.TryGetProperty("ok", out var okEl) && okEl.GetBoolean();
+                        double applied = root.TryGetProperty("applied", out var aEl) && aEl.ValueKind == JsonValueKind.Number
+                                         ? aEl.GetDouble() : 0.0;
+                        _tcsSetSR?.TrySetResult(ok ? applied : -1.0);
+                        break;
+                    }
+
+
                     case "start_ack":
                         _tcsStart?.TrySetResult(root.TryGetProperty("ok", out var ok4) && ok4.GetBoolean());
                         break;
@@ -318,6 +358,7 @@ namespace XR2Learn_ShimmerAPI.IMU
                         if (root.TryGetProperty("cfg", out var cfg))
                         {
                             bool Get(string name) => cfg.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.True;
+
                             EnableLowNoiseAccelerometer  = Get("EnableLowNoiseAccelerometer");
                             EnableWideRangeAccelerometer = Get("EnableWideRangeAccelerometer");
                             EnableGyroscope              = Get("EnableGyroscope");
@@ -327,9 +368,16 @@ namespace XR2Learn_ShimmerAPI.IMU
                             EnableExtA6                  = Get("EnableExtA6");
                             EnableExtA7                  = Get("EnableExtA7");
                             EnableExtA15                 = Get("EnableExtA15");
+
+                            // ⬇️ usa la STESSA 'cfg' (niente "out var cfg" di nuovo)
+                            if (cfg.TryGetProperty("SamplingRate", out var srEl) && srEl.ValueKind == JsonValueKind.Number)
+                            {
+                                SamplingRate = srEl.GetDouble();
+                            }
                         }
                         break;
                     }
+
 
                     case "sample":
                     {

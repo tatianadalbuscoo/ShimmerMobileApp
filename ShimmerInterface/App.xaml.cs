@@ -29,7 +29,7 @@ public partial class App : Application
                 Children =
                 {
                     new ActivityIndicator { IsRunning = true, IsVisible = true, HeightRequest = 32 },
-                    new Label { Text = "Connessione al bridge…", FontSize = 16, Margin = new Thickness(0,12,0,0) }
+                    new Label { Text = "Connecting to the bridge…", FontSize = 16, Margin = new Thickness(0,12,0,0) }
                 }
             }
         });

@@ -110,6 +110,11 @@ private volatile bool _reconfigInProgress = false;
 
             // Shimmer3 usa clock 32768 Hz, Shimmer2 1024 Hz
             double clock = 32768.0;
+#if IOS || MACCATALYST
+    if (!string.IsNullOrWhiteSpace(BridgeTargetMac))
+        return SetFirmwareSamplingRateNearestAsync(requestedHz).GetAwaiter().GetResult();
+#endif
+
 #if WINDOWS
             try
             {
