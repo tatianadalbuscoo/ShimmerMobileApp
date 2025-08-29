@@ -59,7 +59,7 @@ public partial class App : Application
     }
 
 #if IOS || MACCATALYST
-    // Parametri bridge: mettili se vuoi in Preferences/Config
+    // Parametri bridge
     const string BridgeHost = "172.20.10.2";
     const int    BridgePort = 8787;
     const string BridgePath = "/";
@@ -87,18 +87,21 @@ public partial class App : Application
 
             foreach (var mac in activeMacs)
             {
+                // 1) chiedi la config reale al server
+                var cfgMap = await QueryConfigAsync(BridgeHost, BridgePort, BridgePath, mac);
+
+                // 2) IMU con flag informativi in base alla config del server
                 var imu = new XR2Learn_ShimmerIMU
                 {
-                    // flag lato client (informativi): l’hardware è gestito dal server
-                    EnableLowNoiseAccelerometer = true,
-                    EnableWideRangeAccelerometer = true,
-                    EnableGyroscope = true,
-                    EnableMagnetometer = true,
-                    EnablePressureTemperature = true,
-                    EnableBattery = true,
-                    EnableExtA6 = true,
-                    EnableExtA7 = true,
-                    EnableExtA15 = true,
+                    EnableLowNoiseAccelerometer  = cfgMap.TryGetValue("lna", out var b1) && b1,
+                    EnableWideRangeAccelerometer = cfgMap.TryGetValue("wra", out var b2) && b2,
+                    EnableGyroscope              = cfgMap.TryGetValue("gyro", out var b3) && b3,
+                    EnableMagnetometer           = cfgMap.TryGetValue("mag", out var b4) && b4,
+                    EnablePressureTemperature    = cfgMap.TryGetValue("pt",  out var b5) && b5,
+                    EnableBattery                = cfgMap.TryGetValue("batt",out var b6) && b6,
+                    EnableExtA6                  = cfgMap.TryGetValue("a6",  out var b7) && b7,
+                    EnableExtA7                  = cfgMap.TryGetValue("a7",  out var b8) && b8,
+                    EnableExtA15                 = cfgMap.TryGetValue("a15", out var b9) && b9,
 
                     BridgeHost = BridgeHost,
                     BridgePort = BridgePort,
@@ -106,22 +109,23 @@ public partial class App : Application
                     BridgeTargetMac = mac // subscribe a questo MAC
                 };
 
+                // 3) ShimmerDevice coerente con i flag IMU (DataPage crea le serie in base a questi)
                 var cfg = new ShimmerDevice
                 {
                     ShimmerName = $"Shimmer {mac}",
                     Port1 = $"ws://{BridgeHost}:{BridgePort}{BridgePath}",
-                    EnableLowNoiseAccelerometer = true,
-                    EnableWideRangeAccelerometer = true,
-                    EnableGyroscope = true,
-                    EnableMagnetometer = true,
-                    EnablePressureTemperature = true,
-                    EnableBattery = true,
-                    EnableExtA6 = true,
-                    EnableExtA7 = true,
-                    EnableExtA15 = true
+
+                    EnableLowNoiseAccelerometer  = imu.EnableLowNoiseAccelerometer,
+                    EnableWideRangeAccelerometer = imu.EnableWideRangeAccelerometer,
+                    EnableGyroscope              = imu.EnableGyroscope,
+                    EnableMagnetometer           = imu.EnableMagnetometer,
+                    EnablePressureTemperature    = imu.EnablePressureTemperature,
+                    EnableBattery                = imu.EnableBattery,
+                    EnableExtA6                  = imu.EnableExtA6,
+                    EnableExtA7                  = imu.EnableExtA7,
+                    EnableExtA15                 = imu.EnableExtA15
                 };
 
-                // una DataPage per device (come su Android/Windows)
                 var page = new DataPage(imu, cfg) { Title = mac };
                 tabs.Children.Add(page);
             }
@@ -184,6 +188,54 @@ public partial class App : Application
         catch { /* ignore parse errors */ }
 
         return Array.Empty<string>();
+    }
+
+    private static async Task<Dictionary<string,bool>> QueryConfigAsync(string host, int port, string path, string mac)
+    {
+        var result = new Dictionary<string,bool>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["lna"] = false, ["wra"] = false, ["gyro"] = false, ["mag"] = false,
+            ["pt"] = false, ["batt"] = false, ["a6"] = false, ["a7"] = false, ["a15"] = false
+        };
+
+        using var ws = new ClientWebSocket();
+        var uri = new Uri($"ws://{host}:{port}{path}");
+        await ws.ConnectAsync(uri, default);
+
+        // hello
+        await ws.SendAsync(Encoding.UTF8.GetBytes("{\"type\":\"hello\"}"),
+                           WebSocketMessageType.Text, true, default);
+        await ReceiveOneAsync(ws); // hello_ack
+
+        // get_config
+        var msg = $"{{\"type\":\"get_config\",\"mac\":\"{mac}\"}}";
+        await ws.SendAsync(Encoding.UTF8.GetBytes(msg),
+                           WebSocketMessageType.Text, true, default);
+
+        var raw = await ReceiveOneAsync(ws);
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("type", out var t) && t.GetString() == "config" &&
+                root.TryGetProperty("ok", out var ok) && ok.GetBoolean() &&
+                root.TryGetProperty("cfg", out var cfg))
+            {
+                bool Get(string name) => cfg.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.True;
+                result["lna"]  = Get("EnableLowNoiseAccelerometer");
+                result["wra"]  = Get("EnableWideRangeAccelerometer");
+                result["gyro"] = Get("EnableGyroscope");
+                result["mag"]  = Get("EnableMagnetometer");
+                result["pt"]   = Get("EnablePressureTemperature");
+                result["batt"] = Get("EnableBattery");
+                result["a6"]   = Get("EnableExtA6");
+                result["a7"]   = Get("EnableExtA7");
+                result["a15"]  = Get("EnableExtA15");
+            }
+        }
+        catch { /* ignore parse errors; default = all false */ }
+
+        return result;
     }
 
     private static async Task<string> ReceiveOneAsync(ClientWebSocket ws)

@@ -6,11 +6,23 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Globalization;
+using UIKit;       // per invocare sul main thread (senza MAUI)
+using Foundation;  // NSThread
 
 namespace XR2Learn_ShimmerAPI.IMU
 {
     public partial class XR2Learn_ShimmerIMU
     {
+        // ===== Helper: invoca sul main thread (iOS/macOS Catalyst) =====
+        private static void RunOnMainThread(Action action)
+        {
+            if (action == null) return;
+            if (NSThread.IsMain)
+                action();
+            else
+                UIApplication.SharedApplication.BeginInvokeOnMainThread(action);
+        }
+
         // ===== Config bridge =====
         public string BridgeHost { get; set; } = "192.168.43.1";
         public int    BridgePort { get; set; } = 8787;
@@ -24,12 +36,16 @@ namespace XR2Learn_ShimmerAPI.IMU
         private volatile bool _bridgeConnected;
         private volatile bool _isStreaming;
 
+        // flag robustezza subscribe & ricezione
+        private volatile bool _subscribed;
+        private volatile bool _gotAnySample;
+
         // ===== ACK TCS =====
         private TaskCompletionSource<bool>? _tcsHello, _tcsOpen, _tcsConfig, _tcsStart;
 
         // ===== DEBUG =====
-        private bool _debug = true;            // abilita/disabilita stampe
-        private int _dbgSamplePrintEvery = 1;  // logga OGNI frame (puoi rimettere 25)
+        private bool _debug = true;
+        private int _dbgSamplePrintEvery = 1;
         private int _dbgSampleCounter = 0;
 
         private void D(string msg)
@@ -50,14 +66,14 @@ namespace XR2Learn_ShimmerAPI.IMU
             return sb.ToString();
         }
 
-        // ===== Wrapper opzionale con .Data per compat con pipeline UI =====
+        // ===== Wrapper con .Data per compat UI =====
         public sealed class NumericPayload
         {
             public double Data { get; set; }
             public NumericPayload(double data) => Data = data;
         }
 
-        // === Helper su object ===
+        // === Helper ===
         private static bool IsNum(object? v) =>
             v is sbyte or byte or short or ushort or int or uint or long or ulong
              or float or double or decimal;
@@ -80,7 +96,6 @@ namespace XR2Learn_ShimmerAPI.IMU
         {
             if (v is null) return "-";
 
-            // estrai eventuale .Data
             if (v is NumericPayload np) v = np.Data;
             else
             {
@@ -117,8 +132,6 @@ namespace XR2Learn_ShimmerAPI.IMU
              IsNumLike(d.ExtADC_A6) || IsNumLike(d.ExtADC_A7) || IsNumLike(d.ExtADC_A15));
 
         // === Helper attese ACK ===
-
-        // Hard: lancia se fallisce
         private static async Task WaitOrThrow(TaskCompletionSource<bool> tcs, string what, int ms)
         {
             var done = await Task.WhenAny(tcs.Task, Task.Delay(ms));
@@ -126,11 +139,24 @@ namespace XR2Learn_ShimmerAPI.IMU
                 throw new InvalidOperationException($"{what} timeout/failed");
         }
 
-        // Soft: NON lancia; ritorna true/false
         private static async Task<bool> WaitSoft(TaskCompletionSource<bool> tcs, int ms)
         {
             var done = await Task.WhenAny(tcs.Task, Task.Delay(ms));
             return done == tcs.Task && tcs.Task.Result;
+        }
+
+        // ==== Subscribe robusto: ritenta più volte ====
+        private async Task EnsureSubscribedAsync()
+        {
+            if (_subscribed) return;
+            for (int i = 0; i < 8 && !_subscribed; i++)
+            {
+                _tcsOpen = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                D($"CMD → open {BridgeTargetMac} (retry {i + 1})");
+                await SendJsonAsync(new { type = "open", mac = BridgeTargetMac }).ConfigureAwait(false);
+                await Task.WhenAny(_tcsOpen.Task, Task.Delay(600)).ConfigureAwait(false);
+                if (_subscribed) break;
+            }
         }
 
         // ---- API usate nel ramo streaming ----
@@ -147,53 +173,41 @@ namespace XR2Learn_ShimmerAPI.IMU
             await SendJsonAsync(new { type = "hello" }).ConfigureAwait(false);
             await WaitOrThrow(_tcsHello, "hello_ack", 3000).ConfigureAwait(false);
 
-            // open (hard)
-            _tcsOpen = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            await SendJsonAsync(new { type = "open", mac = BridgeTargetMac }).ConfigureAwait(false);
-            // open (soft): non blocchiamo il flusso se l'ACK si perde
-            _tcsOpen = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            D($"CMD → open {BridgeTargetMac}");
-            await SendJsonAsync(new { type = "open", mac = BridgeTargetMac }).ConfigureAwait(false);
+            // subscribe robusto
+            _subscribed = false;
+            await EnsureSubscribedAsync().ConfigureAwait(false);
 
-            // aspetta "gentilmente" 2 secondi, poi prosegue comunque
-            var gotOpen = await WaitSoft(_tcsOpen, 2000).ConfigureAwait(false);
-            if (!gotOpen)
-                D("open_ack non ricevuto entro 2s → proseguo comunque");
-
-
-            // piccola pausa per permettere l’apertura SPP completa
-            await Task.Delay(200).ConfigureAwait(false);
-
-            // set_config (soft)
+            // set_config (soft): ok anche se server_managed
             _tcsConfig = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var cfg = new
             {
                 type = "set_config",
-                EnableLowNoiseAccelerometer = this.EnableLowNoiseAccelerometer,
+                EnableLowNoiseAccelerometer  = this.EnableLowNoiseAccelerometer,
                 EnableWideRangeAccelerometer = this.EnableWideRangeAccelerometer,
-                EnableGyroscope = this.EnableGyroscope,
-                EnableMagnetometer = this.EnableMagnetometer,
-                EnablePressureTemperature = this.EnablePressureTemperature,
-                EnableBattery = this.EnableBattery,
-                EnableExtA6 = this.EnableExtA6,
-                EnableExtA7 = this.EnableExtA7,
-                EnableExtA15 = this.EnableExtA15,
-                SamplingRate = this.SamplingRate
+                EnableGyroscope              = this.EnableGyroscope,
+                EnableMagnetometer           = this.EnableMagnetometer,
+                EnablePressureTemperature    = this.EnablePressureTemperature,
+                EnableBattery                = this.EnableBattery,
+                EnableExtA6                  = this.EnableExtA6,
+                EnableExtA7                  = this.EnableExtA7,
+                EnableExtA15                 = this.EnableExtA15,
+                SamplingRate                 = this.SamplingRate
             };
             await SendJsonAsync(cfg).ConfigureAwait(false);
-
-            var cfgOk = await WaitSoft(_tcsConfig, 6000).ConfigureAwait(false);
-            if (!cfgOk)
-                D("config_ack non ricevuto / ok=false → continuo con i default del bridge");
+            _ = await WaitSoft(_tcsConfig, 6000).ConfigureAwait(false);
         }
 
         private async Task StartStreamingMacAsync()
         {
             if (!_bridgeConnected) await ConnectMacAsync().ConfigureAwait(false);
 
+            // assicurati di essere sottoscritto
+            await EnsureSubscribedAsync().ConfigureAwait(false);
+
+            // invia start con il MAC (aiuta il server a “capire” a quale stream ti riferisci)
             _tcsStart = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             D("CMD → start");
-            await SendJsonAsync(new { type = "start" }).ConfigureAwait(false);
+            await SendJsonAsync(new { type = "start", mac = BridgeTargetMac }).ConfigureAwait(false);
             await WaitOrThrow(_tcsStart, "start_ack", 12000).ConfigureAwait(false);
 
             _isStreaming = true;
@@ -279,8 +293,12 @@ namespace XR2Learn_ShimmerAPI.IMU
                         break;
 
                     case "open_ack":
-                        _tcsOpen?.TrySetResult(root.TryGetProperty("ok", out var ok2) && ok2.GetBoolean());
+                    {
+                        bool ok = root.TryGetProperty("ok", out var ok2) && ok2.GetBoolean();
+                        _subscribed = ok;
+                        _tcsOpen?.TrySetResult(ok);
                         break;
+                    }
 
                     case "config_ack":
                     {
@@ -295,17 +313,35 @@ namespace XR2Learn_ShimmerAPI.IMU
                         _tcsStart?.TrySetResult(root.TryGetProperty("ok", out var ok4) && ok4.GetBoolean());
                         break;
 
+                    case "config_changed":
+                    {
+                        if (root.TryGetProperty("cfg", out var cfg))
+                        {
+                            bool Get(string name) => cfg.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.True;
+                            EnableLowNoiseAccelerometer  = Get("EnableLowNoiseAccelerometer");
+                            EnableWideRangeAccelerometer = Get("EnableWideRangeAccelerometer");
+                            EnableGyroscope              = Get("EnableGyroscope");
+                            EnableMagnetometer           = Get("EnableMagnetometer");
+                            EnablePressureTemperature    = Get("EnablePressureTemperature");
+                            EnableBattery                = Get("EnableBattery");
+                            EnableExtA6                  = Get("EnableExtA6");
+                            EnableExtA7                  = Get("EnableExtA7");
+                            EnableExtA15                 = Get("EnableExtA15");
+                        }
+                        break;
+                    }
+
                     case "sample":
                     {
-                        // stampa “Gyroscope X: …” ecc. e aggiorna LatestData
+                        _gotAnySample = true;
+
                         double? ts = root.TryGetProperty("ts", out var tsEl) && tsEl.ValueKind == JsonValueKind.Number ? tsEl.GetDouble() : (double?)null;
 
-                        // helper lettura triple {x,y,z}
                         static double? N(JsonElement parent, string name)
                         {
+                            if (parent.ValueKind != JsonValueKind.Object) return null;
                             if (!parent.TryGetProperty(name, out var el)) return null;
-                            if (el.ValueKind == JsonValueKind.Number) return el.GetDouble();
-                            return null;
+                            return el.ValueKind == JsonValueKind.Number ? el.GetDouble() : (double?)null;
                         }
 
                         JsonElement lna = default, wra = default, gyro = default, mag = default, ext = default;
@@ -328,18 +364,7 @@ namespace XR2Learn_ShimmerAPI.IMU
                         double? a7 = N(ext, "a7");
                         double? a15 = N(ext, "a15");
 
-                        // LOG leggibile
-                        D($"SAMPLE ts={ts?.ToString("F0", CultureInfo.InvariantCulture) ?? "-"} " +
-                          $"LNA=({Fmt(new NumericPayload(lnaX ?? 0))}, {Fmt(new NumericPayload(lnaY ?? 0))}, {Fmt(new NumericPayload(lnaZ ?? 0))}) " +
-                          $"WRA=({Fmt(new NumericPayload(wraX ?? 0))}, {Fmt(new NumericPayload(wraY ?? 0))}, {Fmt(new NumericPayload(wraZ ?? 0))}) " +
-                          $"GYRO=({Fmt(new NumericPayload(gx ?? 0))}, {Fmt(new NumericPayload(gy ?? 0))}, {Fmt(new NumericPayload(gz ?? 0))}) " +
-                          $"MAG=({Fmt(new NumericPayload(mx ?? 0))}, {Fmt(new NumericPayload(my ?? 0))}, {Fmt(new NumericPayload(mz ?? 0))}) " +
-                          $"TEMP={(temp?.ToString("F3", CultureInfo.InvariantCulture) ?? "-")} " +
-                          $"PRESS={(press?.ToString("F3", CultureInfo.InvariantCulture) ?? "-")} " +
-                          $"VBATT={(vbatt?.ToString("F3", CultureInfo.InvariantCulture) ?? "-")} " +
-                          $"EXT=({Fmt(new NumericPayload(a6 ?? 0))}, {Fmt(new NumericPayload(a7 ?? 0))}, {Fmt(new NumericPayload(a15 ?? 0))})");
 
-                        // Aggiorna LatestData in modo coerente con la pipeline UI
                         LatestData = new XR2Learn_ShimmerIMUData(
                             timeStamp: (uint)Math.Max(0, (int)(ts ?? 0)),
                             accelerometerX: lnaX.HasValue ? new NumericPayload(lnaX.Value) : null,
@@ -362,16 +387,13 @@ namespace XR2Learn_ShimmerAPI.IMU
                             extADC_A15: a15.HasValue ? new NumericPayload(a15.Value) : null
                         );
 
-                        // invoca callback UI se serve
+                        // Notifica la UI sul MAIN THREAD
                         try
                         {
                             if (HasAnyValue(LatestData))
                             {
-                                if (_debug && (_dbgSampleCounter++ % _dbgSamplePrintEvery == 0))
-                                {
-                                    // già stampato sopra
-                                }
-                                SampleReceived?.Invoke(this, LatestData);
+                                RunOnMainThread(() =>
+                                    SampleReceived?.Invoke(this, LatestData));
                             }
                         }
                         catch { }
@@ -432,7 +454,6 @@ namespace XR2Learn_ShimmerAPI.IMU
                     var chunk = new byte[offset];
                     Buffer.BlockCopy(buffer, 0, chunk, 0, offset);
 
-                    // alcuni server inviano ACK come "binario" ma è JSON
                     if (chunk.Length > 0 && (chunk[0] == (byte)'{' || chunk[0] == (byte)'['))
                     {
                         var txt = Encoding.UTF8.GetString(chunk, 0, chunk.Length);
@@ -456,7 +477,8 @@ namespace XR2Learn_ShimmerAPI.IMU
                                   $"LNA=({Fmt(data.LowNoiseAccelerometerX)}, {Fmt(data.LowNoiseAccelerometerY)}, {Fmt(data.LowNoiseAccelerometerZ)})");
                             }
 
-                            SampleReceived?.Invoke(this, data);
+                            RunOnMainThread(() =>
+                                SampleReceived?.Invoke(this, data));
                         }
                     }
                     catch (Exception ex)
@@ -470,7 +492,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             D("RX loop end");
         }
 
-        // Parser provvisorio RAW 10B — lo lasciamo (se mai servisse binario)
+        // Parser RAW 10B (fallback binario)
         private void OnPacketReceived(byte[] payload)
         {
             try
