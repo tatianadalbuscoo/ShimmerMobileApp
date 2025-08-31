@@ -1,5 +1,4 @@
 ﻿using ShimmerInterface.Models;
-using XR2Learn_ShimmerAPI.IMU;
 using ShimmerInterface.ViewModels;
 
 namespace ShimmerInterface.Views;
@@ -10,7 +9,6 @@ namespace ShimmerInterface.Views;
 /// </summary>
 public partial class LoadingPage : ContentPage
 {
-
     /// <summary>
     /// Reference to the ViewModel associated with this view.
     /// The ViewModel encapsulates all logic related to device connection,
@@ -18,14 +16,13 @@ public partial class LoadingPage : ContentPage
     /// </summary>
     private readonly LoadingPageViewModel viewModel;
 
-
     /// <summary>
     /// Initializes the LoadingPage and establishes the data binding context with the associated ViewModel.
     /// Also subscribes to property change notifications to reactively respond to state transitions such as alerts.
     /// </summary>
     /// <param name="device">The Shimmer device selected by the user for connection.</param>
-    /// <param name="completion">A TaskCompletionSource used to return the connected device instance asynchronously to the caller.</param>
-    public LoadingPage(ShimmerDevice device, TaskCompletionSource<XR2Learn_ShimmerIMU?> completion)
+    /// <param name="completion">A TaskCompletionSource used to return the connected device instance (IMU o EXG) asincronamente al chiamante.</param>
+    public LoadingPage(ShimmerDevice device, TaskCompletionSource<object?> completion)
     {
         InitializeComponent();
 
@@ -36,7 +33,6 @@ public partial class LoadingPage : ContentPage
         // Subscribe to ViewModel property changes to react to state changes 
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
     }
-
 
     /// <summary>
     /// Called automatically by the framework when the page becomes visible.
@@ -50,7 +46,6 @@ public partial class LoadingPage : ContentPage
         await viewModel.StartConnectionCommand.ExecuteAsync(null);
     }
 
-
     /// <summary>
     /// Reacts to property changes signaled by the ViewModel.
     /// Specifically handles the case where an alert needs to be shown to the user upon connection success or failure.
@@ -60,7 +55,6 @@ public partial class LoadingPage : ContentPage
     {
         if (e.PropertyName == nameof(viewModel.ShowAlert) && viewModel.ShowAlert)
         {
-
             // Display the alert as configured by the ViewModel
             await DisplayAlert(viewModel.AlertTitle, viewModel.AlertMessage, "OK");
 
@@ -68,7 +62,6 @@ public partial class LoadingPage : ContentPage
             viewModel.DismissAlertCommand.Execute(null);
         }
     }
-
 
     /// <summary>
     /// Called automatically when the page is about to disappear from view.
@@ -80,7 +73,6 @@ public partial class LoadingPage : ContentPage
 
         if (viewModel != null)
         {
-
             // Cleanly unsubscribe from the ViewModel to avoid dangling references
             viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         }

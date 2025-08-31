@@ -8,6 +8,10 @@ using System.Collections.Generic;
 using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
 
+#if WINDOWS
+using XR2Learn_ShimmerAPI.GSR;  // XR2Learn_ShimmerEXG, ExgMode
+#endif
+
 
 
 namespace ShimmerInterface.ViewModels;
@@ -43,7 +47,18 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private const double MIN_SAMPLING_RATE = 1;
 
     // ==== Device references and internal timer for periodic updates ====
-    private readonly XR2Learn_ShimmerIMU shimmer; // Reference to the connected Shimmer device
+    private readonly XR2Learn_ShimmerIMU? shimmerImu;
+#if WINDOWS
+private readonly XR2Learn_ShimmerEXG? shimmerExg;
+#endif
+
+    // flag di sessione EXG (copiati dal config)
+    private readonly bool enableExg;
+    private readonly bool exgModeECG;
+    private readonly bool exgModeEMG;
+    private readonly bool exgModeTest;
+    private readonly bool exgModeRespiration;
+
     private bool _disposed = false;
 
     // ==== Data storage for real-time series ====
@@ -153,6 +168,50 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     // Command da bindare al bottone ✓
     public IAsyncRelayCommand ApplySamplingRateCommand { get; }
 
+    private double DeviceSamplingRate => shimmerImu?.SamplingRate
+#if WINDOWS
+                                     ?? shimmerExg?.SamplingRate
+#endif
+                                     ?? 51.2;
+
+    private void DeviceStartStreaming()
+    {
+        try { shimmerImu?.StartStreaming(); } catch { }
+#if WINDOWS
+    try { shimmerExg?.StartStreaming(); } catch { }
+#endif
+    }
+    private void DeviceStopStreaming()
+    {
+        try { shimmerImu?.StopStreaming(); } catch { }
+#if WINDOWS
+    try { shimmerExg?.StopStreaming(); } catch { }
+#endif
+    }
+    private double SetFirmwareSamplingRateNearestUnified(double newRate)
+    {
+        if (shimmerImu != null) return shimmerImu.SetFirmwareSamplingRateNearest(newRate);
+#if WINDOWS
+    if (shimmerExg != null) return shimmerExg.SetFirmwareSamplingRateNearest(newRate);
+#endif
+        return newRate;
+    }
+    private void SubscribeSamples()
+    {
+        if (shimmerImu != null) shimmerImu.SampleReceived += OnSampleReceived;
+#if WINDOWS
+    if (shimmerExg != null) shimmerExg.SampleReceived += OnSampleReceived;
+#endif
+    }
+    private void UnsubscribeSamples()
+    {
+        if (shimmerImu != null) shimmerImu.SampleReceived -= OnSampleReceived;
+#if WINDOWS
+    if (shimmerExg != null) shimmerExg.SampleReceived -= OnSampleReceived;
+#endif
+    }
+
+
 
     // ==== Public properties and events ====
 
@@ -174,7 +233,8 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// Gets the current elapsed time in seconds since data collection started.
     /// </summary>
     public double CurrentTimeInSeconds
-    => Math.Max(0, (sampleCounter / shimmer.SamplingRate) - timeBaselineSeconds);
+        => Math.Max(0, (sampleCounter / DeviceSamplingRate) - timeBaselineSeconds);
+
 
 
 
@@ -276,7 +336,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         if (disposing)
         {
             // sgancia eventi e pulisci risorse gestite
-            shimmer.SampleReceived -= OnSampleReceived;
+            UnsubscribeSamples();
             ChartUpdateRequested = null;
             ClearAllDataCollections();
         }
@@ -286,19 +346,12 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
 
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="DataPageViewModel"/> class.
-    /// Configures the ViewModel based on the selected Shimmer device and its sensor configuration,
-    /// initializes available parameters, default axis settings, and prepares the state for real-time data acquisition.
-    /// </summary>
-    /// <param name="shimmerDevice">The connected Shimmer IMU device.</param>
-    /// <param name="config">The sensor configuration object indicating which sensors are enabled.</param>
     public DataPageViewModel(XR2Learn_ShimmerIMU shimmerDevice, ShimmerDevice config)
     {
-        shimmer = shimmerDevice;
-        shimmer.SampleReceived += OnSampleReceived;
+        shimmerImu = shimmerDevice;
+        SubscribeSamples();
 
-        // Store which sensors are enabled for this session
+        // IMU: copia sensori
         enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
         enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
         enableGyroscope = config.EnableGyroscope;
@@ -309,31 +362,28 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         enableExtA7 = config.EnableExtA7;
         enableExtA15 = config.EnableExtA15;
 
-        // Initialize the sampling rate display property
-        samplingRateDisplay = shimmer.SamplingRate;
+        // EXG: in sessione IMU disattiva tutto
+        enableExg = false;
+        exgModeECG = exgModeEMG = exgModeTest = exgModeRespiration = false;
 
-        // Populate list of available chart parameters
+        samplingRateDisplay = DeviceSamplingRate;
+
         InitializeAvailableParameters();
-
-        // Ensure the selected parameter is valid; otherwise, select the first available
         if (!AvailableParameters.Contains(SelectedParameter))
             SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
 
-        // Create collections for only those parameters with real sensor data
         InitializeDataCollections();
 
-        // Set up axis and chart settings based on the selected parameter
         if (!string.IsNullOrEmpty(SelectedParameter))
         {
             UpdateYAxisSettings(SelectedParameter);
             IsXAxisLabelIntervalEnabled = SelectedParameter != "HeartRate";
         }
 
-        // Store the last valid input values for validation and restore
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
-        _samplingRateText = shimmer.SamplingRate.ToString(CultureInfo.InvariantCulture);
-        _lastValidSamplingRate = shimmer.SamplingRate;
+        _samplingRateText = DeviceSamplingRate.ToString(CultureInfo.InvariantCulture);
+        _lastValidSamplingRate = DeviceSamplingRate;
         OnPropertyChanged(nameof(SamplingRateText));
         _lastValidTimeWindowSeconds = TimeWindowSeconds;
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
@@ -342,10 +392,63 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         ApplyYMinCommand = new RelayCommand(() => ApplyYMin(), () => IsYAxisManualEnabled);
         ApplyYMaxCommand = new RelayCommand(() => ApplyYMax(), () => IsYAxisManualEnabled);
 
-
-        // Sync UI entry fields to current state
         UpdateTextProperties();
     }
+
+#if WINDOWS
+public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config)
+{
+    shimmerExg = shimmerDevice;
+    SubscribeSamples();
+
+    // sensori IMU: puoi mantenerli se l’EXG li forwarda
+    enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
+    enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
+    enableGyroscope = config.EnableGyroscope;
+    enableMagnetometer = config.EnableMagnetometer;
+    enablePressureTemperature = config.EnablePressureTemperature;
+    enableBattery = config.EnableBattery;
+    enableExtA6 = config.EnableExtA6;
+    enableExtA7 = config.EnableExtA7;
+    enableExtA15 = config.EnableExtA15;
+
+    // EXG: abilita e copia modalità
+    enableExg = config.EnableExg;
+    exgModeECG = config.IsExgModeECG;
+    exgModeEMG = config.IsExgModeEMG;
+    exgModeTest = config.IsExgModeTest;
+    exgModeRespiration = config.IsExgModeRespiration;
+
+    samplingRateDisplay = DeviceSamplingRate;
+
+    InitializeAvailableParameters();
+    if (!AvailableParameters.Contains(SelectedParameter))
+        SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
+
+    InitializeDataCollections();
+
+    if (!string.IsNullOrEmpty(SelectedParameter))
+    {
+        UpdateYAxisSettings(SelectedParameter);
+        IsXAxisLabelIntervalEnabled = SelectedParameter != "HeartRate";
+    }
+
+    _lastValidYAxisMin = YAxisMin;
+    _lastValidYAxisMax = YAxisMax;
+    _samplingRateText = DeviceSamplingRate.ToString(CultureInfo.InvariantCulture);
+    _lastValidSamplingRate = DeviceSamplingRate;
+    OnPropertyChanged(nameof(SamplingRateText));
+    _lastValidTimeWindowSeconds = TimeWindowSeconds;
+    _lastValidXAxisLabelInterval = XAxisLabelInterval;
+
+    ApplySamplingRateCommand = new AsyncRelayCommand(ApplySamplingRateAsync, () => !IsApplyingSamplingRate);
+    ApplyYMinCommand = new RelayCommand(() => ApplyYMin(), () => IsYAxisManualEnabled);
+    ApplyYMaxCommand = new RelayCommand(() => ApplyYMax(), () => IsYAxisManualEnabled);
+
+    UpdateTextProperties();
+}
+#endif
+
 
     partial void OnIsYAxisManualEnabledChanged(bool value)
     {
@@ -394,7 +497,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         else
         {
             // solo ri-baseline senza perdere i dati
-            timeBaselineSeconds = sampleCounter / shimmer.SamplingRate;
+            timeBaselineSeconds = sampleCounter / DeviceSamplingRate;
             UpdateChart();
         }
     }
@@ -419,21 +522,15 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
     public void AttachToDevice()
     {
-        try
-        {
-            shimmer.SampleReceived -= OnSampleReceived; // evita doppia sub
-            shimmer.SampleReceived += OnSampleReceived;
-        }
-        catch { /* no-op */ }
+        try { UnsubscribeSamples(); SubscribeSamples(); }
+        catch { }
+
     }
 
     public void DetachFromDevice()
     {
-        try
-        {
-            shimmer.SampleReceived -= OnSampleReceived;
-        }
-        catch { /* no-op */ }
+        try { UnsubscribeSamples(); } catch { }
+
     }
 
 
@@ -466,7 +563,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             await Task.Run(() => UpdateSamplingRateAndRestart(req));
 
             // conferma finale con OK (inglese, vale anche su Windows)
-            ShowAlertRequested?.Invoke(this, $"Sampling rate set to {shimmer.SamplingRate:0.###} Hz.\nClick OK to continue.");
+            ShowAlertRequested?.Invoke(this, $"Sampling rate set to {DeviceSamplingRate:0.###} Hz.\nClick OK to continue.");
         }
         catch (Exception ex)
         {
@@ -518,6 +615,17 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             dataParameters.Add("ExtADC_A7");
         if (enableExtA15)
             dataParameters.Add("ExtADC_A15");
+        // EXG
+        if (enableExg)
+        {
+            if (!dataPointsCollections.ContainsKey("Exg"))
+            {
+                dataPointsCollections["Exg"] = new List<float>();
+                timeStampsCollections["Exg"] = new List<int>();
+            }
+        }
+
+
 
         // Create empty data and timestamp collections if not already present
         foreach (var parameter in dataParameters)
@@ -633,26 +741,26 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         }
 
         // Single parameter selected
+        // Single parameter selected
         else
         {
+            var key = MapToInternalKey(cleanParam);
 
-            // If no data for this parameter: use fallback defaults
-            if (!dataPointsCollections.TryGetValue(cleanParam, out var list) || list.Count == 0)
+            // Se non ci sono dati per questo parametro (display→key interna), usa i default del "display"
+            if (!dataPointsCollections.TryGetValue(key, out var list) || list.Count == 0)
             {
                 _autoYAxisMin = GetDefaultYAxisMin(cleanParam);
                 _autoYAxisMax = GetDefaultYAxisMax(cleanParam);
                 return;
             }
 
-            var data = dataPointsCollections[cleanParam];
+            var data = dataPointsCollections[key];
             var min = data.Min();
             var max = data.Max();
             var range = max - min;
 
             if (Math.Abs(range) < 0.001)
             {
-
-                // All values are (almost) the same: center and add margin
                 var center = (min + max) / 2;
                 var margin = Math.Abs(center) * 0.1 + 0.1;
                 _autoYAxisMin = center - margin;
@@ -660,13 +768,12 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             }
             else
             {
-
-                // Normal case: add 10% margin
                 var margin = range * 0.1;
                 _autoYAxisMin = min - margin;
                 _autoYAxisMax = max + margin;
             }
         }
+
 
         // Round the limits
         _autoYAxisMin = Math.Round(_autoYAxisMin, 3);
@@ -947,22 +1054,15 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     {
         try
         {
-            // 1) Prova sempre a fermare lo streaming (se era già fermo, nessun problema)
-            try { shimmer.StopStreaming(); } catch { /* già fermo o metodo non operativo */ }
+            try { DeviceStopStreaming(); } catch { }
+            double applied = SetFirmwareSamplingRateNearestUnified(newRate);
+            try { DeviceStartStreaming(); } catch { }
 
-            // 2) Scrivi nel firmware col “nearest”
-            double applied = shimmer.SetFirmwareSamplingRateNearest(newRate);
-
-            // 3) Prova sempre a riavviare lo streaming
-            try { shimmer.StartStreaming(); } catch { /* gestito altrove se serve */ }
-
-            // 4) Allinea UI allo “snap” realmente applicato
             SamplingRateDisplay = applied;
             _lastValidSamplingRate = applied;
             _samplingRateText = applied.ToString(CultureInfo.InvariantCulture);
             OnPropertyChanged(nameof(SamplingRateText));
 
-            // 5) Pulisci buffer e aggiorna grafico
             ClearAllDataCollections();
             ResetAllCounters();
             ValidationMessage = "";
@@ -974,6 +1074,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             ResetSamplingRateText();
         }
     }
+
 
 
 
@@ -1042,6 +1143,11 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             // ADC esterni (V)
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
 
+            "ECG" or "EMG" or "EXG Test" => -2.0,
+            "Respiration" => 0.0,
+
+
+
             // Fallback generico
             _ => 0
         };
@@ -1087,6 +1193,11 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 
             // ADC esterni (V)
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3.3,
+
+            "ECG" or "EMG" or "EXG Test" => 2.0,
+            "Respiration" => 5.0,
+
+
 
             // Fallback generico
             _ => 1
@@ -1192,6 +1303,19 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             AvailableParameters.Add("ExtADC_A7");
         if (enableExtA15)
             AvailableParameters.Add("ExtADC_A15");
+        // ===== EXG =====
+        // ===== EXG (un solo canale) =====
+        // ===== EXG (un SOLO canale) =====
+        if (enableExg)
+        {
+            if (exgModeRespiration) AvailableParameters.Add("Respiration");
+            else if (exgModeECG) AvailableParameters.Add("ECG");
+            else if (exgModeEMG) AvailableParameters.Add("EMG");
+            else if (exgModeTest) AvailableParameters.Add("EXG Test");
+            else AvailableParameters.Add("EXG"); // fallback
+        }
+
+
 
         // If the current selection is no longer available, select the first parameter
         if (!AvailableParameters.Contains(SelectedParameter))
@@ -1213,6 +1337,19 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         return displayName;
     }
 
+    public static string MapToInternalKey(string displayName)
+    {
+        var name = CleanParameterName(displayName);
+        return name switch
+        {
+            // un unico buffer interno per tutte le modalità EXG
+            "ECG" or "EMG" or "EXG Test" or "Respiration" => "Exg",
+            _ => name
+        };
+    }
+
+
+
     private static bool IsSplitVariantLabel(string displayName) =>
     displayName.Contains("separate charts", StringComparison.OrdinalIgnoreCase)
  || displayName.Contains("split", StringComparison.OrdinalIgnoreCase);
@@ -1230,9 +1367,35 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         string cleanName = CleanParameterName(parameter);
 
         // Return true for sensor groups that support multi-line charting
-        return cleanName is "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
-                          "Gyroscope" or "Magnetometer";
+        return cleanName is "Low-Noise Accelerometer" or "Wide-Range Accelerometer"
+                          or "Gyroscope" or "Magnetometer";
+
+
     }
+
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void LogExg(Dictionary<string, float> values, int tMs)
+    {
+        try
+        {
+            if (values.TryGetValue("Exg", out var v))
+            {
+                string mode = exgModeRespiration ? "Respiration"
+                            : exgModeECG ? "ECG"
+                            : exgModeEMG ? "EMG"
+                            : exgModeTest ? "EXG Test"
+                            : "EXG";
+                System.Diagnostics.Debug.WriteLine($"[EXG] t={tMs} ms | {mode}={v:F4}");
+            }
+            else if (enableExg && sampleCounter % 50 == 0)
+            {
+                System.Diagnostics.Debug.WriteLine("[EXG] nessun campo EXG trovato nel sample (ExgCh1/ExgRespiration/Respiration/ECG/EMG).");
+            }
+        }
+        catch { }
+    }
+
+
 
 
 
@@ -1255,6 +1418,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             "Wide-Range Accelerometer" => new List<string> { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" },
             "Gyroscope" => new List<string> { "GyroscopeX", "GyroscopeY", "GyroscopeZ" },
             "Magnetometer" => new List<string> { "MagnetometerX", "MagnetometerY", "MagnetometerZ" },
+            "EXG" => new List<string> { "ExgCh1", "ExgCh2" },
             _ => new List<string>()  // Return empty if group not recognized
         };
     }
@@ -1410,6 +1574,31 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             if (enableExtA15)
                 values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data / 1000f;
 
+            // ===== EXG (un solo canale) =====
+            try
+            {
+                if (enableExg)
+                {
+                    // Unico buffer interno: "Exg"
+                    if (exgModeRespiration)
+                    {
+                        if (HasProp(sample, "ExgRespiration")) values["Exg"] = (float)sample.ExgRespiration.Data;
+                        else if (HasProp(sample, "Respiration")) values["Exg"] = (float)sample.Respiration.Data;
+                    }
+                    else
+                    {
+                        // ECG/EMG/EXG Test: prova le proprietà più comuni
+                        if (HasProp(sample, "ExgCh1")) values["Exg"] = (float)sample.ExgCh1.Data;
+                        else if (HasProp(sample, "ECG")) values["Exg"] = (float)sample.ECG.Data;
+                        else if (HasProp(sample, "EMG")) values["Exg"] = (float)sample.EMG.Data;
+                        else if (HasProp(sample, "Exg")) values["Exg"] = (float)sample.Exg.Data;
+                    }
+                }
+            }
+            catch { /* no-op */ }
+
+
+
 
         }
         catch (Exception ex)
@@ -1426,7 +1615,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
 
             // Calculate the maximum allowed points for each collection (according to the time window)
-            var maxPoints = (int)(TimeWindowSeconds * shimmer.SamplingRate);
+            var maxPoints = (int)(TimeWindowSeconds * DeviceSamplingRate);
+            LogExg(values, timestampMs);
+
 
             // For each available parameter, add the new value and timestamp (if present in the extracted values)
             foreach (var kv in values)
@@ -1464,6 +1655,12 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         }
     }
 
+    private static bool HasProp(dynamic obj, string name)
+    {
+        try { return obj.GetType().GetProperty(name) != null; }
+        catch { return false; }
+    }
+
 
     /// <summary>
     /// Retrieves a snapshot (deep copy) of the data and timestamp series for a given parameter.
@@ -1479,10 +1676,11 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     {
         lock (_dataLock)
         {
-            string cleanName = CleanParameterName(parameter);
+            string key = MapToInternalKey(parameter);
 
-            var dataList = dataPointsCollections.TryGetValue(cleanName, out var d) ? new List<float>(d) : new List<float>();
-            var timeList = timeStampsCollections.TryGetValue(cleanName, out var t) ? new List<int>(t) : new List<int>();
+            var dataList = dataPointsCollections.TryGetValue(key, out var d) ? new List<float>(d) : new List<float>();
+            var timeList = timeStampsCollections.TryGetValue(key, out var t) ? new List<int>(t) : new List<int>();
+
             return (dataList, timeList);
         }
     }
@@ -1718,6 +1916,31 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 YAxisMin = 0;
                 YAxisMax = 3.3;
                 break;
+            case "ECG":
+                YAxisLabel = "ECG"; YAxisUnit = "mV";
+                ChartTitle = "ECG";
+                YAxisMin = -2; YAxisMax = 2;
+                break;
+
+            case "EMG":
+                YAxisLabel = "EMG"; YAxisUnit = "mV";
+                ChartTitle = "EMG";
+                YAxisMin = -2; YAxisMax = 2;
+                break;
+
+            case "EXG Test":
+                YAxisLabel = "EXG Test"; YAxisUnit = "mV";
+                ChartTitle = "EXG Test";
+                YAxisMin = -2; YAxisMax = 2;
+                break;
+
+            case "Respiration":
+                YAxisLabel = "Respiration"; YAxisUnit = "a.u.";
+                ChartTitle = "Respiration";
+                YAxisMin = 0; YAxisMax = 5;
+                break;
+
+
         }
     }
 
@@ -1843,9 +2066,16 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             EnableBattery = enableBattery,
             EnableExtA6 = enableExtA6,
             EnableExtA7 = enableExtA7,
-            EnableExtA15 = enableExtA15
+            EnableExtA15 = enableExtA15,
 
+            // EXG
+            EnableExg = enableExg,
+            IsExgModeECG = exgModeECG,
+            IsExgModeEMG = exgModeEMG,
+            IsExgModeTest = exgModeTest,
+            IsExgModeRespiration = exgModeRespiration
         };
+
     }
 
 
@@ -1868,7 +2098,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 {
 
                     // Set timestamp in milliseconds, as in regular acquisition
-                    timeStampsCollections[param][i] = (int)(i * (1000.0 / shimmer.SamplingRate));
+                    timeStampsCollections[param][i] = (int)(i * (1000.0 / DeviceSamplingRate));
                 }
             }
         }

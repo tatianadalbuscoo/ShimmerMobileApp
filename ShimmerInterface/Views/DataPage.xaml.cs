@@ -19,7 +19,10 @@ public partial class DataPage : ContentPage
     private readonly DataPageViewModel viewModel;
 
     private bool _firstOpen = true;
-    private readonly XR2Learn_ShimmerIMU _imu;
+    private XR2Learn_ShimmerIMU? _imu;
+#if WINDOWS
+    private readonly XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG? _exg;
+#endif
 
 
     /// <summary>
@@ -44,6 +47,22 @@ public partial class DataPage : ContentPage
         viewModel.HideBusyRequested += OnHideBusyRequested;
         viewModel.ShowAlertRequested += OnShowAlertRequested;
     }
+
+#if WINDOWS
+    public DataPage(XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG shimmer, ShimmerDevice sensorConfig)
+    {
+        InitializeComponent();
+        NavigationPage.SetHasBackButton(this, false);
+        _exg = shimmer;
+        viewModel = new DataPageViewModel(shimmer, sensorConfig); // usa il ctor EXG del VM
+        BindingContext = viewModel;
+
+        viewModel.ChartUpdateRequested += OnChartUpdateRequested;
+        viewModel.ShowBusyRequested += OnShowBusyRequested;
+        viewModel.HideBusyRequested += OnHideBusyRequested;
+        viewModel.ShowAlertRequested += OnShowAlertRequested;
+    }
+#endif
 
     /// <summary>
     /// Renders the chart surface using SkiaSharp, including background, grid, sensor data,
@@ -164,6 +183,22 @@ public partial class DataPage : ContentPage
             "ExtADC_A6" => config.EnableExtA6,
             "ExtADC_A7" => config.EnableExtA7,
             "ExtADC_A15" => config.EnableExtA15,
+
+            // EXG (verrà popolato dal ViewModel nel prossimo step)
+            "ExgCh1" => config.WantsExg && config.WantExgCh1,
+            "ExgCh2" => config.WantsExg && config.WantExgCh2,
+            "ExgRespiration" => config.WantsExg && config.WantRespiration,
+
+            // EXG (gruppo a 2 canali)
+            "EXG" or "ExgCh1" or "ExgCh2"
+                => viewModel.GetCurrentSensorConfiguration().EnableExg,
+
+            // Respiration (solo se EXG attivo e modalità respiration)
+            "Respiration" or "ExgRespiration"
+                => viewModel.GetCurrentSensorConfiguration().EnableExg
+                   && viewModel.GetCurrentSensorConfiguration().IsExgModeRespiration,
+
+
 
             // Any other unknown or unsupported parameter
             _ => false
@@ -470,9 +505,17 @@ public partial class DataPage : ContentPage
         {
             "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
             "Gyroscope" or "Magnetometer" => new[] { SKColors.Red, SKColors.Green, SKColors.Blue },
+
+            // EXG: 2 canali tipici (Ch1/Ch2)
+            "EXG" => new[] { SKColors.Red, SKColors.Blue },
+
+            // Respiration: singolo tracciato
+            "Respiration" => new[] { SKColors.Blue },
+
             _ => new[] { SKColors.Blue }
         };
     }
+
 
     /// <summary>Formats a time value for the X-axis.</summary>
     private string FormatTimeLabel(int timeValue) => timeValue + "s";
@@ -597,8 +640,17 @@ public partial class DataPage : ContentPage
         "Wide-Range Accelerometer" => viewModel.GetCurrentSensorConfiguration().EnableWideRangeAccelerometer,
         "Gyroscope" => viewModel.GetCurrentSensorConfiguration().EnableGyroscope,
         "Magnetometer" => viewModel.GetCurrentSensorConfiguration().EnableMagnetometer,
+
+        // EXG intero gruppo
+        "EXG" => viewModel.GetCurrentSensorConfiguration().EnableExg,
+
+        // Respiration solo se EXG attivo e modalità Respiration selezionata
+        "Respiration" => viewModel.GetCurrentSensorConfiguration().EnableExg
+                         && viewModel.GetCurrentSensorConfiguration().IsExgModeRespiration,
+
         _ => false
     };
+
 
 
     // ============== NUOVI HANDLER PER WARNING OVERLAY + ALERT ==============
@@ -655,12 +707,12 @@ public partial class DataPage : ContentPage
 #if IOS || MACCATALYST
         try
         {
-            if (!_imu.IsConnected())
+            if (_imu != null && !_imu.IsConnected())
             {
                 _imu.Connect();        // apre la WebSocket verso BridgeHost:BridgePort
                 await Task.Delay(100); // piccolo respiro
             }
-            _imu.StartStreaming();     // manda "start"
+            _imu?.StartStreaming();     // manda "start" se presente
         }
         catch (Exception ex)
         {

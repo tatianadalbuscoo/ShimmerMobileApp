@@ -3,7 +3,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ShimmerInterface.Models;
 using ShimmerInterface.Views;
-using XR2Learn_ShimmerAPI.IMU;
 using XR2Learn_ShimmerAPI;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -28,7 +27,7 @@ public partial class MainPageViewModel : ObservableObject
     public ObservableCollection<ShimmerDevice> AvailableDevices { get; } = new();
 
     // Internal list to keep track of connected Shimmer instances
-    private readonly List<(XR2Learn_ShimmerIMU shimmer, ShimmerDevice device)> connectedShimmers = new();
+    private readonly List<(object shimmer, ShimmerDevice device)> connectedShimmers = new();
 
     // Command to connect to selected Shimmer devices
     public IRelayCommand<INavigation> ConnectCommand { get; }
@@ -126,11 +125,11 @@ public partial class MainPageViewModel : ObservableObject
         var adapter = Android.Bluetooth.BluetoothAdapter.DefaultAdapter;
         if (adapter == null)
         {
-            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth not available", Port1 = "(no adapter)", PortDisplay="(no adapter)", ShimmerName = "----" });
+            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth not available", Port1 = "(no adapter)", ShimmerName = "----" });
         }
         else if (!adapter.IsEnabled)
         {
-            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth disabled", Port1 = "(enable it from settings)", PortDisplay="(enable it from settings)", ShimmerName = "----" });
+            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth disabled", Port1 = "(enable it from settings)", ShimmerName = "----" });
         }
         else
         {
@@ -168,13 +167,13 @@ public partial class MainPageViewModel : ObservableObject
 
             if (!any)
             {
-                AvailableDevices.Add(new ShimmerDevice { DisplayName = "No Shimmer paired", Port1 = "(Pair in settings)", PortDisplay="(Pair in settings)", ShimmerName = "----" });
+                AvailableDevices.Add(new ShimmerDevice { DisplayName = "No Shimmer paired", Port1 = "(Pair in settings)",  ShimmerName = "----" });
             }
         }
     }
     catch (Exception ex)
     {
-        AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth Error", Port1 = ex.Message, PortDisplay=ex.Message, ShimmerName = "----" });
+        AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth Error", Port1 = ex.Message, ShimmerName = "----" });
     }
 #else
     Console.WriteLine("No supported platforms.");
@@ -213,7 +212,7 @@ public partial class MainPageViewModel : ObservableObject
         {
 
             // Create a TaskCompletionSource to wait for the device to be initialized
-            var tcs = new TaskCompletionSource<XR2Learn_ShimmerIMU?>();
+            var tcs = new TaskCompletionSource<object?>();
 
             // Show a loading page to initialize the connection
             var loadingPage = new LoadingPage(device, tcs);
@@ -241,39 +240,45 @@ public partial class MainPageViewModel : ObservableObject
     }
 
 
-    /// <summary>
-    /// Creates a tabbed page with one tab per connected Shimmer device.
-    /// Each tab hosts a DataPage displaying sensor data for a specific device.
-    /// </summary>
     private void CreateTabbedPage()
     {
-
-        // Create a new TabbedPage to hold one page per Shimmer device
         var tabbedPage = new TabbedPage();
-
-        // Loop through all connected Shimmer devices
         foreach (var (shimmer, device) in connectedShimmers)
         {
+            string TitleFor(ShimmerDevice d, int index) =>
+                !string.IsNullOrEmpty(d?.ShimmerName) && d.ShimmerName != "Unknown"
+                    ? $"Shimmer {d.ShimmerName}"
+                    : $"Shimmer {index + 1}";
 
-            // Create a new DataPage to display sensor data from the connected Shimmer device
-            var dataPage = new DataPage(shimmer, device);
-
-            // Set the title of the tab: use Shimmer ID if known, otherwise use index number
-            string tabTitle = !string.IsNullOrEmpty(device?.ShimmerName) && device.ShimmerName != "Unknown"
-                ? $"Shimmer {device.ShimmerName}"
-                : $"Shimmer {connectedShimmers.IndexOf((shimmer, device!)) + 1}";
-
-            // Add the DataPage to the TabbedPage
-            dataPage.Title = tabTitle;
-            tabbedPage.Children.Add(dataPage);
+#if WINDOWS
+    if (shimmer is XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU sImuWin)
+    {
+        var page = new DataPage(sImuWin, device);
+        page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
+        tabbedPage.Children.Add(page);
+    }
+    else if (shimmer is XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG sExgWin)
+    {
+        // <<< NUOVO: pagina per EXG >>>
+        var page = new DataPage(sExgWin, device); // richiede il costruttore EXG in DataPage
+        page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device))) + " (EXG)";
+        tabbedPage.Children.Add(page);
+    }
+#else
+            // Android/iOS: solo IMU
+            var page = new DataPage((XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU)shimmer, device);
+            page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
+            tabbedPage.Children.Add(page);
+#endif
         }
 
-        // Set the new TabbedPage as the main page of the application inside a NavigationPage
+
         if (Application.Current != null)
         {
             Application.Current.MainPage = new NavigationPage(tabbedPage);
         }
     }
+
 
 
     ///// Windows ///////////////////////////////////////////////////////////////////////////////////////////////////////////
