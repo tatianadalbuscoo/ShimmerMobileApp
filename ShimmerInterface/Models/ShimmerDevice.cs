@@ -60,17 +60,35 @@ namespace ShimmerInterface.Models
         [ObservableProperty]
         private bool enableExtA15 = true;
 
+        // ========= NEW: Scan results for UI =========
+
+        // True => EXG, False => IMU (set by scanner in VM)
+        [ObservableProperty]
+        private bool isExg;
+
+        // Raw board id/name as seen from FW (optional, useful for debug)
+        [ObservableProperty]
+        private string boardRawId = "";
+
+        // Channels read from FW (comma-separated)
+        [ObservableProperty]
+        private string channelsDisplay = "(none)";
+
+        // Badge text for the card ("EXG" or "IMU")
+        public string BoardKindLabel => IsExg ? "EXG" : "IMU";
+
+        // Update dependent computed property when IsExg changes
+        partial void OnIsExgChanged(bool value) => OnPropertyChanged(nameof(BoardKindLabel));
+
+        // ========= UI helpers =========
 
         public string PortDisplay =>
 #if ANDROID
-    $"MAC: {Port1}";
-#elif WINDOWS
-            $"Port: {Port1}";
+            $"MAC: {Port1}";
 #else
-    $"Port: {Port1}";
+            $"Port: {Port1}";
 #endif
 
         partial void OnPort1Changed(string value) => OnPropertyChanged(nameof(PortDisplay));
-
     }
 }

@@ -43,41 +43,12 @@ public partial class MainPageViewModel : ObservableObject
     public MainPageViewModel()
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
-        RefreshDevicesCommand = new RelayCommand(LoadDevices);
-
-    LoadDevices();              
-
+        RefreshDevicesCommand = new AsyncRelayCommand(LoadDevicesAsync); // ← era RelayCommand
+        _ = LoadDevicesAsync(); // ← carica subito
     }
 
-
-
-
-
-
-
-    /// <summary>
-    /// Scans available serial ports and creates a ShimmerDevice for each one.
-    /// Extracts Shimmer names from WMI when available.
-    /// Only shows devices with known Shimmer names (filters out "Unknown").
-    /// </summary>
-    /// <summary>
-    /// Scans available serial ports and creates a ShimmerDevice for each one.
-    /// Extracts Shimmer names from WMI when available.
-    /// Only shows devices with known Shimmer names (filters out "Unknown").
-    /// </summary>
-    /// <summary>
-    /// Scans available serial ports and creates a ShimmerDevice for each one.
-    /// Extracts Shimmer names from WMI when available.
-    /// Only shows devices with known Shimmer names (filters out "Unknown").
-    /// </summary>
-    /// <summary>
-    /// Scans available serial ports and creates a ShimmerDevice for each one.
-    /// Extracts Shimmer names from WMI when available.
-    /// Only shows devices with known Shimmer names (filters out "Unknown").
-    /// </summary>
-    private void LoadDevices()
+    private async Task LoadDevicesAsync()
     {
-
 #if WINDOWS
     AvailableDevices.Clear();
 
@@ -90,34 +61,43 @@ public partial class MainPageViewModel : ObservableObject
 
     foreach (var port in ports)
     {
-        if (shimmerNames.TryGetValue(port, out string? shimmerName))
+        if (!shimmerNames.TryGetValue(port, out string? shimmerName)) continue;
+        if (shimmerName == "Unknown") continue;
+
+        var device = new ShimmerDevice
         {
-            if (shimmerName != "Unknown")
-            {
-                string displayName = $"Shimmer {shimmerName}";
-                AvailableDevices.Add(new ShimmerDevice
-                {
-                    DisplayName = displayName,
-                    Port1 = port,
-                    IsSelected = false,
-                    ShimmerName = shimmerName,
-                    EnableLowNoiseAccelerometer = true,
-                    EnableWideRangeAccelerometer = true,
-                    EnableGyroscope = true,
-                    EnableMagnetometer = true,
-                    EnablePressureTemperature = true,
-                    EnableBattery = true,
-                    EnableExtA6 = true,
-                    EnableExtA7 = true,
-                    EnableExtA15 = true
-                });
-            }
+            DisplayName = $"Shimmer {shimmerName}", // solo nome; il “badge” EXG/IMU lo mostriamo a destra
+            Port1 = port,
+            ShimmerName = shimmerName,
+
+            // default sensori (come avevi)
+            IsSelected = false,
+            EnableLowNoiseAccelerometer = true,
+            EnableWideRangeAccelerometer = true,
+            EnableGyroscope = true,
+            EnableMagnetometer = true,
+            EnablePressureTemperature = true,
+            EnableBattery = true,
+            EnableExtA6 = true,
+            EnableExtA7 = true,
+            EnableExtA15 = true
+        };
+
+        // 1) Rileva board kind (EXG vs IMU)
+        try
+        {
+            var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindWindowsAsync(device.DisplayName, port);
+            device.IsExg = ok && kind == ShimmerSensorScanner.BoardKind.EXG;
+            device.BoardRawId = raw; // opzionale: utile debug
         }
+        catch { device.IsExg = false; }
+
+
+        AvailableDevices.Add(device);
     }
 
 #elif MACCATALYST || IOS
-        // Bridge mode: su iOS/Mac avviamo direttamente DataPage dall'App.
-        // MainPage non viene usata; lasciamo uno stub per evitare problemi se aperta per sbaglio.
+        // Bridge mode (come prima)
         AvailableDevices.Clear();
         AvailableDevices.Add(new ShimmerDevice
         {
@@ -125,6 +105,8 @@ public partial class MainPageViewModel : ObservableObject
             Port1 = "(gestito da App → DataPage)",
             ShimmerName = "Bridge",
             IsSelected = false,
+            ChannelsDisplay = "(n/a)",
+            IsExg = false,
 
             EnableLowNoiseAccelerometer = true,
             EnableWideRangeAccelerometer = true,
@@ -139,29 +121,16 @@ public partial class MainPageViewModel : ObservableObject
 
 #elif ANDROID
     AvailableDevices.Clear();
-
     try
     {
         var adapter = Android.Bluetooth.BluetoothAdapter.DefaultAdapter;
         if (adapter == null)
         {
-            AvailableDevices.Add(new ShimmerDevice
-            {
-                DisplayName = "Bluetooth not available",
-                Port1 = "(no adapter)",
-                ShimmerName = "----",
-                IsSelected = false
-            });
+            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth not available", Port1 = "(no adapter)", PortDisplay="(no adapter)", ShimmerName = "----" });
         }
         else if (!adapter.IsEnabled)
         {
-            AvailableDevices.Add(new ShimmerDevice
-            {
-                DisplayName = "Bluetooth disabled\r\n",
-                Port1 = "(enable it from settings)",
-                ShimmerName = "----",
-                IsSelected = false
-            });
+            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth disabled", Port1 = "(enable it from settings)", PortDisplay="(enable it from settings)", ShimmerName = "----" });
         }
         else
         {
@@ -169,25 +138,21 @@ public partial class MainPageViewModel : ObservableObject
             var any = false;
             foreach (var d in bonded)
             {
-
                 var name = d?.Name ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(name)) continue;
                 if (!name.Contains("Shimmer", StringComparison.OrdinalIgnoreCase)) continue;
 
                 any = true;
-
-                // MAC address -> lo usiamo come Port1 per la Connect su Android
                 var mac = d!.Address;
-
-                // Prova a estrarre l'ID a 4 char tipo "Shimmer3-XXXX"
                 var shimmerName = ExtractShimmerName(deviceId: string.Empty, friendlyName: name);
 
                 AvailableDevices.Add(new ShimmerDevice
                 {
-                    DisplayName = name,  
-                    Port1 = mac,         
-                    IsSelected = false,
+                    DisplayName = name,
+                    Port1 = mac,
                     ShimmerName = shimmerName,
+                    IsExg = false,              // su Android lascia default (se vuoi, aggiungiamo detection più avanti)
+                    ChannelsDisplay = "(unknown)",
 
                     EnableLowNoiseAccelerometer = true,
                     EnableWideRangeAccelerometer = true,
@@ -199,37 +164,25 @@ public partial class MainPageViewModel : ObservableObject
                     EnableExtA7 = true,
                     EnableExtA15 = true
                 });
-
             }
 
             if (!any)
             {
-                AvailableDevices.Add(new ShimmerDevice
-                {
-                    DisplayName = "No Shimmer paired",
-                    Port1 = "(Do the pairing in Bluetooth settings.)",
-                    ShimmerName = "----",
-                    IsSelected = false
-                });
+                AvailableDevices.Add(new ShimmerDevice { DisplayName = "No Shimmer paired", Port1 = "(Pair in settings)", PortDisplay="(Pair in settings)", ShimmerName = "----" });
             }
         }
     }
     catch (Exception ex)
     {
-        AvailableDevices.Add(new ShimmerDevice
-        {
-            DisplayName = "Bluetooth Error\r\n",
-            Port1 = ex.Message,
-            ShimmerName = "----",
-            IsSelected = false
-        });
+        AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth Error", Port1 = ex.Message, PortDisplay=ex.Message, ShimmerName = "----" });
     }
-
 #else
-    Console.WriteLine("ELSE branch - no supported platforms");
+    Console.WriteLine("No supported platforms.");
 #endif
-
     }
+
+
+
 
 
 

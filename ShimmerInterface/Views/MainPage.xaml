@@ -40,38 +40,59 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                         <Frame Padding="15" Margin="5" BorderColor="Gray" BackgroundColor="White" CornerRadius="8">
                             <VerticalStackLayout Spacing="10">
 
-                                <!-- Device display name -->
-                                <Label Text="{Binding DisplayName}" FontAttributes="Bold" FontSize="16" TextColor="Black" />
+                                <!-- Header: name + side badge IMU/EXG -->
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+                                    <!-- Device display name -->
+                                    <Label Grid.Row="0" Grid.Column="0"
+                                           Text="{Binding DisplayName}"
+                                           FontAttributes="Bold"
+                                           FontSize="16"
+                                           TextColor="Black" />
 
-                                <Label Text="{Binding PortDisplay}" FontSize="12" TextColor="Gray" />
+                                    <!-- Badge IMU/EXG a destra -->
+                                    <Frame Grid.Row="0" Grid.Column="1"
+                                           Padding="8,2"
+                                           CornerRadius="10"
+                                           HasShadow="False"
+                                           BackgroundColor="White"
+                                           BorderColor="Gray"
+                                           VerticalOptions="Center">
+                                        <Label Text="{Binding BoardKindLabel}"
+                                               FontAttributes="Bold"
+                                               FontSize="12"
+                                               TextColor="Black" />
+                                    </Frame>
 
-                                <!-- Checkbox to select the device to connect -->
-                                <!-- Checkbox/Switch to select the device to connect -->
+                                    <!-- Porta -->
+                                    <Label Grid.Row="1" Grid.Column="0"
+                                           Text="{Binding PortDisplay}"
+                                           FontSize="12"
+                                           TextColor="Gray" />
+                                </Grid>
+
                                 <!-- Checkbox/Switch to select the device to connect -->
                                 <HorizontalStackLayout Spacing="10"
-                                           Padding="0,6,0,10"
-                                           HeightRequest="44"
-                                           MinimumHeightRequest="44"
-                                           VerticalOptions="Center">
-                                <!-- Switch per coerenza visiva, legato a IsSelected -->
-                                <Switch IsToggled="{Binding IsSelected, Mode=TwoWay}"
-                                WidthRequest="52"
-                                HeightRequest="32"
-                                MinimumHeightRequest="32"
-                                HorizontalOptions="Start"
-                                VerticalOptions="Center" />
-                                                        <Label Text="Select for connection"
-                               VerticalOptions="Center"
-                               FontSize="14"
-                               TextColor="Black" />
-                                                    </HorizontalStackLayout>
-
-
+                                                       Padding="0,6,0,10"
+                                                       HeightRequest="44"
+                                                       MinimumHeightRequest="44"
+                                                       VerticalOptions="Center">
+                                    <!-- Switch per coerenza visiva, legato a IsSelected -->
+                                    <Switch IsToggled="{Binding IsSelected, Mode=TwoWay}"
+                                            WidthRequest="52"
+                                            HeightRequest="32"
+                                            MinimumHeightRequest="32"
+                                            HorizontalOptions="Start"
+                                            VerticalOptions="Center" />
+                                    <Label Text="Select for connection"
+                                           VerticalOptions="Center"
+                                           FontSize="14"
+                                           TextColor="Black" />
+                                </HorizontalStackLayout>
 
                                 <!-- Separator -->
                                 <BoxView HeightRequest="1"
-                                     BackgroundColor="LightGray"
-                                     Margin="0,20,0,0" />
+                                         BackgroundColor="LightGray"
+                                         Margin="0,20,0,0" />
 
                                 <!-- Sensor configuration section -->
                                 <Label Text="Sensor Configuration" FontAttributes="Bold" FontSize="14" TextColor="Black" />
