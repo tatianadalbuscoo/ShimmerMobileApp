@@ -184,14 +184,14 @@ public partial class DataPage : ContentPage
             "ExtADC_A7" => config.EnableExtA7,
             "ExtADC_A15" => config.EnableExtA15,
 
-            // EXG (verrà popolato dal ViewModel nel prossimo step)
+            // EXG singoli canali (abilitati dal ViewModel/Config)
             "ExgCh1" => config.WantsExg && config.WantExgCh1,
             "ExgCh2" => config.WantsExg && config.WantExgCh2,
             "ExgRespiration" => config.WantsExg && config.WantRespiration,
 
-            // EXG (gruppo a 2 canali)
-            "EXG" or "ExgCh1" or "ExgCh2"
-                => viewModel.GetCurrentSensorConfiguration().EnableExg,
+                        // Gruppi EXG a 2 canali (mostriamo EXG1/EXG2 dentro ECG/EMG/EXG Test/Respiration)
+            "EXG" or "ECG" or "EMG" or "EXG Test"
+                            => viewModel.GetCurrentSensorConfiguration().EnableExg,
 
             // Respiration (solo se EXG attivo e modalità respiration)
             "Respiration" or "ExgRespiration"
@@ -506,11 +506,9 @@ public partial class DataPage : ContentPage
             "Low-Noise Accelerometer" or "Wide-Range Accelerometer" or
             "Gyroscope" or "Magnetometer" => new[] { SKColors.Red, SKColors.Green, SKColors.Blue },
 
-            // EXG: 2 canali tipici (Ch1/Ch2)
-            "EXG" => new[] { SKColors.Red, SKColors.Blue },
 
-            // Respiration: singolo tracciato
-            "Respiration" => new[] { SKColors.Blue },
+            // EXG-based groups: 2 canali (CH1/CH2) in tutte le modalità
+            "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration" => new[] { SKColors.Red, SKColors.Blue },
 
             _ => new[] { SKColors.Blue }
         };

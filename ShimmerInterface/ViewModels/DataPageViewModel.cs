@@ -103,7 +103,7 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
     private static readonly string[] GyroscopeAxes = [ "GyroscopeX", "GyroscopeY", "GyroscopeZ" ];
     private static readonly string[] MagnetometerAxes = [ "MagnetometerX", "MagnetometerY", "MagnetometerZ" ];
     private static readonly string[] EnvSensors = [ "Temperature_BMP180", "Pressure_BMP180" ];
-    private static readonly string[] BatteryParams = [ "BatteryVoltage", "BatteryPercent" ];
+    private static readonly string[] BatteryParams = ["BatteryVoltage", "BatteryPercent"];
 
     private double timeBaselineSeconds = 0;
 
@@ -618,12 +618,23 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
         // EXG
         if (enableExg)
         {
-            if (!dataPointsCollections.ContainsKey("Exg"))
+            if (!dataPointsCollections.ContainsKey("ExgCh1"))
             {
-                dataPointsCollections["Exg"] = new List<float>();
-                timeStampsCollections["Exg"] = new List<int>();
+                dataPointsCollections["ExgCh1"] = new List<float>();
+                timeStampsCollections["ExgCh1"] = new List<int>();
             }
-        }
+            if (!dataPointsCollections.ContainsKey("ExgCh2"))
+            {
+                dataPointsCollections["ExgCh2"] = new List<float>();
+                timeStampsCollections["ExgCh2"] = new List<int>();
+                            }
+                        // opzionale: se un domani vuoi traccia separata per la respirazione
+                        if (!timeStampsCollections.ContainsKey("ExgRespiration"))
+                            {
+                dataPointsCollections["ExgRespiration"] = new List<float>();
+                timeStampsCollections["ExgRespiration"] = new List<int>();
+                            }
+                    }
 
 
 
@@ -1340,17 +1351,14 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
     public static string MapToInternalKey(string displayName)
     {
         var name = CleanParameterName(displayName);
-        return name switch
-        {
-            // un unico buffer interno per tutte le modalità EXG
-            "ECG" or "EMG" or "EXG Test" or "Respiration" => "Exg",
-            _ => name
-        };
+        // Per EXG usiamo chiavi distinte per canale; i gruppi (ECG/EMG/EXG Test/Respiration)
+        // non vengono mappati a un buffer singolo perché in Multi-chart usiamo i sotto-parametri.
+        return name;
     }
 
 
 
-    private static bool IsSplitVariantLabel(string displayName) =>
+private static bool IsSplitVariantLabel(string displayName) =>
     displayName.Contains("separate charts", StringComparison.OrdinalIgnoreCase)
  || displayName.Contains("split", StringComparison.OrdinalIgnoreCase);
 
@@ -1367,8 +1375,10 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
         string cleanName = CleanParameterName(parameter);
 
         // Return true for sensor groups that support multi-line charting
-        return cleanName is "Low-Noise Accelerometer" or "Wide-Range Accelerometer"
-                          or "Gyroscope" or "Magnetometer";
+              return cleanName is "Low-Noise Accelerometer" or "Wide-Range Accelerometer"
+         or "Gyroscope" or "Magnetometer"
+                                  // Trattiamo anche le modalità EXG come gruppi a 2 serie
+        or "ECG" or "EMG" or "EXG Test" or "Respiration" or "EXG";
 
 
     }
@@ -1378,19 +1388,23 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
     {
         try
         {
-            if (values.TryGetValue("Exg", out var v))
+            var has1 = values.TryGetValue("ExgCh1", out var v1);
+            var has2 = values.TryGetValue("ExgCh2", out var v2);
+                        if (has1 || has2)
             {
                 string mode = exgModeRespiration ? "Respiration"
-                            : exgModeECG ? "ECG"
-                            : exgModeEMG ? "EMG"
-                            : exgModeTest ? "EXG Test"
-                            : "EXG";
-                System.Diagnostics.Debug.WriteLine($"[EXG] t={tMs} ms | {mode}={v:F4}");
-            }
-            else if (enableExg && sampleCounter % 50 == 0)
-            {
-                System.Diagnostics.Debug.WriteLine("[EXG] nessun campo EXG trovato nel sample (ExgCh1/ExgRespiration/Respiration/ECG/EMG).");
-            }
+                                            : exgModeECG ? "ECG"
+                                            : exgModeEMG ? "EMG"
+                                            : exgModeTest ? "EXG Test"
+                                            : "EXG";
+                string s1 = has1 ? v1.ToString("F4") : "-";
+                string s2 = has2 ? v2.ToString("F4") : "-";
+                System.Diagnostics.Debug.WriteLine($"[EXG] t={tMs} ms | {mode}  CH1={s1}  CH2={s2}");
+                            }
+                        else if (enableExg && sampleCounter % 50 == 0)
+                            {
+                System.Diagnostics.Debug.WriteLine("[EXG] nessun campo EXG trovato nel sample (ExgCh1/ExgCh2/ExgRespiration).");
+                            }
         }
         catch { }
     }
@@ -1418,7 +1432,7 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
             "Wide-Range Accelerometer" => new List<string> { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" },
             "Gyroscope" => new List<string> { "GyroscopeX", "GyroscopeY", "GyroscopeZ" },
             "Magnetometer" => new List<string> { "MagnetometerX", "MagnetometerY", "MagnetometerZ" },
-            "EXG" => new List<string> { "ExgCh1", "ExgCh2" },
+            "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration" => new List<string> { "ExgCh1", "ExgCh2" },
             _ => new List<string>()  // Return empty if group not recognized
         };
     }
@@ -1488,8 +1502,6 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
     }
 
 
-
-
     /// <summary>
     /// Processes a single data sample from the Shimmer device, updates all enabled data collections
     /// with the new values, manages timestamps, trims collections to respect the time window,
@@ -1499,107 +1511,96 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
     /// <param name="currentTimeSeconds">The timestamp (in seconds) of the current sample.</param>
     private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
     {
-
-        // Dictionary to store extracted values for enabled parameters
         var values = new Dictionary<string, float>();
 
         try
         {
-
-            // Add Low-Noise Accelerometer values if enabled
+            // ===== Low-noise Accelerometer =====
             if (enableLowNoiseAccelerometer)
             {
-                values["Low-Noise AccelerometerX"] = (float)sample.LowNoiseAccelerometerX.Data;
-                values["Low-Noise AccelerometerY"] = (float)sample.LowNoiseAccelerometerY.Data;
-                values["Low-Noise AccelerometerZ"] = (float)sample.LowNoiseAccelerometerZ.Data;
+                if (HasProp(sample, "LowNoiseAccelerometerX") && sample.LowNoiseAccelerometerX != null)
+                    values["Low-Noise AccelerometerX"] = (float)sample.LowNoiseAccelerometerX.Data;
+                if (HasProp(sample, "LowNoiseAccelerometerY") && sample.LowNoiseAccelerometerY != null)
+                    values["Low-Noise AccelerometerY"] = (float)sample.LowNoiseAccelerometerY.Data;
+                if (HasProp(sample, "LowNoiseAccelerometerZ") && sample.LowNoiseAccelerometerZ != null)
+                    values["Low-Noise AccelerometerZ"] = (float)sample.LowNoiseAccelerometerZ.Data;
             }
 
-            // Add Wide-Range Accelerometer values if enabled
+            // ===== Wide-range Accelerometer =====
             if (enableWideRangeAccelerometer)
             {
-                values["Wide-Range AccelerometerX"] = (float)sample.WideRangeAccelerometerX.Data;
-                values["Wide-Range AccelerometerY"] = (float)sample.WideRangeAccelerometerY.Data;
-                values["Wide-Range AccelerometerZ"] = (float)sample.WideRangeAccelerometerZ.Data;
+                if (HasProp(sample, "WideRangeAccelerometerX") && sample.WideRangeAccelerometerX != null)
+                    values["Wide-Range AccelerometerX"] = (float)sample.WideRangeAccelerometerX.Data;
+                if (HasProp(sample, "WideRangeAccelerometerY") && sample.WideRangeAccelerometerY != null)
+                    values["Wide-Range AccelerometerY"] = (float)sample.WideRangeAccelerometerY.Data;
+                if (HasProp(sample, "WideRangeAccelerometerZ") && sample.WideRangeAccelerometerZ != null)
+                    values["Wide-Range AccelerometerZ"] = (float)sample.WideRangeAccelerometerZ.Data;
             }
 
-            // Add Gyroscope values if enabled
+            // ===== Gyroscope =====
             if (enableGyroscope)
             {
-                values["GyroscopeX"] = (float)sample.GyroscopeX.Data;
-                values["GyroscopeY"] = (float)sample.GyroscopeY.Data;
-                values["GyroscopeZ"] = (float)sample.GyroscopeZ.Data;
+                if (HasProp(sample, "GyroscopeX") && sample.GyroscopeX != null)
+                    values["GyroscopeX"] = (float)sample.GyroscopeX.Data;
+                if (HasProp(sample, "GyroscopeY") && sample.GyroscopeY != null)
+                    values["GyroscopeY"] = (float)sample.GyroscopeY.Data;
+                if (HasProp(sample, "GyroscopeZ") && sample.GyroscopeZ != null)
+                    values["GyroscopeZ"] = (float)sample.GyroscopeZ.Data;
             }
 
-            // Add Magnetometer values if enabled
+            // ===== Magnetometer =====
             if (enableMagnetometer)
             {
-                values["MagnetometerX"] = (float)sample.MagnetometerX.Data;
-                values["MagnetometerY"] = (float)sample.MagnetometerY.Data;
-                values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
+                if (HasProp(sample, "MagnetometerX") && sample.MagnetometerX != null)
+                    values["MagnetometerX"] = (float)sample.MagnetometerX.Data;
+                if (HasProp(sample, "MagnetometerY") && sample.MagnetometerY != null)
+                    values["MagnetometerY"] = (float)sample.MagnetometerY.Data;
+                if (HasProp(sample, "MagnetometerZ") && sample.MagnetometerZ != null)
+                    values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
             }
 
-            // Add Pressure and Temperature values if enabled
+            // ===== Env (BMP180) =====
             if (enablePressureTemperature)
             {
-                values["Temperature_BMP180"] = (float)sample.Temperature_BMP180.Data;
-                values["Pressure_BMP180"] = (float)sample.Pressure_BMP180.Data;
+                if (HasProp(sample, "Temperature_BMP180") && sample.Temperature_BMP180 != null)
+                    values["Temperature_BMP180"] = (float)sample.Temperature_BMP180.Data;
+                if (HasProp(sample, "Pressure_BMP180") && sample.Pressure_BMP180 != null)
+                    values["Pressure_BMP180"] = (float)sample.Pressure_BMP180.Data;
             }
 
-            // Add Battery Voltage and Percentage if enabled and available
-            if (enableBattery && sample.BatteryVoltage != null)
+            // ===== Battery =====
+            if (enableBattery && HasProp(sample, "BatteryVoltage") && sample.BatteryVoltage != null)
             {
+                values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data / 1000f; // mV → V
 
-                // Convert mV to V
-                values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data / 1000f;
-
-                // Calculate battery percentage based on voltage range
                 float batteryV = values["BatteryVoltage"];
                 float percent;
-                if (batteryV <= 3.3f)
-                    percent = 0;
-                else if (batteryV >= 4.2f)
-                    percent = 100;
-                else if (batteryV <= 4.10f)
-                    percent = (batteryV - 3.3f) / (4.10f - 3.3f) * 97f;
-                else
-                    percent = 97f + (batteryV - 4.10f) / (4.20f - 4.10f) * 3f;
+                if (batteryV <= 3.3f) percent = 0;
+                else if (batteryV >= 4.2f) percent = 100;
+                else if (batteryV <= 4.10f) percent = (batteryV - 3.3f) / (4.10f - 3.3f) * 97f;
+                else percent = 97f + (batteryV - 4.10f) / (4.20f - 4.10f) * 3f;
+
                 values["BatteryPercent"] = Math.Clamp(percent, 0, 100);
             }
 
-            // Add external ADC channels if enabled
-            if (enableExtA6)
+            // ===== External ADC =====
+            if (enableExtA6 && HasProp(sample, "ExtADC_A6") && sample.ExtADC_A6 != null)
                 values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data / 1000f;
-            if (enableExtA7)
+            if (enableExtA7 && HasProp(sample, "ExtADC_A7") && sample.ExtADC_A7 != null)
                 values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data / 1000f;
-            if (enableExtA15)
+            if (enableExtA15 && HasProp(sample, "ExtADC_A15") && sample.ExtADC_A15 != null)
                 values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data / 1000f;
 
-            // ===== EXG (un solo canale) =====
-            try
+            // ===== EXG: sempre due canali visibili (CH1/CH2) + opzionale respiration =====
+            if (enableExg)
             {
-                if (enableExg)
-                {
-                    // Unico buffer interno: "Exg"
-                    if (exgModeRespiration)
-                    {
-                        if (HasProp(sample, "ExgRespiration")) values["Exg"] = (float)sample.ExgRespiration.Data;
-                        else if (HasProp(sample, "Respiration")) values["Exg"] = (float)sample.Respiration.Data;
-                    }
-                    else
-                    {
-                        // ECG/EMG/EXG Test: prova le proprietà più comuni
-                        if (HasProp(sample, "ExgCh1")) values["Exg"] = (float)sample.ExgCh1.Data;
-                        else if (HasProp(sample, "ECG")) values["Exg"] = (float)sample.ECG.Data;
-                        else if (HasProp(sample, "EMG")) values["Exg"] = (float)sample.EMG.Data;
-                        else if (HasProp(sample, "Exg")) values["Exg"] = (float)sample.Exg.Data;
-                    }
-                }
+                if (HasProp(sample, "ExgCh1") && sample.ExgCh1 != null)
+                    values["ExgCh1"] = (float)sample.ExgCh1.Data;
+                if (HasProp(sample, "ExgCh2") && sample.ExgCh2 != null)
+                    values["ExgCh2"] = (float)sample.ExgCh2.Data;
+                if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
+                    values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
             }
-            catch { /* no-op */ }
-
-
-
-
         }
         catch (Exception ex)
         {
@@ -1607,22 +1608,17 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
             return;
         }
 
-        // Synchronize access to data collections, otherwise when the app is not in full screen it throws an exception
+        // ==== Store (thread-safe) ====
         lock (_dataLock)
         {
-
-            // Convert current time to milliseconds for the timestamp
             int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
+            int maxPoints = (int)(TimeWindowSeconds * DeviceSamplingRate);
 
-            // Calculate the maximum allowed points for each collection (according to the time window)
-            var maxPoints = (int)(TimeWindowSeconds * DeviceSamplingRate);
             LogExg(values, timestampMs);
 
-
-            // For each available parameter, add the new value and timestamp (if present in the extracted values)
             foreach (var kv in values)
             {
-                var key = kv.Key;    // es.: "Low-Noise AccelerometerX"
+                var key = kv.Key;
                 var v = kv.Value;
 
                 if (!dataPointsCollections.ContainsKey(key))
@@ -1635,31 +1631,33 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
                 timeStampsCollections[key].Add(timestampMs);
                 TrimCollection(key, maxPoints);
             }
-
         }
 
-        // If Y-axis is set to automatic mode, recalculate its range and update properties if necessary
+        // ==== Auto Y-axis ====
         if (AutoYAxis)
         {
             CalculateAutoYAxisRange();
 
-            // Only update if the auto range has changed significantly
             if (Math.Abs(YAxisMin - _autoYAxisMin) > 0.01 || Math.Abs(YAxisMax - _autoYAxisMax) > 0.01)
             {
                 YAxisMin = _autoYAxisMin;
                 YAxisMax = _autoYAxisMax;
-
-                // Refresh the displayed text properties if needed
                 UpdateYAxisTextPropertiesOnly();
             }
         }
     }
 
+
     private static bool HasProp(dynamic obj, string name)
     {
-        try { return obj.GetType().GetProperty(name) != null; }
+        try
+        {
+            var t = obj.GetType();
+            return t.GetProperty(name) != null || t.GetField(name) != null; // <-- aggiungi il check dei field
+        }
         catch { return false; }
     }
+
 
 
     /// <summary>

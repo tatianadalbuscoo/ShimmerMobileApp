@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 #if WINDOWS
@@ -14,6 +14,7 @@ namespace XR2Learn_ShimmerAPI.GSR
         ExGTest,
         Respiration
     }
+
     // NOTE: Windows-only for now (same style as IMU, but restricted)
     public partial class XR2Learn_ShimmerEXG
     {
@@ -47,10 +48,10 @@ namespace XR2Learn_ShimmerAPI.GSR
         private int indexExtA7;
         private int indexExtA15;
 
-        // ExG indices (mode dependent)
-        private int indexExgCh1;
-        private int indexExgCh2;
-        private int indexExgResp;
+        // EXG (2 linee da mostrare sempre)
+        private int indexExgCh1;   // CH1 generico (EXG_CH1/EXG1_CH1/ECG_CH1/EMG_CH1…)
+        private int indexExgCh2;   // CH2 generico (EXG_CH2/EXG2_CH1/ECG_CH2/EMG_CH2…)
+        private int indexExgResp;  // opzionale, solo in modalità Respiration
 #endif
 
         public XR2Learn_ShimmerEXG()
@@ -163,12 +164,9 @@ namespace XR2Learn_ShimmerAPI.GSR
 
                 if (_enableExg)
                 {
-                    try
-                    {
-                        enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXG1_24BIT;
-                        enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXG2_24BIT;
-                    }
-                    catch { }
+                    // abilita entrambi i blocchi EXG
+                    enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXG1_24BIT;
+                    enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXG2_24BIT;
                 }
 
                 _winEnabledSensors = enabled;
@@ -188,14 +186,27 @@ namespace XR2Learn_ShimmerAPI.GSR
         private static SensorData? GetSafe(ObjectCluster oc, int idx)
             => idx >= 0 ? oc.GetData(idx) : null;
 
-        private static int FirstIndex(ObjectCluster oc, string[] names, string? fmt = null)
+        // Cerca su più NOMI e FORMATI (CAL → RAW → UNCAL → default/null)
+        private static (int idx, string? name, string? fmt) FindSignal(ObjectCluster oc, string[] names)
         {
+            string[] formats = new[]
+            {
+                ShimmerConfiguration.SignalFormats.CAL,
+                "RAW",
+                "UNCAL"
+            };
+            foreach (var f in formats)
+                foreach (var n in names)
+                {
+                    int i = oc.GetIndex(n, f);
+                    if (i >= 0) return (i, n, f);
+                }
             foreach (var n in names)
             {
-                var i = oc.GetIndex(n, fmt ?? ShimmerConfiguration.SignalFormats.CAL);
-                if (i >= 0) return i;
+                int i = oc.GetIndex(n, null);
+                if (i >= 0) return (i, n, null);
             }
-            return -1;
+            return (-1, null, null);
         }
 
         private void HandleEvent(object sender, EventArgs args)
@@ -209,6 +220,7 @@ namespace XR2Learn_ShimmerAPI.GSR
 
                 if (firstDataPacket)
                 {
+                    // IMU e vari
                     indexTimeStamp = oc.GetIndex(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL);
                     indexLowNoiseAccX = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
                     indexLowNoiseAccY = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
@@ -229,9 +241,36 @@ namespace XR2Learn_ShimmerAPI.GSR
                     indexExtA7             = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7, ShimmerConfiguration.SignalFormats.CAL);
                     indexExtA15            = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15, ShimmerConfiguration.SignalFormats.CAL);
 
-                    indexExgCh1 = FirstIndex(oc, new[] { "EXG_CH1", "EXG1", "ECG_CH1", "EMG_CH1", "ExG CH1" });
-                    indexExgCh2 = FirstIndex(oc, new[] { "EXG_CH2", "EXG2", "ECG_CH2", "EMG_CH2", "ExG CH2" });
-                    indexExgResp = FirstIndex(oc, new[] { "RESPIRATION", "EXG_RESPIRATION", "RESP", "Respiration" });
+                    // === EXG: vogliamo due serie sempre ===
+                    var ch1 = FindSignal(oc, new[]
+                    {
+                        // EXG primo canale
+                        "EXG_CH1",                       // naming comune
+                        Shimmer3Configuration.SignalNames.EXG1_CH1,
+                        "EXG1_CH1","EXG1 CH1","EXG CH1",
+                        // alias quando la board è in ECG/EMG
+                        "ECG_CH1","ECG CH1","EMG_CH1","EMG CH1",
+                        "ECG RA-LL","ECG LL-RA","ECG_RA-LL","ECG_LL-RA"
+                    });
+                    var ch2 = FindSignal(oc, new[]
+                    {
+                        // secondo tracciato: può chiamarsi EXG_CH2 o EXG2_CH1 a seconda del FW
+                        "EXG_CH2",
+                        Shimmer3Configuration.SignalNames.EXG2_CH1,
+                        "EXG2_CH1","EXG2 CH1","EXG CH2",
+                        "ECG_CH2","ECG CH2","EMG_CH2","EMG CH2",
+                        "ECG LA-RA","ECG_RA-LA","ECG_LA-RA"
+                    });
+                    var rr = FindSignal(oc, new[] { "RESPIRATION","EXG_RESPIRATION","RESP","Respiration" });
+
+                    indexExgCh1 = ch1.idx;
+                    indexExgCh2 = ch2.idx;
+                    indexExgResp = rr.idx;
+
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[EXG map] CH1 idx={indexExgCh1} name={ch1.name} fmt={ch1.fmt} | " +
+                        $"CH2 idx={indexExgCh2} name={ch2.name} fmt={ch2.fmt} | " +
+                        $"RESP idx={indexExgResp} name={rr.name} fmt={rr.fmt}");
 
                     firstDataPacket = false;
                 }
@@ -256,8 +295,12 @@ namespace XR2Learn_ShimmerAPI.GSR
                     GetSafe(oc, indexExtA6),
                     GetSafe(oc, indexExtA7),
                     GetSafe(oc, indexExtA15),
+
+                    // DUE TRACCE sempre presenti (se EXG abilitato)
                     _enableExg ? GetSafe(oc, indexExgCh1) : null,
                     _enableExg ? GetSafe(oc, indexExgCh2) : null,
+
+                    // Respiration solo nella modalità dedicata
                     (_enableExg && _exgMode == ExgMode.Respiration) ? GetSafe(oc, indexExgResp) : null
                 );
 
