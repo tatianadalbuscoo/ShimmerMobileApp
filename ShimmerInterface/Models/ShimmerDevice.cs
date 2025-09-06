@@ -52,6 +52,13 @@ namespace ShimmerInterface.Models
         /// <summary>Channels read from FW (comma-separated) – opzionale per UI/debug</summary>
         [ObservableProperty] private string channelsDisplay = "(none)";
 
+        // ===== Badge di stato (EXG/IMU/device off) =====
+        [ObservableProperty] private string rightBadge = string.Empty;
+
+        public bool IsDeviceOff =>
+            string.Equals(RightBadge, "device off", StringComparison.OrdinalIgnoreCase);
+
+
         /// <summary>Badge text for the card ("EXG" or "IMU")</summary>
         public string BoardKindLabel => IsExg ? "EXG" : "IMU";
 

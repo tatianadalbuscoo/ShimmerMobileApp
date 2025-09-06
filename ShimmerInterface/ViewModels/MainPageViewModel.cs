@@ -82,14 +82,25 @@ public partial class MainPageViewModel : ObservableObject
             EnableExtA15 = true
         };
 
-        // 1) Rileva board kind (EXG vs IMU)
-        try
-        {
-            var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindWindowsAsync(device.DisplayName, port);
-            device.IsExg = ok && kind == ShimmerSensorScanner.BoardKind.EXG;
-            device.BoardRawId = raw; // opzionale: utile debug
-        }
-        catch { device.IsExg = false; }
+// 1) Rileva board kind (EXG vs IMU)
+try
+{
+    var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindWindowsAsync(device.DisplayName, port);
+
+    device.IsExg      = ok && kind == ShimmerSensorScanner.BoardKind.EXG;
+    device.BoardRawId = raw;
+
+    // >>> NEW: imposta il badge
+    device.RightBadge = ok
+        ? (device.IsExg ? "EXG" : "IMU")
+        : "device off";
+}
+catch
+{
+    device.IsExg = false;
+    device.RightBadge = "device off"; // >>> NEW
+}
+
 
 
         AvailableDevices.Add(device);
@@ -225,11 +236,22 @@ public partial class MainPageViewModel : ObservableObject
             // Close the loading page after connection attempt
             await Application.Current.MainPage.Navigation.PopModalAsync();
 
-            // If connection was successful, add to the connected list
+            // Se la connessione è riuscita, aggiungi alla lista
             if (shimmer != null)
             {
                 connectedShimmers.Add((shimmer, device));
             }
+            else
+            {
+                // >>> NEW: marca subito come device off e avvisa
+                device.RightBadge = "device off";
+                await App.Current!.MainPage!.DisplayAlert(
+                    "Device off",
+                    $"{device.DisplayName} appears to be powered off. Turn it on and try again.",
+                    "OK"
+                );
+            }
+
         }
 
         // If at least one device was connected, create the tabbed interface

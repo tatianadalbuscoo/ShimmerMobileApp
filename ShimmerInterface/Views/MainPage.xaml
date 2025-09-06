@@ -40,17 +40,35 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                                            TextColor="Black" />
 
                                     <Frame Grid.Row="0" Grid.Column="1"
-                                           Padding="8,2"
-                                           CornerRadius="10"
-                                           HasShadow="False"
-                                           BackgroundColor="White"
-                                           BorderColor="Gray"
-                                           VerticalOptions="Center">
-                                        <Label Text="{Binding BoardKindLabel}"
-                                               FontAttributes="Bold"
-                                               FontSize="12"
-                                               TextColor="Black" />
+                                       Padding="8,2"
+                                       CornerRadius="10"
+                                       HasShadow="False"
+                                       BackgroundColor="White"
+                                       BorderColor="Gray"
+                                       VerticalOptions="Center">
+
+                                        <!-- Mostra EXG/IMU o "device off" -->
+                                        <Label Text="{Binding RightBadge}"
+                                           FontAttributes="Bold"
+                                           FontSize="12"
+                                           TextColor="Black">
+                                            <!-- Se "device off", colora il testo di rosso -->
+                                            <Label.Triggers>
+                                                <DataTrigger TargetType="Label" Binding="{Binding RightBadge}" Value="device off">
+                                                    <Setter Property="TextColor" Value="IndianRed" />
+                                                </DataTrigger>
+                                            </Label.Triggers>
+                                        </Label>
+
+                                        <!-- Se "device off", colora anche il bordo/background -->
+                                        <Frame.Triggers>
+                                            <DataTrigger TargetType="Frame" Binding="{Binding RightBadge}" Value="device off">
+                                                <Setter Property="BorderColor" Value="IndianRed" />
+                                                <Setter Property="BackgroundColor" Value="#FFF5F5" />
+                                            </DataTrigger>
+                                        </Frame.Triggers>
                                     </Frame>
+
 
                                     <Label Grid.Row="1" Grid.Column="0"
                                            Text="{Binding PortDisplay}"
