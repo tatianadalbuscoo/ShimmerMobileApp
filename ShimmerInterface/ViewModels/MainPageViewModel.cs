@@ -29,6 +29,9 @@ public partial class MainPageViewModel : ObservableObject
     // Internal list to keep track of connected Shimmer instances
     private readonly List<(object shimmer, ShimmerDevice device)> connectedShimmers = new();
 
+    // NEW: stato per overlay/avviso durante il refresh
+    [ObservableProperty] private bool isRefreshing;
+
     // Command to connect to selected Shimmer devices
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
@@ -39,12 +42,56 @@ public partial class MainPageViewModel : ObservableObject
     /// <summary>
     /// Constructor: initializes commands and loads devices on startup.
     /// </summary>
-    public MainPageViewModel()
+   /* public MainPageViewModel()
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
         RefreshDevicesCommand = new AsyncRelayCommand(LoadDevicesAsync); // ← era RelayCommand
         _ = LoadDevicesAsync(); // ← carica subito
+    }*/
+
+    public MainPageViewModel()
+    {
+        ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
+        RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAsync); // <-- usa il wrapper
+        _ = LoadDevicesAsync(); // start senza overlay
     }
+
+    private async Task RefreshDevicesAsync()
+    {
+        if (IsRefreshing)
+        {
+            await App.Current!.MainPage!.DisplayAlert(
+                "Please wait",
+                "A device refresh is already in progress.",
+                "OK"
+            );
+            return;
+        }
+
+        try
+        {
+            IsRefreshing = true;
+
+            // >>> NEW: lascia il thread UI ridisegnare l'overlay PRIMA di bloccare con lo scan
+            await Task.Yield();      // cede il controllo al dispatcher
+            await Task.Delay(50);    // piccolo buffer per assicurare il render
+
+            await LoadDevicesAsync(); // il tuo scan
+                                      // opzionale:
+                                      // await App.Current!.MainPage!.DisplayAlert("Refresh complete", "Device list is up to date.", "OK");
+        }
+        catch (Exception ex)
+        {
+            await App.Current!.MainPage!.DisplayAlert("Refresh failed", ex.Message, "OK");
+        }
+        finally
+        {
+            IsRefreshing = false;
+        }
+    }
+
+
+
 
     private async Task LoadDevicesAsync()
     {
