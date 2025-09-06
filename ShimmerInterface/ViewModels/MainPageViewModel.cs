@@ -6,6 +6,9 @@ using ShimmerInterface.Views;
 using XR2Learn_ShimmerAPI;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using Microsoft.Maui.ApplicationModel; // per MainThread.InvokeOnMainThreadAsync
+using System.Linq;
+using System.Threading.Tasks;
 
 
 
@@ -32,6 +35,10 @@ public partial class MainPageViewModel : ObservableObject
     // NEW: stato per overlay/avviso durante il refresh
     [ObservableProperty] private bool isRefreshing;
 
+    // Testo mostrato nell'overlay (refresh/scan iniziale)
+    [ObservableProperty] private string overlayMessage = "Refreshing devices…";
+
+
     // Command to connect to selected Shimmer devices
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
@@ -53,32 +60,52 @@ public partial class MainPageViewModel : ObservableObject
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
         RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAsync); // <-- usa il wrapper
-        _ = LoadDevicesAsync(); // start senza overlay
+        _ = InitialScanAsync(); // start CON overlay "Scanning devices…"
     }
+
+    private async Task InitialScanAsync()
+    {
+        try
+        {
+            OverlayMessage = "Scanning devices…"; // <<< testo diverso all'avvio
+            IsRefreshing = true;
+
+            // Mostra subito l'overlay prima di iniziare lo scan
+            await Task.Yield();
+            await Task.Delay(50);
+
+            await LoadDevicesAsync();
+        }
+        catch (Exception ex)
+        {
+            await App.Current!.MainPage!.DisplayAlert("Initial scan failed", ex.Message, "OK");
+        }
+        finally
+        {
+            IsRefreshing = false;
+        }
+    }
+
 
     private async Task RefreshDevicesAsync()
     {
         if (IsRefreshing)
         {
-            await App.Current!.MainPage!.DisplayAlert(
-                "Please wait",
-                "A device refresh is already in progress.",
-                "OK"
-            );
+            await App.Current!.MainPage!.DisplayAlert("Please wait", "A device refresh is already in progress.", "OK");
             return;
         }
 
         try
         {
+            OverlayMessage = "Refreshing devices…"; // <<< NEW
             IsRefreshing = true;
 
-            // >>> NEW: lascia il thread UI ridisegnare l'overlay PRIMA di bloccare con lo scan
-            await Task.Yield();      // cede il controllo al dispatcher
-            await Task.Delay(50);    // piccolo buffer per assicurare il render
+            await Task.Yield();
+            await Task.Delay(50);
 
-            await LoadDevicesAsync(); // il tuo scan
-                                      // opzionale:
-                                      // await App.Current!.MainPage!.DisplayAlert("Refresh complete", "Device list is up to date.", "OK");
+            await LoadDevicesAsync();
+            // opzionale: OK finale
+            // await App.Current!.MainPage!.DisplayAlert("Refresh complete", "Device list is up to date.", "OK");
         }
         catch (Exception ex)
         {
@@ -93,65 +120,73 @@ public partial class MainPageViewModel : ObservableObject
 
 
 
+
     private async Task LoadDevicesAsync()
     {
 #if WINDOWS
-    AvailableDevices.Clear();
-
-    var ports = XR2Learn_SerialPortsManager
-        .GetAvailableSerialPortsNames()
-        .OrderBy(p => p)
-        .ToList();
-
-    var shimmerNames = GetShimmerNamesFromWMI();
-
-    foreach (var port in ports)
+    // Esegui scoperta e detection su thread in background
+    var devices = await Task.Run(async () =>
     {
-        if (!shimmerNames.TryGetValue(port, out string? shimmerName)) continue;
-        if (shimmerName == "Unknown") continue;
+        var list = new List<ShimmerDevice>();
 
-        var device = new ShimmerDevice
+        var ports = XR2Learn_SerialPortsManager
+            .GetAvailableSerialPortsNames()
+            .OrderBy(p => p)
+            .ToList();
+
+        var shimmerNames = GetShimmerNamesFromWMI();
+
+        foreach (var port in ports)
         {
-            DisplayName = $"Shimmer {shimmerName}", // solo nome; il “badge” EXG/IMU lo mostriamo a destra
-            Port1 = port,
-            ShimmerName = shimmerName,
+            if (!shimmerNames.TryGetValue(port, out string? shimmerName)) continue;
+            if (shimmerName == "Unknown") continue;
 
-            // default sensori (come avevi)
-            IsSelected = false,
-            EnableLowNoiseAccelerometer = true,
-            EnableWideRangeAccelerometer = true,
-            EnableGyroscope = true,
-            EnableMagnetometer = true,
-            EnablePressureTemperature = true,
-            EnableBattery = true,
-            EnableExtA6 = true,
-            EnableExtA7 = true,
-            EnableExtA15 = true
-        };
+            var device = new ShimmerDevice
+            {
+                DisplayName = $"Shimmer {shimmerName}",
+                Port1 = port,
+                ShimmerName = shimmerName,
 
-// 1) Rileva board kind (EXG vs IMU)
-try
-{
-    var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindWindowsAsync(device.DisplayName, port);
+                IsSelected = false,
+                EnableLowNoiseAccelerometer = true,
+                EnableWideRangeAccelerometer = true,
+                EnableGyroscope = true,
+                EnableMagnetometer = true,
+                EnablePressureTemperature = true,
+                EnableBattery = true,
+                EnableExtA6 = true,
+                EnableExtA7 = true,
+                EnableExtA15 = true
+            };
 
-    device.IsExg      = ok && kind == ShimmerSensorScanner.BoardKind.EXG;
-    device.BoardRawId = raw;
+            // Rileva board kind (EXG vs IMU) – anche questo off-UI-thread
+            try
+            {
+                var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindWindowsAsync(device.DisplayName, port);
 
-    // >>> NEW: imposta il badge
-    device.RightBadge = ok
-        ? (device.IsExg ? "EXG" : "IMU")
-        : "device off";
-}
-catch
-{
-    device.IsExg = false;
-    device.RightBadge = "device off"; // >>> NEW
-}
+                device.IsExg      = ok && kind == ShimmerSensorScanner.BoardKind.EXG;
+                device.BoardRawId = raw;
+                device.RightBadge = ok ? (device.IsExg ? "EXG" : "IMU") : "device off";
+            }
+            catch
+            {
+                device.IsExg = false;
+                device.RightBadge = "device off";
+            }
 
+            list.Add(device);
+        }
 
+        return list;
+    });
 
-        AvailableDevices.Add(device);
-    }
+    // Aggiorna la ObservableCollection SOLO sul MainThread
+    await MainThread.InvokeOnMainThreadAsync(() =>
+    {
+        AvailableDevices.Clear();
+        foreach (var d in devices)
+            AvailableDevices.Add(d);
+    });
 
 #elif MACCATALYST || IOS
         // Bridge mode (come prima)

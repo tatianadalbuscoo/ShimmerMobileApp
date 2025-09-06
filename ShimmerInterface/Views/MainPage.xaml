@@ -179,11 +179,18 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <Button Text="Connect to Selected Devices"
-                    Style="{StaticResource PrimaryButton}"
-                    Command="{Binding ConnectCommand}"
-                    CommandParameter="{Binding Navigation, Source={x:Reference MainPageRoot}}" />
-        </VerticalStackLayout>
+                <Button Text="Connect to Selected Devices"
+        Style="{StaticResource PrimaryButton}"
+        Command="{Binding ConnectCommand}"
+        CommandParameter="{Binding Navigation, Source={x:Reference MainPageRoot}}">
+                    <Button.Triggers>
+                        <DataTrigger TargetType="Button" Binding="{Binding IsRefreshing}" Value="True">
+                            <Setter Property="IsEnabled" Value="False" />
+                        </DataTrigger>
+                    </Button.Triggers>
+                </Button>
+
+            </VerticalStackLayout>
         </ScrollView>
 
         <!-- OVERLAY “avviso con rotellina” mentre IsRefreshing è true -->
@@ -197,12 +204,13 @@ Includes device selection, sensor options toggles, and a button to initiate conn
          HorizontalOptions="Center"
          VerticalOptions="Center">
                 <VerticalStackLayout Spacing="12" HorizontalOptions="Center">
-                    <ActivityIndicator IsRunning="True" WidthRequest="36" HeightRequest="36" />
-                    <Label Text="Refreshing devices…"
-             FontAttributes="Bold"
-             FontSize="16"
-             TextColor="Black"
-             HorizontalTextAlignment="Center" />
+                    <ActivityIndicator IsRunning="{Binding IsRefreshing}" WidthRequest="36" HeightRequest="36" />
+                    <Label Text="{Binding OverlayMessage}"
+       FontAttributes="Bold"
+       FontSize="16"
+       TextColor="Black"
+       HorizontalTextAlignment="Center" />
+
                 </VerticalStackLayout>
             </Frame>
         </Grid>
