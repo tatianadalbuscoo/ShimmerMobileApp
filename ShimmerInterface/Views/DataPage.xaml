@@ -212,6 +212,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                        Style="{StaticResource TitleLabel}" />
 
                 <!-- Chart legend (show only in Multi mode where lines are overlaid) -->
+                <!-- Chart legend (dinamica; mostra EXG1/EXG2 per i gruppi EXG) -->
                 <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
                     <StackLayout.Triggers>
                         <!-- Hide legend when Single OR Split -->
@@ -223,24 +224,40 @@ It includes configuration controls, parameter selection, and a dynamically updat
                         </DataTrigger>
                     </StackLayout.Triggers>
 
-                    <!-- X axis legend -->
+                    <!-- Serie 1 -->
                     <HorizontalStackLayout Spacing="5">
-                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Red" VerticalOptions="Center" />
-                        <Label Text="X" FontSize="12" VerticalOptions="Center" />
+                        <HorizontalStackLayout.Triggers>
+                            <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend1Text}" Value="">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
+                        </HorizontalStackLayout.Triggers>
+                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="{Binding Legend1Color}" VerticalOptions="Center" />
+                        <Label Text="{Binding Legend1Text}" FontSize="12" VerticalOptions="Center" />
                     </HorizontalStackLayout>
 
-                    <!-- Y axis legend -->
+                    <!-- Serie 2 -->
                     <HorizontalStackLayout Spacing="5">
-                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Green" VerticalOptions="Center" />
-                        <Label Text="Y" FontSize="12" VerticalOptions="Center" />
+                        <HorizontalStackLayout.Triggers>
+                            <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend2Text}" Value="">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
+                        </HorizontalStackLayout.Triggers>
+                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="{Binding Legend2Color}" VerticalOptions="Center" />
+                        <Label Text="{Binding Legend2Text}" FontSize="12" VerticalOptions="Center" />
                     </HorizontalStackLayout>
 
-                    <!-- Z axis legend -->
+                    <!-- Serie 3 -->
                     <HorizontalStackLayout Spacing="5">
-                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="Blue" VerticalOptions="Center" />
-                        <Label Text="Z" FontSize="12" VerticalOptions="Center" />
+                        <HorizontalStackLayout.Triggers>
+                            <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend3Text}" Value="">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
+                        </HorizontalStackLayout.Triggers>
+                        <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="{Binding Legend3Color}" VerticalOptions="Center" />
+                        <Label Text="{Binding Legend3Text}" FontSize="12" VerticalOptions="Center" />
                     </HorizontalStackLayout>
                 </StackLayout>
+
 
                 <!-- Unified chart (Single/Multi). Hidden when Split. -->
                 <Border x:Name="UnifiedChartBorder"

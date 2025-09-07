@@ -7,6 +7,8 @@ using System.Linq;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
+using Microsoft.Maui.Graphics;
+
 
 #if WINDOWS
 using XR2Learn_ShimmerAPI.GSR;  // XR2Learn_ShimmerEXG, ExgMode
@@ -1154,9 +1156,8 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
             // ADC esterni (V)
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
 
-            "ECG" or "EMG" or "EXG Test" => -2.0,
-            "Respiration" => 0.0,
-
+            "ECG" or "EMG" or "EXG Test" => -15.0,
+            "Respiration" => -15.0,
 
 
             // Fallback generico
@@ -1205,8 +1206,8 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
             // ADC esterni (V)
             "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3.3,
 
-            "ECG" or "EMG" or "EXG Test" => 2.0,
-            "Respiration" => 5.0,
+            "ECG" or "EMG" or "EXG Test" => 15.0,
+            "Respiration" => 15.0,
 
 
 
@@ -1435,7 +1436,50 @@ private static bool IsSplitVariantLabel(string displayName) =>
             "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration" => new List<string> { "ExgCh1", "ExgCh2" },
             _ => new List<string>()  // Return empty if group not recognized
         };
+
     }
+
+    // === Legend helpers ===
+    public static string GetLegendLabel(string groupParameter, string subParameter)
+    {
+        var group = CleanParameterName(groupParameter);
+
+        // Nei gruppi EXG vogliamo "EXG1/EXG2" al posto di ExgCh1/ExgCh2
+        if (group is "ECG" or "EMG" or "EXG Test" or "Respiration" or "EXG")
+        {
+            return subParameter switch
+            {
+                "ExgCh1" => "EXG1",
+                "ExgCh2" => "EXG2",
+                _ => subParameter
+            };
+        }
+
+        // Per i gruppi IMU usa X/Y/Z
+        if (subParameter.EndsWith("X")) return "X";
+        if (subParameter.EndsWith("Y")) return "Y";
+        if (subParameter.EndsWith("Z")) return "Z";
+
+        // Parametri singoli: riusa il nome pulito
+        return CleanParameterName(subParameter);
+    }
+
+    // Etichette leggibili per la legenda corrente (bindabile dalla view)
+    public List<string> LegendLabels =>
+        GetCurrentSubParameters().Select(p => GetLegendLabel(SelectedParameter, p)).ToList();
+
+    // Etichette singole per la legenda (comode da bindare in XAML)
+    public string Legend1Text => LegendLabels.ElementAtOrDefault(0) ?? "";
+    public string Legend2Text => LegendLabels.ElementAtOrDefault(1) ?? "";
+    public string Legend3Text => LegendLabels.ElementAtOrDefault(2) ?? "";
+
+    // Colori coerenti con le serie disegnate.
+    // Nota: se in Multi hai solo 2 serie, la seconda la faccio Blu (come nello screenshot)
+    public Color Legend1Color => Colors.Red;
+    public Color Legend2Color => (LegendLabels.Count == 2) ? Colors.Blue : Colors.Green;
+    public Color Legend3Color => Colors.Blue;
+
+
 
 
     /// <summary>
@@ -1724,6 +1768,14 @@ private static bool IsSplitVariantLabel(string displayName) =>
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
         UpdateTextProperties();
+        OnPropertyChanged(nameof(LegendLabels));
+        OnPropertyChanged(nameof(Legend1Text));
+        OnPropertyChanged(nameof(Legend2Text));
+        OnPropertyChanged(nameof(Legend3Text));
+        OnPropertyChanged(nameof(Legend1Color));
+        OnPropertyChanged(nameof(Legend2Color));
+        OnPropertyChanged(nameof(Legend3Color));
+        OnPropertyChanged(nameof(LegendLabels));
         ValidationMessage = "";
         UpdateChart();
     }
@@ -1917,26 +1969,34 @@ private static bool IsSplitVariantLabel(string displayName) =>
             case "ECG":
                 YAxisLabel = "ECG"; YAxisUnit = "mV";
                 ChartTitle = "ECG";
-                YAxisMin = -2; YAxisMax = 2;
+                YAxisMin = -15; YAxisMax = 15;
                 break;
+
 
             case "EMG":
                 YAxisLabel = "EMG"; YAxisUnit = "mV";
                 ChartTitle = "EMG";
-                YAxisMin = -2; YAxisMax = 2;
+                YAxisMin = -15; YAxisMax = 15;
                 break;
+
 
             case "EXG Test":
                 YAxisLabel = "EXG Test"; YAxisUnit = "mV";
                 ChartTitle = "EXG Test";
-                YAxisMin = -2; YAxisMax = 2;
+                YAxisMin = -15; YAxisMax = 15;
                 break;
 
+
             case "Respiration":
-                YAxisLabel = "Respiration"; YAxisUnit = "a.u.";
+                YAxisLabel = "Respiration";
+                YAxisUnit = "mV";           
                 ChartTitle = "Respiration";
-                YAxisMin = 0; YAxisMax = 5;
+                YAxisMin = -15;               
+                YAxisMax = 15;               
                 break;
+
+
+
 
 
         }
