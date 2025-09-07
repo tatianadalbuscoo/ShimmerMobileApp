@@ -166,6 +166,11 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
     public IRelayCommand ApplyYMinCommand { get; }
     public IRelayCommand ApplyYMaxCommand { get; }
 
+    public bool IsExgSplit =>
+    ChartDisplayMode == ChartDisplayMode.Split &&
+    (CleanParameterName(SelectedParameter) is "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration");
+
+
 
     // Command da bindare al bottone ✓
     public IAsyncRelayCommand ApplySamplingRateCommand { get; }
@@ -630,13 +635,15 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
                 dataPointsCollections["ExgCh2"] = new List<float>();
                 timeStampsCollections["ExgCh2"] = new List<int>();
                             }
-                        // opzionale: se un domani vuoi traccia separata per la respirazione
-                        if (!timeStampsCollections.ContainsKey("ExgRespiration"))
-                            {
+            // opzionale: se un domani vuoi traccia separata per la respirazione
+            // dopo
+            if (!dataPointsCollections.ContainsKey("ExgRespiration"))
+            {
                 dataPointsCollections["ExgRespiration"] = new List<float>();
                 timeStampsCollections["ExgRespiration"] = new List<int>();
-                            }
-                    }
+            }
+
+        }
 
 
 
@@ -650,6 +657,28 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
             }
         }
     }
+
+    public string ChartModeLabel
+    {
+        get
+        {
+            var clean = CleanParameterName(SelectedParameter);
+            bool isExg = clean is "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration";
+
+            return ChartDisplayMode switch
+            {
+                ChartDisplayMode.Single => "Single Parameter",
+                ChartDisplayMode.Multi => isExg
+                    ? "Multi Parameter (EXG1, EXG2)"
+                    : "Multi Parameter (X, Y, Z)",
+                ChartDisplayMode.Split => isExg
+                    ? "Split (two separate charts)"
+                    : "Split (three separate charts)",
+                _ => "Single Parameter"
+            };
+        }
+    }
+
 
 
     /// <summary>
@@ -1315,17 +1344,37 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
             AvailableParameters.Add("ExtADC_A7");
         if (enableExtA15)
             AvailableParameters.Add("ExtADC_A15");
-        // ===== EXG =====
-        // ===== EXG (un solo canale) =====
-        // ===== EXG (un SOLO canale) =====
+
+        // ===== EXG (gruppo + variante split EXG1·EXG2) =====
         if (enableExg)
         {
-            if (exgModeRespiration) AvailableParameters.Add("Respiration");
-            else if (exgModeECG) AvailableParameters.Add("ECG");
-            else if (exgModeEMG) AvailableParameters.Add("EMG");
-            else if (exgModeTest) AvailableParameters.Add("EXG Test");
-            else AvailableParameters.Add("EXG"); // fallback
+            if (exgModeRespiration)
+            {
+                AvailableParameters.Add("Respiration");
+                AvailableParameters.Add("    → Respiration — separate charts (EXG1·EXG2)");
+            }
+            else if (exgModeECG)
+            {
+                AvailableParameters.Add("ECG");
+                AvailableParameters.Add("    → ECG — separate charts (EXG1·EXG2)");
+            }
+            else if (exgModeEMG)
+            {
+                AvailableParameters.Add("EMG");
+                AvailableParameters.Add("    → EMG — separate charts (EXG1·EXG2)");
+            }
+            else if (exgModeTest)
+            {
+                AvailableParameters.Add("EXG Test");
+                AvailableParameters.Add("    → EXG Test — separate charts (EXG1·EXG2)");
+            }
+            else
+            {
+                AvailableParameters.Add("EXG");
+                AvailableParameters.Add("    → EXG — separate charts (EXG1·EXG2)");
+            }
         }
+
 
 
 
@@ -1342,10 +1391,13 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
         if (displayName.StartsWith("    → ")) displayName = displayName[6..];
 
         // elimina il suffisso della variante split (usa più pattern per robustezza)
-        displayName = displayName.Replace(" — separate charts (X·Y·Z)", "")
+        displayName = displayName.Replace(" — separate charts (EXG1·EXG2)", "")
+                                 .Replace(" - separate charts (EXG1·EXG2)", "")
+                                 .Replace(" — separate charts (X·Y·Z)", "")
                                  .Replace(" - separate charts (X·Y·Z)", "")
                                  .Replace(" (separate charts)", "")
                                  .Trim();
+
         return displayName;
     }
 
@@ -1356,6 +1408,7 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
         // non vengono mappati a un buffer singolo perché in Multi-chart usiamo i sotto-parametri.
         return name;
     }
+
 
 
 
@@ -1544,6 +1597,31 @@ private static bool IsSplitVariantLabel(string displayName) =>
         string cleanName = CleanParameterName(SelectedParameter);
         return IsMultiChart(cleanName) ? GetSubParameters(cleanName) : new List<string> { cleanName };
     }
+
+    public string GetSplitParameterForCanvas(int slotIndex)
+    {
+        // slotIndex: 0 = primo riquadro (in XAML è canvasX), 1 = secondo (canvasY), 2 = terzo (canvasZ)
+        var clean = CleanParameterName(SelectedParameter);
+
+        if (ChartDisplayMode != ChartDisplayMode.Split)
+            return clean; // non in split: ignora
+
+        // Caso EXG: 2 soli canali
+        if (IsExgSplit)
+        {
+            return slotIndex switch
+            {
+                0 => "ExgCh1",
+                1 => "ExgCh2",
+                _ => "" // il terzo grafico (Z) resta vuoto/nascosto
+            };
+        }
+
+        // Caso IMU XYZ: 3 assi
+        var sub = GetSubParameters(clean);
+        return (slotIndex >= 0 && slotIndex < sub.Count) ? sub[slotIndex] : "";
+    }
+
 
 
     /// <summary>
@@ -1756,6 +1834,9 @@ private static bool IsSplitVariantLabel(string displayName) =>
             ? ChartDisplayMode.Split
             : (IsMultiChart(cleanName) ? ChartDisplayMode.Multi : ChartDisplayMode.Single);
 
+        OnPropertyChanged(nameof(ChartModeLabel));
+        OnPropertyChanged(nameof(IsExgSplit)); // <-- AGGIUNGI QUESTA
+
         UpdateYAxisSettings(cleanName);
 
         if (AutoYAxis)
@@ -1779,6 +1860,7 @@ private static bool IsSplitVariantLabel(string displayName) =>
         ValidationMessage = "";
         UpdateChart();
     }
+
 
 
 

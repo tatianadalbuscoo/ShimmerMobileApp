@@ -579,10 +579,26 @@ public partial class DataPage : ContentPage
         double timeStart = Math.Max(0, currentTime - viewModel.TimeWindowSeconds);
         double timeRange = viewModel.TimeWindowSeconds;
 
-        // Pick X/Y/Z key
-        var trio = DataPageViewModel.GetSubParameters(group);
-        if (trio.Count < 3) { DrawNoDataMessage(canvas, info); return; }
-        var key = trio[axisIndex];
+        // === Supporto EXG split: EXG1/EXG2 separati (Z nascosto dal XAML) ===
+        string key;
+        SKColor strokeColor;
+
+        if (viewModel.IsExgSplit)
+        {
+            // 0 -> EXG1 (rosso), 1 -> EXG2 (blu), 2 -> nessun grafico
+            key = axisIndex == 0 ? "ExgCh1" :
+                  axisIndex == 1 ? "ExgCh2" : "";
+            if (string.IsNullOrEmpty(key)) return; // niente terzo grafico in split EXG
+            strokeColor = axisIndex == 0 ? SKColors.Red : SKColors.Blue;
+        }
+        else
+        {
+            // Caso IMU XYZ standard
+            var trio = DataPageViewModel.GetSubParameters(group);
+            if (trio.Count < 3) { DrawNoDataMessage(canvas, info); return; }
+            key = trio[axisIndex];
+            strokeColor = new[] { SKColors.Red, SKColors.Green, SKColors.Blue }[axisIndex];
+        }
 
         var (data, timeMs) = viewModel.GetSeriesSnapshot(key);
         int count = Math.Min(data.Count, timeMs.Count);
@@ -596,16 +612,13 @@ public partial class DataPage : ContentPage
         double safeY = yRange > 0 ? yRange : 1e-9;
         double safeT = timeRange > 0 ? timeRange : 1e-9;
 
-        // Colori standard: X=Rosso, Y=Verde, Z=Blu
-        var axisColors = new[] { SKColors.Red, SKColors.Green, SKColors.Blue };
         using var paint = new SKPaint
         {
-            Color = axisColors[axisIndex],
+            Color = strokeColor,
             Style = SKPaintStyle.Stroke,
             StrokeWidth = 2,
             IsAntialias = true
         };
-
         using var path = new SKPath();
 
         for (int i = 0; i < count; i++)
@@ -621,33 +634,46 @@ public partial class DataPage : ContentPage
 
         canvas.DrawPath(path, paint);
 
+        // Titolo corretto (EXG1/EXG2 in split EXG)
+        string splitTitle;
+        if (viewModel.IsExgSplit)
+        {
+            string exgLabel = axisIndex == 0 ? "EXG1" : "EXG2";
+            splitTitle = $"Real-time {group} — {exgLabel}";
+        }
+        else
+        {
+            string axisLetter = axisIndex == 0 ? "X" : axisIndex == 1 ? "Y" : "Z";
+            splitTitle = $"Real-time {group} — Axis {axisLetter}";
+        }
 
-
-        // Axes and title
-        string axisLetter = axisIndex == 0 ? "X" : axisIndex == 1 ? "Y" : "Z";
-        string baseTitle = $"Real-time {group}";          // niente (X,Y,Z)
-        string splitTitle = $"{baseTitle} — Axis {axisLetter}";
         DrawAxesAndTitle(canvas, info, leftMargin, margin, w, h, yRange, bottomY, timeStart, splitTitle);
+
 
     }
 
     // Helper: check if the whole group is enabled
-    private bool IsGroupEnabled(string group) => group switch
+    private bool IsGroupEnabled(string group)
     {
-        "Low-Noise Accelerometer" => viewModel.GetCurrentSensorConfiguration().EnableLowNoiseAccelerometer,
-        "Wide-Range Accelerometer" => viewModel.GetCurrentSensorConfiguration().EnableWideRangeAccelerometer,
-        "Gyroscope" => viewModel.GetCurrentSensorConfiguration().EnableGyroscope,
-        "Magnetometer" => viewModel.GetCurrentSensorConfiguration().EnableMagnetometer,
+        var cfg = viewModel.GetCurrentSensorConfiguration();
+        return group switch
+        {
+            "Low-Noise Accelerometer" => cfg.EnableLowNoiseAccelerometer,
+            "Wide-Range Accelerometer" => cfg.EnableWideRangeAccelerometer,
+            "Gyroscope" => cfg.EnableGyroscope,
+            "Magnetometer" => cfg.EnableMagnetometer,
 
-        // EXG intero gruppo
-        "EXG" => viewModel.GetCurrentSensorConfiguration().EnableExg,
+            // EXG (gruppi a due canali)
+            "EXG" => cfg.EnableExg,
+            "ECG" => cfg.EnableExg && cfg.IsExgModeECG,
+            "EMG" => cfg.EnableExg && cfg.IsExgModeEMG,
+            "EXG Test" => cfg.EnableExg && cfg.IsExgModeTest,
+            "Respiration" => cfg.EnableExg && cfg.IsExgModeRespiration,
 
-        // Respiration solo se EXG attivo e modalità Respiration selezionata
-        "Respiration" => viewModel.GetCurrentSensorConfiguration().EnableExg
-                         && viewModel.GetCurrentSensorConfiguration().IsExgModeRespiration,
+            _ => false
+        };
+    }
 
-        _ => false
-    };
 
 
 

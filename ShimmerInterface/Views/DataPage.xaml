@@ -58,23 +58,11 @@ It includes configuration controls, parameter selection, and a dynamically updat
                            FontSize="16"
                            FontAttributes="Bold" />
                     <Label Grid.Row="1" Grid.Column="1"
-                           VerticalOptions="Center"
-                           FontSize="16"
-                           TextColor="{StaticResource Primary}"
-                           Text="Single Parameter">
-                        <!-- Dynamically change label based on chart mode -->
-                        <Label.Triggers>
-                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Single">
-                                <Setter Property="Text" Value="Single Parameter" />
-                            </DataTrigger>
-                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Multi">
-                                <Setter Property="Text" Value="Multi Parameter (X,Y,Z)" />
-                            </DataTrigger>
-                            <DataTrigger TargetType="Label" Binding="{Binding ChartDisplayMode}" Value="Split">
-                                <Setter Property="Text" Value="Split (three separate charts)" />
-                            </DataTrigger>
-                        </Label.Triggers>
-                    </Label>
+                       VerticalOptions="Center"
+                       FontSize="16"
+                       TextColor="{StaticResource Primary}"
+                       Text="{Binding ChartModeLabel}" />
+
 
                     <!-- Auto Y-axis toggle -->
                     <Label Grid.Row="2" Grid.Column="0"
@@ -314,15 +302,23 @@ It includes configuration controls, parameter selection, and a dynamically updat
 
                     <!-- Z chart -->
                     <Border BackgroundColor="White"
-                            Stroke="{StaticResource Gray200}"
-                            StrokeThickness="1"
-                            Padding="5"
-                            HeightRequest="220">
-                        <!-- One dedicated canvas for Z axis -->
-                        <skia:SKCanvasView x:Name="canvasZ"
-                                           HeightRequest="210"
-                                           PaintSurface="OnCanvasZPaintSurface" />
+                        Stroke="{StaticResource Gray200}"
+                        StrokeThickness="1"
+                        Padding="5"
+                        HeightRequest="220">
+                                        <!-- AGGIUNTA: in Split EXG mostriamo solo 2 grafici (EXG1/EXG2) -->
+                                        <Border.Triggers>
+                                            <DataTrigger TargetType="Border" Binding="{Binding IsExgSplit}" Value="True">
+                                                <Setter Property="IsVisible" Value="False" />
+                                            </DataTrigger>
+                                        </Border.Triggers>
+
+                                        <skia:SKCanvasView x:Name="canvasZ"
+                                       HeightRequest="210"
+                                       PaintSurface="OnCanvasZPaintSurface" />
                     </Border>
+
+
                 </VerticalStackLayout>
 
                 <!-- Compact summary of current settings -->
@@ -343,7 +339,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             <Label.FormattedText>
                                 <FormattedString>
                                     <Span Text="Display Mode:  " TextColor="{StaticResource Primary}"/>
-                                    <Span Text="{Binding ChartDisplayMode}" TextColor="Black"/>
+                                    <Span Text="{Binding ChartModeLabel}" TextColor="Black"/>
                                 </FormattedString>
                             </Label.FormattedText>
                         </Label>
