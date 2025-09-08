@@ -5,9 +5,8 @@ using System.Threading.Tasks;
 using ShimmerAPI;
 #endif
 #if ANDROID
-using XR2Learn_ShimmerAPI.IMU.Android; // per ShimmerLogAndStreamAndroidBluetoothV2
+using XR2Learn_ShimmerAPI.Android;   // ShimmerLogAndStreamAndroidBluetoothV2
 #endif
-
 
 namespace XR2Learn_ShimmerAPI.IMU
 {

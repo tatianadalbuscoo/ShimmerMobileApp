@@ -22,6 +22,12 @@ namespace XR2Learn_ShimmerAPI.GSR
         private bool _enableExg;
         private ExgMode _exgMode;
 
+#if ANDROID
+private string? _endpointMac;
+private string? _deviceId;
+#endif
+
+
         public double SamplingRate
         {
             get => _samplingRate;

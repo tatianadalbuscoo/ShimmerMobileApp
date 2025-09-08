@@ -1,5 +1,6 @@
 ﻿using ShimmerInterface.ViewModels;
 using XR2Learn_ShimmerAPI.IMU;
+using XR2Learn_ShimmerAPI.GSR;
 using SkiaSharp.Views.Maui;
 using SkiaSharp;
 using ShimmerInterface.Models;
@@ -20,9 +21,12 @@ public partial class DataPage : ContentPage
 
     private bool _firstOpen = true;
     private XR2Learn_ShimmerIMU? _imu;
-#if WINDOWS
-    private readonly XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG? _exg;
+
+
+#if WINDOWS || ANDROID
+private readonly XR2Learn_ShimmerEXG? _exg;
 #endif
+
 
 
     /// <summary>
@@ -48,7 +52,7 @@ public partial class DataPage : ContentPage
         viewModel.ShowAlertRequested += OnShowAlertRequested;
     }
 
-#if WINDOWS
+#if WINDOWS || ANDROID
     public DataPage(XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG shimmer, ShimmerDevice sensorConfig)
     {
         InitializeComponent();

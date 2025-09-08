@@ -8,7 +8,7 @@ using Android.Bluetooth;
 using Java.Util;
 using Java.Lang.Reflect; // Method
 
-namespace XR2Learn_ShimmerAPI.IMU.Android
+namespace XR2Learn_ShimmerAPI.Android
 {
     /// <summary>Connessione RFCOMM SPP verso Shimmer con retry/fallback e timeout.</summary>
     internal sealed class AndroidBluetoothConnection : IShimmerConnection

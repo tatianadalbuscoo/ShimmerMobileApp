@@ -1,7 +1,7 @@
 ﻿#if ANDROID
 using System.IO;
 
-namespace XR2Learn_ShimmerAPI.IMU.Android
+namespace XR2Learn_ShimmerAPI.Android
 {
     /// <summary>Astrazione di trasporto per ShimmerBluetooth (solo Android).</summary>
     internal interface IShimmerConnection

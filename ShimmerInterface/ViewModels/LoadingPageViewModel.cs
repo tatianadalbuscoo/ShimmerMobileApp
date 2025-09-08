@@ -5,9 +5,10 @@ using ShimmerInterface.Models;
 using System.Diagnostics;
 
 
-#if WINDOWS
+#if WINDOWS || ANDROID
 using XR2Learn_ShimmerAPI.GSR; // ← wrapper EXG
 #endif
+
 
 namespace ShimmerInterface.ViewModels;
 
@@ -178,7 +179,60 @@ public partial class LoadingPageViewModel : ObservableObject
                 exg.StartStreaming();
                 return exg; // ← può essere usato come dynamic nella DataPage
             }
+#elif ANDROID
+    if (device.IsExg && device.EnableExg)
+    {
+        var exgModeSel =
+            device.IsExgModeRespiration ? ExgMode.Respiration :
+            device.IsExgModeECG        ? ExgMode.ECG :
+            device.IsExgModeEMG        ? ExgMode.EMG :
+            ExgMode.ECG; // default
+
+        var exg = new XR2Learn_ShimmerEXG
+        {
+            EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
+            EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
+            EnableGyroscope = device.EnableGyroscope,
+            EnableMagnetometer = device.EnableMagnetometer,
+            EnablePressureTemperature = device.EnablePressureTemperature,
+            EnableBatteryVoltage = device.EnableBattery,
+            EnableExtA6 = device.EnableExtA6,
+            EnableExtA7 = device.EnableExtA7,
+            EnableExtA15 = device.EnableExtA15,
+
+            EnableExg = true,
+            ExgMode   = exgModeSel
+        };
+
+        // ⬇️ NIENTE named args: tutti posizionali
+        exg.ConfigureAndroid(
+            "Shimmer3",                    // deviceId / name (come per IMU)
+            device.Port1,                  // MAC
+            device.EnableLowNoiseAccelerometer,
+            device.EnableWideRangeAccelerometer,
+            device.EnableGyroscope,
+            device.EnableMagnetometer,
+            device.EnablePressureTemperature,
+            device.EnableBattery,
+            device.EnableExtA6,
+            device.EnableExtA7,
+            device.EnableExtA15,
+            true,                          // enableExg
+            exgModeSel                     // ExgMode
+        );
+
+        var connectTaskExg = Task.Run(() => exg.Connect());
+        var completedExg = await Task.WhenAny(connectTaskExg, Task.Delay(30000));
+        if (completedExg != connectTaskExg) return null;
+        if (connectTaskExg.IsFaulted) return null;
+        if (!exg.IsConnected()) return null;
+
+        exg.StartStreaming();
+        return exg;
+    }
+
 #endif
+
             // ===== Branch IMU (default o piattaforme non-Windows) =====
 
             var imu = new XR2Learn_ShimmerIMU

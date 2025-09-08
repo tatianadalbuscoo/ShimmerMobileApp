@@ -228,6 +228,8 @@ public partial class MainPageViewModel : ObservableObject
         {
             var bonded = adapter.BondedDevices;
             var any = false;
+
+            // IMPORTANT: evita blocchi UI
             foreach (var d in bonded)
             {
                 var name = d?.Name ?? string.Empty;
@@ -238,13 +240,24 @@ public partial class MainPageViewModel : ObservableObject
                 var mac = d!.Address;
                 var shimmerName = ExtractShimmerName(deviceId: string.Empty, friendlyName: name);
 
+                var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindAndroidAsync("scan", mac);
+
                 AvailableDevices.Add(new ShimmerDevice
                 {
                     DisplayName = name,
                     Port1 = mac,
                     ShimmerName = shimmerName,
-                    IsExg = false,              // su Android lascia default (se vuoi, aggiungiamo detection più avanti)
-                    ChannelsDisplay = "(unknown)",
+                    BoardRawId = raw,
+                    IsExg = ok && kind == ShimmerSensorScanner.BoardKind.EXG,
+
+                    // ⬇️ prima: "unknown" –> ora "device off"
+                    RightBadge = ok
+                        ? (kind == ShimmerSensorScanner.BoardKind.EXG ? "EXG" : "IMU")
+                        : "device off",
+
+                    ChannelsDisplay = ok
+                        ? (kind == ShimmerSensorScanner.BoardKind.EXG ? "EXG" : "IMU")
+                        : "(off)",
 
                     EnableLowNoiseAccelerometer = true,
                     EnableWideRangeAccelerometer = true,
@@ -256,6 +269,7 @@ public partial class MainPageViewModel : ObservableObject
                     EnableExtA7 = true,
                     EnableExtA15 = true
                 });
+
             }
 
             if (!any)
@@ -268,6 +282,7 @@ public partial class MainPageViewModel : ObservableObject
     {
         AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth Error", Port1 = ex.Message, ShimmerName = "----" });
     }
+
 #else
     Console.WriteLine("No supported platforms.");
 #endif
@@ -354,26 +369,31 @@ public partial class MainPageViewModel : ObservableObject
                     ? $"Shimmer {d.ShimmerName}"
                     : $"Shimmer {index + 1}";
 
-#if WINDOWS
-    if (shimmer is XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU sImuWin)
+
+#if WINDOWS || ANDROID
+    if (shimmer is XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU sImu)
     {
-        var page = new DataPage(sImuWin, device);
+        var page = new DataPage(sImu, device);
         page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
         tabbedPage.Children.Add(page);
     }
-    else if (shimmer is XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG sExgWin)
+    else if (shimmer is XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG sExg)
     {
-        // <<< NUOVO: pagina per EXG >>>
-        var page = new DataPage(sExgWin, device); // richiede il costruttore EXG in DataPage
+        var page = new DataPage(sExg, device); // costruttore EXG in DataPage
         page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device))) + " (EXG)";
         tabbedPage.Children.Add(page);
     }
 #else
             // Android/iOS: solo IMU
-            var page = new DataPage((XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU)shimmer, device);
-            page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
-            tabbedPage.Children.Add(page);
+            if (shimmer is XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU sImuDroid)
+            {
+                var page = new DataPage(sImuDroid, device);
+                page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
+                tabbedPage.Children.Add(page);
+            }
+            // (se mai capitasse un EXG su Android, qui lo ignoriamo)
 #endif
+
         }
 
 

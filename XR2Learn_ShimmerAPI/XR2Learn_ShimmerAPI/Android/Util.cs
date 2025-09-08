@@ -2,7 +2,7 @@
 using System;
 using System.Text;
 
-namespace XR2Learn_ShimmerAPI.IMU.Android
+namespace XR2Learn_ShimmerAPI.Android
 {
     public static class Util
     {
