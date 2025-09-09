@@ -6,11 +6,35 @@ Includes device selection, sensor options toggles, and a button to initiate conn
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:shapes="clr-namespace:Microsoft.Maui.Controls.Shapes;assembly=Microsoft.Maui.Controls"
              xmlns:viewmodels="clr-namespace:ShimmerInterface.ViewModels"
              xmlns:models="clr-namespace:ShimmerInterface.Models"
              x:Class="ShimmerInterface.Views.MainPage"
              x:Name="MainPageRoot"
              BackgroundColor="{StaticResource PageBackground}">
+    <ContentPage.Resources>
+        <ControlTemplate x:Key="RadioWithDotTemplate">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                <!-- Cerchio + puntino sovrapposti -->
+                <Grid WidthRequest="18" HeightRequest="18" VerticalOptions="Center">
+                    <!-- Anello -->
+                    <shapes:Ellipse WidthRequest="18" HeightRequest="18"
+                    Fill="Transparent" Stroke="Black" StrokeThickness="2" />
+                    <!-- Puntino -->
+                    <shapes:Ellipse WidthRequest="10" HeightRequest="10"
+                    Fill="Black"
+                    HorizontalOptions="Center" VerticalOptions="Center"
+                    IsVisible="{TemplateBinding IsChecked}" />
+                </Grid>
+
+
+                <!-- Testo del RadioButton -->
+                <ContentPresenter Grid.Column="1" VerticalOptions="Center" />
+            </Grid>
+        </ControlTemplate>
+
+    </ContentPage.Resources>
+
 
     <ContentPage.BindingContext>
         <viewmodels:MainPageViewModel />
@@ -158,19 +182,31 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                                                          Spacing="6"
                                                          IsVisible="{Binding IsExg}"
                                                          Margin="0,12,0,0">
-                                        <RadioButton Content="ECG"
-                                                     GroupName="{Binding ExgModeGroupName}"
-                                                     IsChecked="{Binding IsExgModeECG, Mode=TwoWay}" />
-                                        <RadioButton Content="EMG"
-                                                     GroupName="{Binding ExgModeGroupName}"
-                                                     IsChecked="{Binding IsExgModeEMG, Mode=TwoWay}" />
-                                        <RadioButton Content="EXG Test"
-                                                     GroupName="{Binding ExgModeGroupName}"
-                                                     IsChecked="{Binding IsExgModeTest, Mode=TwoWay}" />
-                                        <RadioButton Content="Respiration"
-                                                     GroupName="{Binding ExgModeGroupName}"
-                                                     IsChecked="{Binding IsExgModeRespiration, Mode=TwoWay}" />
-                                    </VerticalStackLayout>
+                                            <RadioButton Content="ECG"
+                                                 TextColor="Black"
+                                                 ControlTemplate="{StaticResource RadioWithDotTemplate}"
+                                                 GroupName="{Binding ExgModeGroupName}"
+                                                 IsChecked="{Binding IsExgModeECG, Mode=TwoWay}" />
+
+                                                                                <RadioButton Content="EMG"
+                                                 TextColor="Black"
+                                                 ControlTemplate="{StaticResource RadioWithDotTemplate}"
+                                                 GroupName="{Binding ExgModeGroupName}"
+                                                 IsChecked="{Binding IsExgModeEMG, Mode=TwoWay}" />
+
+                                                                                <RadioButton Content="EXG Test"
+                                                 TextColor="Black"
+                                                 ControlTemplate="{StaticResource RadioWithDotTemplate}"
+                                                 GroupName="{Binding ExgModeGroupName}"
+                                                 IsChecked="{Binding IsExgModeTest, Mode=TwoWay}" />
+
+                                                                                <RadioButton Content="Respiration"
+                                                 TextColor="Black"
+                                                 ControlTemplate="{StaticResource RadioWithDotTemplate}"
+                                                 GroupName="{Binding ExgModeGroupName}"
+                                                 IsChecked="{Binding IsExgModeRespiration, Mode=TwoWay}" />
+
+                                        </VerticalStackLayout>
                                 </Grid>
                             </VerticalStackLayout>
                         </Frame>

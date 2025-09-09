@@ -1461,7 +1461,6 @@ private static bool IsSplitVariantLabel(string displayName) =>
                                             : "EXG";
                 string s1 = has1 ? v1.ToString("F4") : "-";
                 string s2 = has2 ? v2.ToString("F4") : "-";
-                System.Diagnostics.Debug.WriteLine($"[EXG] t={tMs} ms | {mode}  CH1={s1}  CH2={s2}");
                             }
                         else if (enableExg && sampleCounter % 50 == 0)
                             {
