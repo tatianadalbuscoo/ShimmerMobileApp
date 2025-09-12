@@ -35,6 +35,8 @@ namespace XR2Learn_ShimmerAPI.GSR
             shimmerAndroid.Connect();
             global::Android.Util.Log.Info("Shimmer-EXG", $"Android Connect() -> {shimmerAndroid.IsConnected()}");
             return;
+#elif MACCATALYST || IOS
+    return;
 #else
             throw new PlatformNotSupportedException("Windows-only in this wrapper.");
 #endif
@@ -51,6 +53,8 @@ namespace XR2Learn_ShimmerAPI.GSR
             shimmerAndroid?.Disconnect();
             await DelayWork(1000);
             return;
+#elif MACCATALYST || IOS
+    await DisconnectMacAsync();
 #else
             await Task.CompletedTask;
             throw new PlatformNotSupportedException("Windows-only in this wrapper.");
@@ -100,6 +104,8 @@ namespace XR2Learn_ShimmerAPI.GSR
             shimmerAndroid.StartStreaming();
             global::Android.Util.Log.Info("Shimmer-EXG", $"StartStreaming OK (sensors=0x{_androidEnabledSensors:X}, SR={sr})");
             return;
+#elif MACCATALYST || IOS
+    await StartStreamingMacAsync();
 #else
             await Task.CompletedTask;
             throw new PlatformNotSupportedException("Windows-only in this wrapper.");
@@ -115,6 +121,8 @@ namespace XR2Learn_ShimmerAPI.GSR
             shimmerAndroid?.StopStreaming();
             await DelayWork(1000);
             return;
+#elif MACCATALYST || IOS
+    await StopStreamingMacAsync();
 #else
             await Task.CompletedTask;
             throw new PlatformNotSupportedException("Windows-only in this wrapper.");
@@ -127,14 +135,16 @@ namespace XR2Learn_ShimmerAPI.GSR
             return shimmer != null && shimmer.IsConnected();
 #elif ANDROID
             return shimmerAndroid != null && shimmerAndroid.IsConnected();
+#elif MACCATALYST || IOS
+    return IsConnectedMac();
 #else
             return false;
 #endif
         }
 
 #if ANDROID
-// piccolo helper per uniformare i Delay come nella IMU
-private Task DelayWork(int ms) => Task.Delay(ms);
+        // piccolo helper per uniformare i Delay come nella IMU
+        private Task DelayWork(int ms) => Task.Delay(ms);
 #endif
     }
 }

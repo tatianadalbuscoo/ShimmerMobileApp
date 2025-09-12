@@ -10,9 +10,7 @@ using System.Threading.Tasks;
 using Microsoft.Maui.Graphics;
 
 
-#if WINDOWS || ANDROID
 using XR2Learn_ShimmerAPI.GSR;  // XR2Learn_ShimmerEXG, ExgMode
-#endif
 
 
 
@@ -52,9 +50,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     // ==== Device references and internal timer for periodic updates ====
     private readonly XR2Learn_ShimmerIMU? shimmerImu;
 
-#if WINDOWS || ANDROID
 private readonly XR2Learn_ShimmerEXG? shimmerExg;
-#endif
 
     // flag di sessione EXG (copiati dal config)
     private readonly bool enableExg;
@@ -178,34 +174,26 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
     public IAsyncRelayCommand ApplySamplingRateCommand { get; }
 
     private double DeviceSamplingRate => shimmerImu?.SamplingRate
-#if WINDOWS || ANDROID
                                      ?? shimmerExg?.SamplingRate
-#endif
                                          ?? 51.2;
 
 
     private void DeviceStartStreaming()
     {
         try { shimmerImu?.StartStreaming(); } catch { }
-#if WINDOWS || ANDROID
     try { shimmerExg?.StartStreaming(); } catch { }
-#endif
     }
     private void DeviceStopStreaming()
     {
         try { shimmerImu?.StopStreaming(); } catch { }
-#if WINDOWS || ANDROID
     try { shimmerExg?.StopStreaming(); } catch { }
-#endif
     }
 
 
     private double SetFirmwareSamplingRateNearestUnified(double newRate)
     {
         if (shimmerImu != null) return shimmerImu.SetFirmwareSamplingRateNearest(newRate);
-#if WINDOWS || ANDROID
     if (shimmerExg != null) return shimmerExg.SetFirmwareSamplingRateNearest(newRate);
-#endif
         return newRate;
     }
 
@@ -213,16 +201,13 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
     private void SubscribeSamples()
     {
         if (shimmerImu != null) shimmerImu.SampleReceived += OnSampleReceived;
-#if WINDOWS || ANDROID
+
     if (shimmerExg != null) shimmerExg.SampleReceived += OnSampleReceived;
-#endif
     }
     private void UnsubscribeSamples()
     {
         if (shimmerImu != null) shimmerImu.SampleReceived -= OnSampleReceived;
-#if WINDOWS || ANDROID
     if (shimmerExg != null) shimmerExg.SampleReceived -= OnSampleReceived;
-#endif
     }
 
 
@@ -410,7 +395,6 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
         UpdateTextProperties();
     }
 
-#if WINDOWS || ANDROID
 public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config)
 {
     shimmerExg = shimmerDevice;
@@ -462,7 +446,6 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
 
     UpdateTextProperties();
 }
-#endif
 
 
     partial void OnIsYAxisManualEnabledChanged(bool value)

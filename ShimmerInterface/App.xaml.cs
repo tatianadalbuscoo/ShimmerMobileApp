@@ -9,6 +9,10 @@ using XR2Learn_ShimmerAPI.IMU;
 using ShimmerInterface.Models;
 #endif
 
+#if IOS || MACCATALYST
+using XR2Learn_ShimmerAPI.GSR;   // <-- AGGIUNGI QUESTO
+#endif
+
 namespace ShimmerInterface;
 
 public partial class App : Application
@@ -87,48 +91,90 @@ public partial class App : Application
 
             foreach (var mac in activeMacs)
             {
-                // 1) chiedi la config reale al server
+                // 1) config reale
                 var cfgMap = await QueryConfigAsync(BridgeHost, BridgePort, BridgePath, mac);
 
-                // 2) IMU con flag informativi in base alla config del server
+                // 2) IMU (resta come prima)
                 var imu = new XR2Learn_ShimmerIMU
                 {
-                    EnableLowNoiseAccelerometer  = cfgMap.TryGetValue("lna", out var b1) && b1,
+                    EnableLowNoiseAccelerometer = cfgMap.TryGetValue("lna", out var b1) && b1,
                     EnableWideRangeAccelerometer = cfgMap.TryGetValue("wra", out var b2) && b2,
-                    EnableGyroscope              = cfgMap.TryGetValue("gyro", out var b3) && b3,
-                    EnableMagnetometer           = cfgMap.TryGetValue("mag", out var b4) && b4,
-                    EnablePressureTemperature    = cfgMap.TryGetValue("pt",  out var b5) && b5,
-                    EnableBattery                = cfgMap.TryGetValue("batt",out var b6) && b6,
-                    EnableExtA6                  = cfgMap.TryGetValue("a6",  out var b7) && b7,
-                    EnableExtA7                  = cfgMap.TryGetValue("a7",  out var b8) && b8,
-                    EnableExtA15                 = cfgMap.TryGetValue("a15", out var b9) && b9,
+                    EnableGyroscope = cfgMap.TryGetValue("gyro", out var b3) && b3,
+                    EnableMagnetometer = cfgMap.TryGetValue("mag", out var b4) && b4,
+                    EnablePressureTemperature = cfgMap.TryGetValue("pt", out var b5) && b5,
+                    EnableBattery = cfgMap.TryGetValue("batt", out var b6) && b6,
+                    EnableExtA6 = cfgMap.TryGetValue("a6", out var b7) && b7,
+                    EnableExtA7 = cfgMap.TryGetValue("a7", out var b8) && b8,
+                    EnableExtA15 = cfgMap.TryGetValue("a15", out var b9) && b9,
 
                     BridgeHost = BridgeHost,
                     BridgePort = BridgePort,
                     BridgePath = BridgePath,
-                    BridgeTargetMac = mac // subscribe a questo MAC
+                    BridgeTargetMac = mac
                 };
 
-                // 3) ShimmerDevice coerente con i flag IMU (DataPage crea le serie in base a questi)
-                var cfg = new ShimmerDevice
+                var cfgImu = new ShimmerDevice
                 {
                     ShimmerName = $"Shimmer {mac}",
                     Port1 = $"ws://{BridgeHost}:{BridgePort}{BridgePath}",
 
-                    EnableLowNoiseAccelerometer  = imu.EnableLowNoiseAccelerometer,
+                    EnableLowNoiseAccelerometer = imu.EnableLowNoiseAccelerometer,
                     EnableWideRangeAccelerometer = imu.EnableWideRangeAccelerometer,
-                    EnableGyroscope              = imu.EnableGyroscope,
-                    EnableMagnetometer           = imu.EnableMagnetometer,
-                    EnablePressureTemperature    = imu.EnablePressureTemperature,
-                    EnableBattery                = imu.EnableBattery,
-                    EnableExtA6                  = imu.EnableExtA6,
-                    EnableExtA7                  = imu.EnableExtA7,
-                    EnableExtA15                 = imu.EnableExtA15
+                    EnableGyroscope = imu.EnableGyroscope,
+                    EnableMagnetometer = imu.EnableMagnetometer,
+                    EnablePressureTemperature = imu.EnablePressureTemperature,
+                    EnableBattery = imu.EnableBattery,
+                    EnableExtA6 = imu.EnableExtA6,
+                    EnableExtA7 = imu.EnableExtA7,
+                    EnableExtA15 = imu.EnableExtA15
                 };
 
-                var page = new DataPage(imu, cfg) { Title = mac };
-                tabs.Children.Add(page);
+                // Pagina IMU
+                var imuPage = new DataPage(imu, cfgImu) { Title = $"IMU • {mac}" };
+                tabs.Children.Add(imuPage);
+
+                // 3) EXG: istanzia l'oggetto bridge EXG
+                var exg = new XR2Learn_ShimmerEXG
+                {
+                    BridgeHost = BridgeHost,
+                    BridgePort = BridgePort,
+                    BridgePath = BridgePath,
+                    BridgeTargetMac = mac
+                };
+
+                // leggi modalità EXG (ecg/emg/test/resp) + abilita
+                var exgMode = await QueryExgModeAsync(BridgeHost, BridgePort, BridgePath, mac);
+                bool exgEnabled = cfgMap.TryGetValue("exg", out var bx) && bx;
+
+                var cfgExg = new ShimmerDevice
+                {
+                    ShimmerName = $"Shimmer {mac}",
+                    Port1 = $"ws://{BridgeHost}:{BridgePort}{BridgePath}",
+
+                    // Flag EXG per la DataPage/VM
+                    EnableExg = exgEnabled,
+                    IsExgModeECG = exgMode == "ecg",
+                    IsExgModeEMG = exgMode == "emg",
+                    IsExgModeTest = exgMode == "test",
+                    IsExgModeRespiration = exgMode == "resp",
+
+                    // (opzionale) puoi anche riflettere i flag IMU se vuoi vederli nella stessa pagina EXG
+                    EnableLowNoiseAccelerometer = imu.EnableLowNoiseAccelerometer,
+                    EnableWideRangeAccelerometer = imu.EnableWideRangeAccelerometer,
+                    EnableGyroscope = imu.EnableGyroscope,
+                    EnableMagnetometer = imu.EnableMagnetometer,
+                    EnablePressureTemperature = imu.EnablePressureTemperature,
+                    EnableBattery = imu.EnableBattery,
+                    EnableExtA6 = imu.EnableExtA6,
+                    EnableExtA7 = imu.EnableExtA7,
+                    EnableExtA15 = imu.EnableExtA15
+                };
+
+                // Pagina EXG (usa il costruttore EXG della DataPage)
+                var exgPage = new DataPage(exg, cfgExg) { Title = $"EXG • {mac}" };
+                tabs.Children.Add(exgPage);
             }
+
 
             await MainThread.InvokeOnMainThreadAsync(() =>
             {
@@ -190,12 +236,23 @@ public partial class App : Application
         return Array.Empty<string>();
     }
 
-    private static async Task<Dictionary<string,bool>> QueryConfigAsync(string host, int port, string path, string mac)
+    private static async Task<Dictionary<string, bool>> QueryConfigAsync(string host, int port, string path, string mac)
     {
-        var result = new Dictionary<string,bool>(StringComparer.OrdinalIgnoreCase)
+        var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase)
         {
-            ["lna"] = false, ["wra"] = false, ["gyro"] = false, ["mag"] = false,
-            ["pt"] = false, ["batt"] = false, ["a6"] = false, ["a7"] = false, ["a15"] = false
+            ["lna"] = false,
+            ["wra"] = false,
+            ["gyro"] = false,
+            ["mag"] = false,
+            ["pt"] = false,
+            ["batt"] = false,
+            ["a6"] = false,
+            ["a7"] = false,
+            ["a15"] = false,
+            // EXG
+            ["exg1"] = false,
+            ["exg2"] = false,
+            ["exg"] = false
         };
 
         using var ws = new ClientWebSocket();
@@ -222,21 +279,75 @@ public partial class App : Application
                 root.TryGetProperty("cfg", out var cfg))
             {
                 bool Get(string name) => cfg.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.True;
-                result["lna"]  = Get("EnableLowNoiseAccelerometer");
-                result["wra"]  = Get("EnableWideRangeAccelerometer");
+
+                // IMU
+                result["lna"] = Get("EnableLowNoiseAccelerometer");
+                result["wra"] = Get("EnableWideRangeAccelerometer");
                 result["gyro"] = Get("EnableGyroscope");
-                result["mag"]  = Get("EnableMagnetometer");
-                result["pt"]   = Get("EnablePressureTemperature");
+                result["mag"] = Get("EnableMagnetometer");
+                result["pt"] = Get("EnablePressureTemperature");
                 result["batt"] = Get("EnableBattery");
-                result["a6"]   = Get("EnableExtA6");
-                result["a7"]   = Get("EnableExtA7");
-                result["a15"]  = Get("EnableExtA15");
+                result["a6"] = Get("EnableExtA6");
+                result["a7"] = Get("EnableExtA7");
+                result["a15"] = Get("EnableExtA15");
+
+                // EXG (naming robusto)
+                bool exg1 = Get("EnableExg1") || Get("EXG1Enabled");
+                bool exg2 = Get("EnableExg2") || Get("EXG2Enabled");
+                bool exg = Get("EnableExg") || exg1 || exg2;
+
+                result["exg1"] = exg1;
+                result["exg2"] = exg2;
+                result["exg"] = exg;
             }
         }
         catch { /* ignore parse errors; default = all false */ }
 
         return result;
     }
+
+    private static async Task<string> QueryExgModeAsync(string host, int port, string path, string mac)
+    {
+        using var ws = new ClientWebSocket();
+        var uri = new Uri($"ws://{host}:{port}{path}");
+        await ws.ConnectAsync(uri, default);
+
+        // hello
+        await ws.SendAsync(Encoding.UTF8.GetBytes("{\"type\":\"hello\"}"),
+                           WebSocketMessageType.Text, true, default);
+        await ReceiveOneAsync(ws); // hello_ack
+
+        // get_config
+        var msg = $"{{\"type\":\"get_config\",\"mac\":\"{mac}\"}}";
+        await ws.SendAsync(Encoding.UTF8.GetBytes(msg),
+                           WebSocketMessageType.Text, true, default);
+
+        var raw = await ReceiveOneAsync(ws);
+        try
+        {
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            if (root.TryGetProperty("type", out var t) && t.GetString() == "config" &&
+                root.TryGetProperty("ok", out var ok) && ok.GetBoolean() &&
+                root.TryGetProperty("cfg", out var cfg))
+            {
+                // prova prima "ExgMode"
+                if (cfg.TryGetProperty("ExgMode", out var m) && m.ValueKind == JsonValueKind.String)
+                    return (m.GetString() ?? "ecg").ToLowerInvariant();
+
+                // alternative comuni
+                if (cfg.TryGetProperty("exg_mode", out var m2) && m2.ValueKind == JsonValueKind.String)
+                    return (m2.GetString() ?? "ecg").ToLowerInvariant();
+
+                // fallback: se c'è una flag respiration
+                if (cfg.TryGetProperty("RespirationEnabled", out var r) && r.ValueKind == JsonValueKind.True)
+                    return "resp";
+            }
+        }
+        catch { }
+        return "ecg"; // default
+    }
+
 
     private static async Task<string> ReceiveOneAsync(ClientWebSocket ws)
     {

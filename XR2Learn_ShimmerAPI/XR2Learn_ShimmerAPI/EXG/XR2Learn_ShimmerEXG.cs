@@ -148,6 +148,11 @@ private static (int idx, string? name, string? fmt) FindSignalA(ObjectCluster oc
             if (requestedHz <= 0) throw new ArgumentOutOfRangeException(nameof(requestedHz));
 
             double clock = 32768.0; // Shimmer3 default; Shimmer2 uses 1024 Hz
+#if IOS || MACCATALYST
+    if (!string.IsNullOrWhiteSpace(BridgeTargetMac))
+        return SetFirmwareSamplingRateNearestAsync(requestedHz).GetAwaiter().GetResult();
+#endif
+
 #if WINDOWS
             try
             {

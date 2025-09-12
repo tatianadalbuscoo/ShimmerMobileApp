@@ -23,9 +23,9 @@ public partial class DataPage : ContentPage
     private XR2Learn_ShimmerIMU? _imu;
 
 
-#if WINDOWS || ANDROID
+
+
 private readonly XR2Learn_ShimmerEXG? _exg;
-#endif
 
 
 
@@ -52,7 +52,6 @@ private readonly XR2Learn_ShimmerEXG? _exg;
         viewModel.ShowAlertRequested += OnShowAlertRequested;
     }
 
-#if WINDOWS || ANDROID
     public DataPage(XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG shimmer, ShimmerDevice sensorConfig)
     {
         InitializeComponent();
@@ -66,7 +65,7 @@ private readonly XR2Learn_ShimmerEXG? _exg;
         viewModel.HideBusyRequested += OnHideBusyRequested;
         viewModel.ShowAlertRequested += OnShowAlertRequested;
     }
-#endif
+
 
     /// <summary>
     /// Renders the chart surface using SkiaSharp, including background, grid, sensor data,
