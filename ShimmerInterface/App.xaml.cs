@@ -88,92 +88,85 @@ public partial class App : Application
             }
 
             var tabs = new TabbedPage { Title = "Shimmer Streams" };
+foreach (var mac in activeMacs)
+{
+    // 1) leggi config reale dal bridge
+    var cfgMap  = await QueryConfigAsync(BridgeHost, BridgePort, BridgePath, mac);
+    bool exgOn  = cfgMap.TryGetValue("exg", out var bx) && bx;
 
-            foreach (var mac in activeMacs)
-            {
-                // 1) config reale
-                var cfgMap = await QueryConfigAsync(BridgeHost, BridgePort, BridgePath, mac);
+    if (exgOn)
+    {
+        // ======== SOLO EXG ========
+        var exg = new XR2Learn_ShimmerEXG
+        {
+            BridgeHost = BridgeHost,
+            BridgePort = BridgePort,
+            BridgePath = BridgePath,
+            BridgeTargetMac = mac
+        };
 
-                // 2) IMU (resta come prima)
-                var imu = new XR2Learn_ShimmerIMU
-                {
-                    EnableLowNoiseAccelerometer = cfgMap.TryGetValue("lna", out var b1) && b1,
-                    EnableWideRangeAccelerometer = cfgMap.TryGetValue("wra", out var b2) && b2,
-                    EnableGyroscope = cfgMap.TryGetValue("gyro", out var b3) && b3,
-                    EnableMagnetometer = cfgMap.TryGetValue("mag", out var b4) && b4,
-                    EnablePressureTemperature = cfgMap.TryGetValue("pt", out var b5) && b5,
-                    EnableBattery = cfgMap.TryGetValue("batt", out var b6) && b6,
-                    EnableExtA6 = cfgMap.TryGetValue("a6", out var b7) && b7,
-                    EnableExtA7 = cfgMap.TryGetValue("a7", out var b8) && b8,
-                    EnableExtA15 = cfgMap.TryGetValue("a15", out var b9) && b9,
+        // modalità EXG (ecg/emg/test/resp) – usa l’helper che abbiamo aggiunto prima
+        var exgMode = await QueryExgModeAsync(BridgeHost, BridgePort, BridgePath, mac);
 
-                    BridgeHost = BridgeHost,
-                    BridgePort = BridgePort,
-                    BridgePath = BridgePath,
-                    BridgeTargetMac = mac
-                };
+        var cfgExg = new ShimmerDevice
+        {
+            ShimmerName = $"Shimmer {mac}",
+            Port1 = $"ws://{BridgeHost}:{BridgePort}{BridgePath}",
 
-                var cfgImu = new ShimmerDevice
-                {
-                    ShimmerName = $"Shimmer {mac}",
-                    Port1 = $"ws://{BridgeHost}:{BridgePort}{BridgePath}",
+            // flag che la DataPage/VM usa per mostrare le serie EXG
+            EnableExg = true,
+            IsExgModeECG         = exgMode == "ecg",
+            IsExgModeEMG         = exgMode == "emg",
+            IsExgModeTest        = exgMode == "test",
+            IsExgModeRespiration = exgMode == "resp"
+        };
 
-                    EnableLowNoiseAccelerometer = imu.EnableLowNoiseAccelerometer,
-                    EnableWideRangeAccelerometer = imu.EnableWideRangeAccelerometer,
-                    EnableGyroscope = imu.EnableGyroscope,
-                    EnableMagnetometer = imu.EnableMagnetometer,
-                    EnablePressureTemperature = imu.EnablePressureTemperature,
-                    EnableBattery = imu.EnableBattery,
-                    EnableExtA6 = imu.EnableExtA6,
-                    EnableExtA7 = imu.EnableExtA7,
-                    EnableExtA15 = imu.EnableExtA15
-                };
+        // Page EXG (e basta)
+        var exgPage = new DataPage(exg, cfgExg) { Title = $"EXG • {mac}" };
+        tabs.Children.Add(exgPage);
+    }
+    else
+    {
+        // ======== SOLO IMU ========
+        var imu = new XR2Learn_ShimmerIMU
+        {
+            EnableLowNoiseAccelerometer  = cfgMap.TryGetValue("lna",  out var b1) && b1,
+            EnableWideRangeAccelerometer = cfgMap.TryGetValue("wra",  out var b2) && b2,
+            EnableGyroscope              = cfgMap.TryGetValue("gyro", out var b3) && b3,
+            EnableMagnetometer           = cfgMap.TryGetValue("mag",  out var b4) && b4,
+            EnablePressureTemperature    = cfgMap.TryGetValue("pt",   out var b5) && b5,
+            EnableBattery                = cfgMap.TryGetValue("batt", out var b6) && b6,
+            EnableExtA6                  = cfgMap.TryGetValue("a6",   out var b7) && b7,
+            EnableExtA7                  = cfgMap.TryGetValue("a7",   out var b8) && b8,
+            EnableExtA15                 = cfgMap.TryGetValue("a15",  out var b9) && b9,
 
-                // Pagina IMU
-                var imuPage = new DataPage(imu, cfgImu) { Title = $"IMU • {mac}" };
-                tabs.Children.Add(imuPage);
+            BridgeHost = BridgeHost,
+            BridgePort = BridgePort,
+            BridgePath = BridgePath,
+            BridgeTargetMac = mac
+        };
 
-                // 3) EXG: istanzia l'oggetto bridge EXG
-                var exg = new XR2Learn_ShimmerEXG
-                {
-                    BridgeHost = BridgeHost,
-                    BridgePort = BridgePort,
-                    BridgePath = BridgePath,
-                    BridgeTargetMac = mac
-                };
+        var cfgImu = new ShimmerDevice
+        {
+            ShimmerName = $"Shimmer {mac}",
+            Port1 = $"ws://{BridgeHost}:{BridgePort}{BridgePath}",
 
-                // leggi modalità EXG (ecg/emg/test/resp) + abilita
-                var exgMode = await QueryExgModeAsync(BridgeHost, BridgePort, BridgePath, mac);
-                bool exgEnabled = cfgMap.TryGetValue("exg", out var bx) && bx;
+            EnableLowNoiseAccelerometer  = imu.EnableLowNoiseAccelerometer,
+            EnableWideRangeAccelerometer = imu.EnableWideRangeAccelerometer,
+            EnableGyroscope              = imu.EnableGyroscope,
+            EnableMagnetometer           = imu.EnableMagnetometer,
+            EnablePressureTemperature    = imu.EnablePressureTemperature,
+            EnableBattery                = imu.EnableBattery,
+            EnableExtA6                  = imu.EnableExtA6,
+            EnableExtA7                  = imu.EnableExtA7,
+            EnableExtA15                 = imu.EnableExtA15
+        };
 
-                var cfgExg = new ShimmerDevice
-                {
-                    ShimmerName = $"Shimmer {mac}",
-                    Port1 = $"ws://{BridgeHost}:{BridgePort}{BridgePath}",
-
-                    // Flag EXG per la DataPage/VM
-                    EnableExg = exgEnabled,
-                    IsExgModeECG = exgMode == "ecg",
-                    IsExgModeEMG = exgMode == "emg",
-                    IsExgModeTest = exgMode == "test",
-                    IsExgModeRespiration = exgMode == "resp",
-
-                    // (opzionale) puoi anche riflettere i flag IMU se vuoi vederli nella stessa pagina EXG
-                    EnableLowNoiseAccelerometer = imu.EnableLowNoiseAccelerometer,
-                    EnableWideRangeAccelerometer = imu.EnableWideRangeAccelerometer,
-                    EnableGyroscope = imu.EnableGyroscope,
-                    EnableMagnetometer = imu.EnableMagnetometer,
-                    EnablePressureTemperature = imu.EnablePressureTemperature,
-                    EnableBattery = imu.EnableBattery,
-                    EnableExtA6 = imu.EnableExtA6,
-                    EnableExtA7 = imu.EnableExtA7,
-                    EnableExtA15 = imu.EnableExtA15
-                };
-
-                // Pagina EXG (usa il costruttore EXG della DataPage)
-                var exgPage = new DataPage(exg, cfgExg) { Title = $"EXG • {mac}" };
-                tabs.Children.Add(exgPage);
-            }
+        // Page IMU (e basta)
+        var imuPage = new DataPage(imu, cfgImu) { Title = $"IMU • {mac}" };
+        tabs.Children.Add(imuPage);
+            
+        }}
 
 
             await MainThread.InvokeOnMainThreadAsync(() =>

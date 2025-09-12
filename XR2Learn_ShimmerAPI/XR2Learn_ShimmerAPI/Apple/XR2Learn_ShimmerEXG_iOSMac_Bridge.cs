@@ -11,10 +11,23 @@ using Foundation;  // NSThread
 
 namespace XR2Learn_ShimmerAPI.GSR
 {
-    // Bridge iOS/MacCatalyst per EXG: WebSocket verso il tuo WsBridge, con parsing JSON
+    // Bridge iOS/MacCatalyst per EXG: instrada IMU/env (EXG1/EXG2 ignorati per ora)
     public partial class XR2Learn_ShimmerEXG
     {
-        // ===== Helper: invoca sul main thread (iOS/macOS Catalyst) =====
+        // ======== API pubblica stile IMU ========
+
+        // Config WS/Bridge
+        public string BridgeHost { get; set; } = "192.168.43.1";
+        public int    BridgePort { get; set; } = 8787;
+        public string BridgePath { get; set; } = "/";
+        public string BridgeTargetMac { get; set; } = "";
+
+        // Ultimo pacchetto instradato
+        public XR2Learn_ShimmerEXGData? LatestData { get; private set; }
+
+
+
+        // ======== Helper main-thread ========
         private static void RunOnMainThread(Action action)
         {
             if (action == null) return;
@@ -22,13 +35,7 @@ namespace XR2Learn_ShimmerAPI.GSR
             else UIApplication.SharedApplication.BeginInvokeOnMainThread(action);
         }
 
-        // ===== Config bridge =====
-        public string BridgeHost { get; set; } = "192.168.43.1";
-        public int    BridgePort { get; set; } = 8787;
-        public string BridgePath { get; set; } = "/";
-        public string BridgeTargetMac { get; set; } = "";
-
-        // ===== Stato =====
+        // ======== Stato WS ========
         private ClientWebSocket? _ws;
         private CancellationTokenSource? _wsCts;
         private Task? _rxLoop;
@@ -39,14 +46,18 @@ namespace XR2Learn_ShimmerAPI.GSR
         private volatile bool _subscribed;
         private volatile bool _gotAnySample;
 
-        // ===== ACK TCS =====
+        // ======== ACK TCS ========
         private TaskCompletionSource<bool>? _tcsHello, _tcsOpen, _tcsConfig, _tcsStart;
         private TaskCompletionSource<double>? _tcsSetSR;
 
-        // ===== DEBUG =====
-        private bool _debug = true;
+        // ======== DEBUG ========
+        private bool _debug = false;
         private int _dbgSamplePrintEvery = 1;
         private int _dbgSampleCounter = 0;
+
+         // ======== THROTTLE UI (aggiungi questi) ========
+    private long _lastUiEmitTicks = 0;
+    private readonly long _uiMinIntervalTicks = TimeSpan.FromMilliseconds(30).Ticks; // ≈33 Hz
 
         private void D(string msg)
         {
@@ -66,7 +77,7 @@ namespace XR2Learn_ShimmerAPI.GSR
             return sb.ToString();
         }
 
-        // ===== Wrapper con .Data per compat UI =====
+        // ======== Wrapper .Data per compat UI ========
         public sealed class NumericPayload
         {
             public double Data { get; set; }
@@ -81,6 +92,7 @@ namespace XR2Learn_ShimmerAPI.GSR
         {
             if (IsNum(v)) return true;
             if (v is NumericPayload) return true;
+
             var p = v?.GetType().GetProperty("Data");
             if (p != null)
             {
@@ -117,18 +129,30 @@ namespace XR2Learn_ShimmerAPI.GSR
             };
         }
 
-        // === Ultimo pacchetto EXG + evento ===
-        public XR2Learn_ShimmerEXGData? LatestData { get; private set; }
+        private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
+            d != null &&
+            (IsNumLike(d.LowNoiseAccelerometerX) || IsNumLike(d.LowNoiseAccelerometerY) || IsNumLike(d.LowNoiseAccelerometerZ) ||
+             IsNumLike(d.WideRangeAccelerometerX) || IsNumLike(d.WideRangeAccelerometerY) || IsNumLike(d.WideRangeAccelerometerZ) ||
+             IsNumLike(d.GyroscopeX) || IsNumLike(d.GyroscopeY) || IsNumLike(d.GyroscopeZ) ||
+             IsNumLike(d.MagnetometerX) || IsNumLike(d.MagnetometerY) || IsNumLike(d.MagnetometerZ) ||
+             IsNumLike(d.Temperature_BMP180) || IsNumLike(d.Pressure_BMP180) ||
+             IsNumLike(d.BatteryVoltage) ||
+             IsNumLike(d.ExtADC_A6) || IsNumLike(d.ExtADC_A7) || IsNumLike(d.ExtADC_A15));
 
+        // ======== Helper attese ACK ========
+        private static async Task WaitOrThrow(TaskCompletionSource<bool> tcs, string what, int ms)
+        {
+            var done = await Task.WhenAny(tcs.Task, Task.Delay(ms));
+            if (done != tcs.Task || !tcs.Task.Result)
+                throw new InvalidOperationException($"{what} timeout/failed");
+        }
+        private static async Task<bool> WaitSoft(TaskCompletionSource<bool> tcs, int ms)
+        {
+            var done = await Task.WhenAny(tcs.Task, Task.Delay(ms));
+            return done == tcs.Task && tcs.Task.Result;
+        }
 
-        private static bool HasAnyExgValue(XR2Learn_ShimmerEXGData d) =>
-            d != null && (
-                IsNumLike(d.Exg1Ch1) || IsNumLike(d.Exg1Ch2) ||
-                IsNumLike(d.Exg2Ch1) || IsNumLike(d.Exg2Ch2) ||
-                IsNumLike(d.ExgRespiration) || IsNumLike(d.BatteryVoltage)
-            );
-
-        // ==== Subscribe robusto: ritenta più volte ====
+        // ======== Subscribe robusto ========
         private async Task EnsureSubscribedAsync()
         {
             if (_subscribed) return;
@@ -142,98 +166,7 @@ namespace XR2Learn_ShimmerAPI.GSR
             }
         }
 
-        // ---- API usate nel ramo streaming ----
-        private async Task ConnectMacAsync()
-        {
-            if (string.IsNullOrWhiteSpace(BridgeHost)) throw new InvalidOperationException("BridgeHost non impostato");
-            if (BridgePort <= 0) throw new InvalidOperationException("BridgePort non valido");
-            if (string.IsNullOrWhiteSpace(BridgeTargetMac)) throw new InvalidOperationException("BridgeTargetMac non impostato");
-
-            await EnsureWebSocketAsync().ConfigureAwait(false);
-
-            // hello (hard)
-            _tcsHello = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            await SendJsonAsync(new { type = "hello" }).ConfigureAwait(false);
-            await WaitOrThrow(_tcsHello, "hello_ack", 3000).ConfigureAwait(false);
-
-            // subscribe robusto
-            _subscribed = false;
-            await EnsureSubscribedAsync().ConfigureAwait(false);
-
-            // set_config (soft): ok anche se server_managed
-            _tcsConfig = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var cfg = new
-            {
-                type = "set_config",
-                // Se/quando il server accetterà config lato client
-                EnableExg1  = true,
-                EnableExg2  = true,
-                ExgUse16Bit = false,
-                SamplingRate = this.SamplingRate
-            };
-            await SendJsonAsync(cfg).ConfigureAwait(false);
-            _ = await WaitSoft(_tcsConfig, 6000).ConfigureAwait(false);
-        }
-
-        private async Task StartStreamingMacAsync()
-        {
-            if (!_bridgeConnected) await ConnectMacAsync().ConfigureAwait(false);
-
-            // assicurati di essere sottoscritto
-            await EnsureSubscribedAsync().ConfigureAwait(false);
-
-            // invia start con il MAC
-            _tcsStart = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            D("CMD → start");
-            await SendJsonAsync(new { type = "start", mac = BridgeTargetMac }).ConfigureAwait(false);
-            await WaitOrThrow(_tcsStart, "start_ack", 12000).ConfigureAwait(false);
-
-            _isStreaming = true;
-        }
-
-        private async Task StopStreamingMacAsync()
-        {
-            if (_ws == null) return;
-            try { D("CMD → stop"); await SendJsonAsync(new { type = "stop" }).ConfigureAwait(false); } catch { }
-            _isStreaming = false;
-        }
-
-        public async Task<double> SetFirmwareSamplingRateNearestAsync(double desiredHz)
-        {
-            if (desiredHz <= 0) throw new ArgumentOutOfRangeException(nameof(desiredHz));
-            if (string.IsNullOrWhiteSpace(BridgeTargetMac)) throw new InvalidOperationException("BridgeTargetMac non impostato");
-
-            // assicurati che il WS sia connesso e la sessione sia "open/subscribed"
-            await EnsureWebSocketAsync().ConfigureAwait(false);
-            await EnsureSubscribedAsync().ConfigureAwait(false);
-
-            _tcsSetSR = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            // invia il comando al bridge
-            await SendJsonAsync(new { type = "set_sampling_rate", mac = BridgeTargetMac, sr = desiredHz }).ConfigureAwait(false);
-
-            // attende l'ACK (timeout 6s)
-            var done = await Task.WhenAny(_tcsSetSR.Task, Task.Delay(6000)).ConfigureAwait(false);
-            if (done != _tcsSetSR.Task) throw new TimeoutException("set_sampling_rate timeout");
-
-            double applied = _tcsSetSR.Task.Result;
-            if (applied <= 0) throw new InvalidOperationException("set_sampling_rate failed");
-
-            // sincronizza il modello locale e restituisci lo "snap" realmente applicato
-            SamplingRate = applied;
-            return applied;
-        }
-
-        private async Task DisconnectMacAsync()
-        {
-            await StopStreamingMacAsync().ConfigureAwait(false);
-            if (_ws != null) { try { D("CMD → close"); await SendJsonAsync(new { type = "close" }).ConfigureAwait(false); } catch { } }
-            await CloseWebSocketAsync().ConfigureAwait(false);
-        }
-
-        private bool IsConnectedMac() => _bridgeConnected && _ws != null && _ws.State == WebSocketState.Open;
-
-        // ====== WS helpers ======
+        // ======== WS helpers ========
         private async Task EnsureWebSocketAsync()
         {
             if (_ws != null && _ws.State == WebSocketState.Open) return;
@@ -271,6 +204,99 @@ namespace XR2Learn_ShimmerAPI.GSR
             D("WS closed");
         }
 
+        // ======== Connect / Start / Stop ========
+        private async Task ConnectMacAsync()
+        {
+            if (string.IsNullOrWhiteSpace(BridgeHost)) throw new InvalidOperationException("BridgeHost non impostato");
+            if (BridgePort <= 0) throw new InvalidOperationException("BridgePort non valido");
+            if (string.IsNullOrWhiteSpace(BridgeTargetMac)) throw new InvalidOperationException("BridgeTargetMac non impostato");
+
+            await EnsureWebSocketAsync().ConfigureAwait(false);
+
+            _tcsHello = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            await SendJsonAsync(new { type = "hello" }).ConfigureAwait(false);
+            await WaitOrThrow(_tcsHello, "hello_ack", 3000).ConfigureAwait(false);
+
+            _subscribed = false;
+            await EnsureSubscribedAsync().ConfigureAwait(false);
+
+            // Config IMU/env (EXG disatteso)
+            _tcsConfig = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cfg = new
+            {
+                type = "set_config",
+                // IMU/env: fissa a true per evitare dipendenze da proprietà mancanti
+                EnableLowNoiseAccelerometer  = true,
+                EnableWideRangeAccelerometer = true,
+                EnableGyroscope              = true,
+                EnableMagnetometer           = true,
+                EnablePressureTemperature    = true,
+
+                // opzionali ext ADC
+                EnableExtA6  = true,
+                EnableExtA7  = true,
+                EnableExtA15 = true,
+
+                // sampling rate dalla partial comune (già esistente nel tuo progetto)
+                SamplingRate = this.SamplingRate
+            };
+            await SendJsonAsync(cfg).ConfigureAwait(false);
+            _ = await WaitSoft(_tcsConfig, 6000).ConfigureAwait(false);
+        }
+
+        private async Task StartStreamingMacAsync()
+        {
+            if (!_bridgeConnected) await ConnectMacAsync().ConfigureAwait(false);
+            await EnsureSubscribedAsync().ConfigureAwait(false);
+
+            _tcsStart = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            D("CMD → start");
+            await SendJsonAsync(new { type = "start", mac = BridgeTargetMac }).ConfigureAwait(false);
+            await WaitOrThrow(_tcsStart, "start_ack", 12000).ConfigureAwait(false);
+
+            _isStreaming = true;
+            _lastUiEmitTicks = 0;
+        }
+
+        private async Task StopStreamingMacAsync()
+        {
+            if (_ws == null) return;
+            try { D("CMD → stop"); await SendJsonAsync(new { type = "stop" }).ConfigureAwait(false); } catch { }
+            _isStreaming = false;
+        }
+
+        private async Task DisconnectMacAsync()
+        {
+            await StopStreamingMacAsync().ConfigureAwait(false);
+            if (_ws != null) { try { D("CMD → close"); await SendJsonAsync(new { type = "close" }).ConfigureAwait(false); } catch { } }
+            await CloseWebSocketAsync().ConfigureAwait(false);
+        }
+
+        private bool IsConnectedMac() => _bridgeConnected && _ws != null && _ws.State == WebSocketState.Open;
+
+        private async Task<double> SetFirmwareSamplingRateNearestImpl(double desiredHz)
+        {
+            if (desiredHz <= 0) throw new ArgumentOutOfRangeException(nameof(desiredHz));
+            if (string.IsNullOrWhiteSpace(BridgeTargetMac)) throw new InvalidOperationException("BridgeTargetMac non impostato");
+
+            await EnsureWebSocketAsync().ConfigureAwait(false);
+            await EnsureSubscribedAsync().ConfigureAwait(false);
+
+            _tcsSetSR = new TaskCompletionSource<double>(TaskCreationOptions.RunContinuationsAsynchronously);
+            await SendJsonAsync(new { type = "set_sampling_rate", mac = BridgeTargetMac, sr = desiredHz }).ConfigureAwait(false);
+
+            var done = await Task.WhenAny(_tcsSetSR.Task, Task.Delay(6000)).ConfigureAwait(false);
+            if (done != _tcsSetSR.Task) throw new TimeoutException("set_sampling_rate timeout");
+
+            double applied = _tcsSetSR.Task.Result;
+            if (applied <= 0) throw new InvalidOperationException("set_sampling_rate failed");
+
+            SamplingRate = applied; // proprietà esistente nella partial comune
+            return applied;
+        }
+
+        // ======== Send JSON ========
         private async Task SendJsonAsync(object payload)
         {
             if (_ws == null) throw new InvalidOperationException("WS non connesso");
@@ -280,20 +306,7 @@ namespace XR2Learn_ShimmerAPI.GSR
             await _ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, _wsCts?.Token ?? CancellationToken.None).ConfigureAwait(false);
         }
 
-        // === Helper attese ACK ===
-        private static async Task WaitOrThrow(TaskCompletionSource<bool> tcs, string what, int ms)
-        {
-            var done = await Task.WhenAny(tcs.Task, Task.Delay(ms));
-            if (done != tcs.Task || !tcs.Task.Result)
-                throw new InvalidOperationException($"{what} timeout/failed");
-        }
-        private static async Task<bool> WaitSoft(TaskCompletionSource<bool> tcs, int ms)
-        {
-            var done = await Task.WhenAny(tcs.Task, Task.Delay(ms));
-            return done == tcs.Task && tcs.Task.Result;
-        }
-
-        // ========= Gestione messaggi =========
+        // ======== Gestione messaggi ========
         private void HandleControlMessage(string txt)
         {
             try
@@ -320,8 +333,6 @@ namespace XR2Learn_ShimmerAPI.GSR
                     case "config_ack":
                     {
                         bool ok3 = root.TryGetProperty("ok", out var okCfg) && okCfg.GetBoolean();
-                        if (!ok3 && root.TryGetProperty("error", out var errCfg))
-                            D("config_ack error: " + errCfg.GetString());
                         _tcsConfig?.TrySetResult(ok3);
                         break;
                     }
@@ -352,57 +363,74 @@ namespace XR2Learn_ShimmerAPI.GSR
                             return el.ValueKind == JsonValueKind.Number ? el.GetDouble() : (double?)null;
                         }
 
-                        JsonElement exg1 = default, exg2 = default, ext = default;
-                        root.TryGetProperty("exg1", out exg1);
-                        root.TryGetProperty("exg2", out exg2);
+                        JsonElement lna = default, wra = default, gyro = default, mag = default, ext = default;
+                        root.TryGetProperty("lna", out lna);
+                        root.TryGetProperty("wra", out wra);
+                        root.TryGetProperty("gyro", out gyro);
+                        root.TryGetProperty("mag", out mag);
                         root.TryGetProperty("ext", out ext);
 
-                        double? e11 = N(exg1, "ch1");
-                        double? e12 = N(exg1, "ch2");
-                        double? e21 = N(exg2, "ch1");
-                        double? e22 = N(exg2, "ch2");
+                        var lnaX = N(lna, "x"); var lnaY = N(lna, "y"); var lnaZ = N(lna, "z");
+                        var wraX = N(wra, "x"); var wraY = N(wra, "y"); var wraZ = N(wra, "z");
+                        var gx   = N(gyro, "x"); var gy   = N(gyro, "y"); var gz   = N(gyro, "z");
+                        var mx   = N(mag,  "x"); var my   = N(mag,  "y"); var mz   = N(mag,  "z");
 
-                        if (!e11.HasValue && root.TryGetProperty("ExgCh1", out var flat1) && flat1.ValueKind==JsonValueKind.Number)
-                            e11 = flat1.GetDouble();
-                        if (!e12.HasValue && root.TryGetProperty("ExgCh2", out var flat2) && flat2.ValueKind==JsonValueKind.Number)
-                            e12 = flat2.GetDouble();
-
-                        double? resp  = root.TryGetProperty("resp", out var rEl) && rEl.ValueKind==JsonValueKind.Number ? rEl.GetDouble() : (double?)null;
+                        double? temp  = root.TryGetProperty("temp",  out var tEl) && tEl.ValueKind == JsonValueKind.Number ? tEl.GetDouble() : (double?)null;
+                        double? press = root.TryGetProperty("press", out var pEl) && pEl.ValueKind == JsonValueKind.Number ? pEl.GetDouble() : (double?)null;
                         double? vbatt = root.TryGetProperty("vbatt", out var vEl) && vEl.ValueKind == JsonValueKind.Number ? vEl.GetDouble() : (double?)null;
 
-                        double? a6 = N(ext, "a6");
-                        double? a7 = N(ext, "a7");
-                        double? a15 = N(ext, "a15");
+                        double? a6   = N(ext, "a6");
+                        double? a7   = N(ext, "a7");
+                        double? a15  = N(ext, "a15");
 
-                        bool hasAnyExg = e11.HasValue || e12.HasValue || e21.HasValue || e22.HasValue || resp.HasValue;
-                        if (hasAnyExg)
+                        LatestData = new XR2Learn_ShimmerEXGData(
+                            timeStamp: (uint)Math.Max(0, (int)(ts ?? 0)),
+                            // IMU/env
+                            accelerometerX:      lnaX.HasValue ? new NumericPayload(lnaX.Value) : null,
+                            accelerometerY:      lnaY.HasValue ? new NumericPayload(lnaY.Value) : null,
+                            accelerometerZ:      lnaZ.HasValue ? new NumericPayload(lnaZ.Value) : null,
+                            wideAccelerometerX:  wraX.HasValue ? new NumericPayload(wraX.Value) : null,
+                            wideAccelerometerY:  wraY.HasValue ? new NumericPayload(wraY.Value) : null,
+                            wideAccelerometerZ:  wraZ.HasValue ? new NumericPayload(wraZ.Value) : null,
+                            gyroscopeX:          gx.HasValue ? new NumericPayload(gx.Value) : null,
+                            gyroscopeY:          gy.HasValue ? new NumericPayload(gy.Value) : null,
+                            gyroscopeZ:          gz.HasValue ? new NumericPayload(gz.Value) : null,
+                            magnetometerX:       mx.HasValue ? new NumericPayload(mx.Value) : null,
+                            magnetometerY:       my.HasValue ? new NumericPayload(my.Value) : null,
+                            magnetometerZ:       mz.HasValue ? new NumericPayload(mz.Value) : null,
+                            temperatureBMP180:   temp.HasValue  ? new NumericPayload(temp.Value)  : null,
+                            pressureBMP180:      press.HasValue ? new NumericPayload(press.Value) : null,
+                            batteryVoltage:      vbatt.HasValue ? new NumericPayload(vbatt.Value) : null,
+                            extADC_A6:           a6.HasValue ? new NumericPayload(a6.Value) : null,
+                            extADC_A7:           a7.HasValue ? new NumericPayload(a7.Value) : null,
+                            extADC_A15:          a15.HasValue ? new NumericPayload(a15.Value) : null,
+                            // EXG: ignorati per ora
+                            exg1Ch1: null, exg1Ch2: null, exg2Ch1: null, exg2Ch2: null,
+                            exgRespiration: null
+                        );
+
+                        try
                         {
-                            LatestData = new XR2Learn_ShimmerEXGData(
-                                timeStamp: (uint)Math.Max(0, (int)(ts ?? 0)),
-                                // opzionali IMU-in-EXG (se il bridge li inserisce comunque)
-                                accelerometerX: null, accelerometerY: null, accelerometerZ: null,
-                                wideAccelerometerX: null, wideAccelerometerY: null, wideAccelerometerZ: null,
-                                gyroscopeX: null, gyroscopeY: null, gyroscopeZ: null,
-                                magnetometerX: null, magnetometerY: null, magnetometerZ: null,
-                                temperatureBMP180: null, pressureBMP180: null,
-                                batteryVoltage: vbatt,
-                                extADC_A6: a6, extADC_A7: a7, extADC_A15: a15,
-                                // EXG
-                                exg1Ch1: e11, exg1Ch2: e12, exg2Ch1: e21, exg2Ch2: e22,
-                                exgRespiration: resp
-                            );
-
-                            try
+                            var data = LatestData;
+                            if (data != null && HasAnyValue(data))
                             {
-                                if (HasAnyExgValue(LatestData))
+                                if (_debug && (_dbgSampleCounter++ % _dbgSamplePrintEvery == 0))
                                 {
-                                    RunOnMainThread(() =>
-                                        SampleReceived?.Invoke(this, LatestData));
+                                    D($"Parsed ts={data.TimeStamp} " +
+                                      $"LNA=({Fmt(data.LowNoiseAccelerometerX)}, {Fmt(data.LowNoiseAccelerometerY)}, {Fmt(data.LowNoiseAccelerometerZ)})");
                                 }
-                            }
-                            catch { }
-                        }
+                                var nowTicks = DateTime.UtcNow.Ticks;
+                                if (nowTicks - _lastUiEmitTicks >= _uiMinIntervalTicks)
+                                {
+                                    _lastUiEmitTicks = nowTicks;
+                                    var snapshot = data;   // o LatestData
+                                    RunOnMainThread(() => SampleReceived?.Invoke(this, snapshot));
+                                }
+                                // else: salta questo frame per non ingolfare la UI
 
+                            }
+                        }
+                        catch { }
                         break;
                     }
 
@@ -448,7 +476,7 @@ namespace XR2Learn_ShimmerAPI.GSR
                 if (result.MessageType == WebSocketMessageType.Text)
                 {
                     var txt = Encoding.UTF8.GetString(buffer, 0, offset);
-                    D("WS ← " + txt);
+                    // if (_debug) D("WS ← sample"); // niente JSON completo
                     HandleControlMessage(txt);
                 }
                 else if (result.MessageType == WebSocketMessageType.Binary)
@@ -469,7 +497,7 @@ namespace XR2Learn_ShimmerAPI.GSR
                     }
 
                     D($"WS ← BIN {offset} B | {HexPreview(chunk, 16)}");
-                    // Nessun parser binario previsto per EXG nel bridge attuale
+                    // nessun parser binario per EXG nel bridge attuale
                 }
             }
 

@@ -57,6 +57,34 @@ private readonly XR2Learn_ShimmerEXG? _exg;
         InitializeComponent();
         NavigationPage.SetHasBackButton(this, false);
         _exg = shimmer;
+
+
+        // 🟢 iOS/MacCatalyst: assicura che i flag EXG risultino “accesi”
+#if IOS || MACCATALYST
+    // Identifica la board come EXG (questo fa scattare i computed WantsExg/WantExgCh1/2)
+    sensorConfig.IsExg = true;
+
+    // Abilita proprio lo streaming EXG
+    sensorConfig.EnableExg = true;
+
+    // Se non è stata scelta nessuna modalità, metti ECG di default
+    if (!(sensorConfig.IsExgModeECG || sensorConfig.IsExgModeEMG || sensorConfig.IsExgModeTest || sensorConfig.IsExgModeRespiration))
+        sensorConfig.IsExgModeECG = true;
+            // 👉 QUI sotto incolla il blocco con gli Enable IMU
+    sensorConfig.EnableLowNoiseAccelerometer  = true;
+    sensorConfig.EnableWideRangeAccelerometer = true;
+    sensorConfig.EnableGyroscope              = true;
+    sensorConfig.EnableMagnetometer           = true;
+    sensorConfig.EnablePressureTemperature    = true;
+    sensorConfig.EnableBattery                = true;
+    sensorConfig.EnableExtA6 = true;
+    sensorConfig.EnableExtA7 = true;
+    sensorConfig.EnableExtA15 = true;
+
+    // (opzionale) se vuoi andare subito sul gruppo EXG in grafico:
+    // sensorConfig.SelectedExgMode = "ECG"; // è collegata ai radio
+#endif
+
         viewModel = new DataPageViewModel(shimmer, sensorConfig); // usa il ctor EXG del VM
         BindingContext = viewModel;
 
@@ -729,24 +757,33 @@ private readonly XR2Learn_ShimmerEXG? _exg;
     {
         base.OnAppearing();
 
-
-
 #if IOS || MACCATALYST
-        try
+    try
+    {
+        // IMU (già presente)
+        if (_imu != null && !_imu.IsConnected())
         {
-            if (_imu != null && !_imu.IsConnected())
-            {
-                _imu.Connect();        // apre la WebSocket verso BridgeHost:BridgePort
-                await Task.Delay(100); // piccolo respiro
-            }
-            _imu?.StartStreaming();     // manda "start" se presente
+            _imu.Connect();
+            await Task.Delay(100);
         }
-        catch (Exception ex)
+        _imu?.StartStreaming();
+
+        // ⬇️ INCOLLA QUI IL BLOCCO EXG ⬇️
+        if (_exg != null && !_exg.IsConnected())
         {
-            await MainThread.InvokeOnMainThreadAsync(() =>
-                DisplayAlert("Bridge", $"Connection to bridge failed:\n{ex.Message}", "OK"));
+            _exg.Connect();
+            await Task.Delay(100);
         }
+        _exg?.StartStreaming();
+        // ⬆️ FINE BLOCCO EXG ⬆️
+    }
+    catch (Exception ex)
+    {
+        await MainThread.InvokeOnMainThreadAsync(() =>
+            DisplayAlert("Bridge", $"Connection to bridge failed:\n{ex.Message}", "OK"));
+    }
 #endif
+
 
 
         // (ri)aggancia eventi UI se necessario, come già fai:

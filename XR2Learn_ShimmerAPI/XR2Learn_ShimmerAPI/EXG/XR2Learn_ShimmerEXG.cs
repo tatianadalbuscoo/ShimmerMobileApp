@@ -11,6 +11,8 @@ using XR2Learn_ShimmerAPI.Android;
 
 namespace XR2Learn_ShimmerAPI.GSR
 {
+
+
     public enum ExgMode
     {
         ECG,
@@ -139,6 +141,19 @@ private static (int idx, string? name, string? fmt) FindSignalA(ObjectCluster oc
             _enableExg = false; // off by default
             _exgMode = ExgMode.ECG;
         }
+
+        // ⬇️⬇️⬇️  AGGIUNGI QUI  ⬇️⬇️⬇️
+        public Task<double> SetFirmwareSamplingRateNearestAsync(double requestedHz)
+        {
+#if IOS || MACCATALYST
+    // Chiama l'implementazione iOS/Mac definita nella partial Apple
+    return SetFirmwareSamplingRateNearestImpl(requestedHz);
+#else
+            // Su Windows/Android usiamo la versione sincrona già presente in questo file
+            return Task.FromResult(SetFirmwareSamplingRateNearest(requestedHz));
+#endif
+        }
+        // ⬆️⬆️⬆️  FINE AGGIUNTA  ⬆️⬆️⬆️
 
         /// <summary>
         /// Applies the nearest sampling rate supported by the firmware and returns it.

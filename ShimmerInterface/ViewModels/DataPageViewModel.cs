@@ -1612,6 +1612,34 @@ private static bool IsSplitVariantLabel(string displayName) =>
         return (slotIndex >= 0 && slotIndex < sub.Count) ? sub[slotIndex] : "";
     }
 
+    private static bool TryGetNumeric(dynamic sample, string field, out float val)
+    {
+        val = 0f;
+        try
+        {
+            var pi = sample?.GetType().GetProperty(field);
+            if (pi == null) return false;
+            var x = pi.GetValue(sample);
+            if (x == null) return false;
+
+            // Caso 1: già numero
+            if (x is sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal)
+            { val = Convert.ToSingle(x); return true; }
+
+            // Caso 2: wrapper con proprietà .Data
+            var dp = x.GetType().GetProperty("Data");
+            if (dp != null)
+            {
+                var inner = dp.GetValue(x);
+                if (inner == null) return false;
+                val = Convert.ToSingle(inner);
+                return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
 
 
     /// <summary>
@@ -1624,6 +1652,7 @@ private static bool IsSplitVariantLabel(string displayName) =>
     private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
     {
         var values = new Dictionary<string, float>();
+
 
         try
         {
@@ -1702,17 +1731,22 @@ private static bool IsSplitVariantLabel(string displayName) =>
                 values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data / 1000f;
             if (enableExtA15 && HasProp(sample, "ExtADC_A15") && sample.ExtADC_A15 != null)
                 values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data / 1000f;
-
             // ===== EXG: sempre due canali visibili (CH1/CH2) + opzionale respiration =====
             if (enableExg)
             {
-                if (HasProp(sample, "ExgCh1") && sample.ExgCh1 != null)
-                    values["ExgCh1"] = (float)sample.ExgCh1.Data;
-                if (HasProp(sample, "ExgCh2") && sample.ExgCh2 != null)
-                    values["ExgCh2"] = (float)sample.ExgCh2.Data;
-                if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
-                    values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
+                // DOPO (tipo esplicito)
+                if (TryGetNumeric(sample, "ExgCh1", out float vExg1))
+                    values["ExgCh1"] = vExg1;
+
+                if (TryGetNumeric(sample, "ExgCh2", out float vExg2))
+                    values["ExgCh2"] = vExg2;
+
+                // opzionale, solo se usi davvero Respiration
+                if (TryGetNumeric(sample, "ExgRespiration", out float vResp))
+                    values["ExgRespiration"] = vResp;
+
             }
+
         }
         catch (Exception ex)
         {
