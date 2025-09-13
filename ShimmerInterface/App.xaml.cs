@@ -326,11 +326,11 @@ foreach (var mac in activeMacs)
             {
                 // prova prima "ExgMode"
                 if (cfg.TryGetProperty("ExgMode", out var m) && m.ValueKind == JsonValueKind.String)
-                    return (m.GetString() ?? "ecg").ToLowerInvariant();
+                    return (m.GetString() ?? "").ToLowerInvariant();
 
                 // alternative comuni
                 if (cfg.TryGetProperty("exg_mode", out var m2) && m2.ValueKind == JsonValueKind.String)
-                    return (m2.GetString() ?? "ecg").ToLowerInvariant();
+                    return (m2.GetString() ?? "").ToLowerInvariant();
 
                 // fallback: se c'è una flag respiration
                 if (cfg.TryGetProperty("RespirationEnabled", out var r) && r.ValueKind == JsonValueKind.True)
@@ -338,7 +338,7 @@ foreach (var mac in activeMacs)
             }
         }
         catch { }
-        return "ecg"; // default
+        return "";
     }
 
 

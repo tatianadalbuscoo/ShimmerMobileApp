@@ -68,8 +68,17 @@ private readonly XR2Learn_ShimmerEXG? _exg;
     sensorConfig.EnableExg = true;
 
     // Se non è stata scelta nessuna modalità, metti ECG di default
-    if (!(sensorConfig.IsExgModeECG || sensorConfig.IsExgModeEMG || sensorConfig.IsExgModeTest || sensorConfig.IsExgModeRespiration))
-        sensorConfig.IsExgModeECG = true;
+// Imposta i radio EXG in base alla modalità proveniente dal bridge
+var mode = (_exg?.CurrentExgMode ?? "").Trim().ToLowerInvariant();
+
+sensorConfig.IsExgModeECG         = mode == "ecg";
+sensorConfig.IsExgModeEMG         = mode == "emg";
+sensorConfig.IsExgModeTest        = mode == "test";
+sensorConfig.IsExgModeRespiration = mode == "resp" || mode == "respiration";
+
+// Se 'mode' è vuoto (bridge non ha ancora risposto), lascia tutte e 4 a false.
+// Niente default forzato a ECG.
+
             // 👉 QUI sotto incolla il blocco con gli Enable IMU
     sensorConfig.EnableLowNoiseAccelerometer  = true;
     sensorConfig.EnableWideRangeAccelerometer = true;
@@ -88,11 +97,64 @@ private readonly XR2Learn_ShimmerEXG? _exg;
         viewModel = new DataPageViewModel(shimmer, sensorConfig); // usa il ctor EXG del VM
         BindingContext = viewModel;
 
+#if IOS || MACCATALYST
+// Selezione immediata se il bridge ha già fornito la modalità
+{
+    var bridgeMode2 = (_exg?.CurrentExgMode ?? "").Trim().ToLowerInvariant();
+    if (bridgeMode2 == "resp" || bridgeMode2 == "respiration")
+        viewModel.SelectedParameter = "Respiration";
+    else if (bridgeMode2 == "ecg")
+        viewModel.SelectedParameter = "ECG";
+    else if (bridgeMode2 == "emg")
+        viewModel.SelectedParameter = "EMG";
+    else if (bridgeMode2 == "test")
+        viewModel.SelectedParameter = "EXG Test";
+}
+
+// Se la modalità arriva qualche istante dopo, allineo al primo sample
+if (_exg != null)
+    _exg.SampleReceived += OnFirstExgSampleSelectGroupOnce;
+#endif
+
+
+
+
         viewModel.ChartUpdateRequested += OnChartUpdateRequested;
         viewModel.ShowBusyRequested += OnShowBusyRequested;
         viewModel.HideBusyRequested += OnHideBusyRequested;
         viewModel.ShowAlertRequested += OnShowAlertRequested;
     }
+
+#if IOS || MACCATALYST
+private bool _exgGroupAutoSelected = false;
+
+private void OnFirstExgSampleSelectGroupOnce(object? sender, dynamic e)
+{
+    if (_exgGroupAutoSelected) return;
+    _exgGroupAutoSelected = true;
+
+    var mode = (_exg?.CurrentExgMode ?? "").Trim().ToLowerInvariant();
+
+    MainThread.BeginInvokeOnMainThread(() =>
+    {
+        if (mode == "resp" || mode == "respiration")
+            viewModel.SelectedParameter = "Respiration";
+        else if (mode == "ecg")
+            viewModel.SelectedParameter = "ECG";
+        else if (mode == "emg")
+            viewModel.SelectedParameter = "EMG";
+        else if (mode == "test")
+            viewModel.SelectedParameter = "EXG Test";
+
+        OnChartUpdateRequested(this, EventArgs.Empty);
+    });
+
+    if (_exg != null)
+        _exg.SampleReceived -= OnFirstExgSampleSelectGroupOnce;
+}
+#endif
+
+
 
 
     /// <summary>
@@ -750,6 +812,12 @@ private readonly XR2Learn_ShimmerEXG? _exg;
         viewModel.DetachFromDevice();
 
         base.OnDisappearing();
+
+#if IOS || MACCATALYST
+if (_exg != null)
+    _exg.SampleReceived -= OnFirstExgSampleSelectGroupOnce;
+#endif
+
     }
 
 

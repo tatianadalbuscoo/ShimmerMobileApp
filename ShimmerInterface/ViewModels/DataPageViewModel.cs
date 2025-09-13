@@ -9,6 +9,9 @@ using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
 using Microsoft.Maui.Graphics;
 
+#if IOS || MACCATALYST
+using Microsoft.Maui.ApplicationModel;  // MainThread
+#endif
 
 using XR2Learn_ShimmerAPI.GSR;  // XR2Learn_ShimmerEXG, ExgMode
 
@@ -33,7 +36,25 @@ public enum ChartDisplayMode { Single, Multi, Split }
 /// </summary>
 public partial class DataPageViewModel : ObservableObject, IDisposable
 {
+#if IOS || MACCATALYST
+    // --- EXG mode (il “pallino” dal bridge) ---
+    private XR2Learn_ShimmerEXG? _exgBridge;
+    private string _exgModeTitle = string.Empty;
 
+    public string ExgModeTitle
+    {
+        get => _exgModeTitle;
+        private set
+        {
+            if (_exgModeTitle == value) return;
+            _exgModeTitle = value;
+            OnPropertyChanged(nameof(ExgModeTitle));
+            OnPropertyChanged(nameof(HasExgMode));
+        }
+    }
+
+    public bool HasExgMode => !string.IsNullOrEmpty(_exgModeTitle);
+#endif
 
     // ==== Application-wide numeric limits for validation ====
     private const double MAX_DOUBLE = 1e6;
@@ -53,12 +74,11 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 private readonly XR2Learn_ShimmerEXG? shimmerExg;
 
     // flag di sessione EXG (copiati dal config)
-    private readonly bool enableExg;
-    private readonly bool exgModeECG;
-    private readonly bool exgModeEMG;
-    private readonly bool exgModeTest;
-    private readonly bool exgModeRespiration;
-
+    private bool enableExg;
+    private bool exgModeECG;
+    private bool exgModeEMG;
+    private bool exgModeTest;
+    private bool exgModeRespiration;
     private bool _disposed = false;
 
     // ==== Data storage for real-time series ====
@@ -369,6 +389,7 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
         samplingRateDisplay = DeviceSamplingRate;
 
         InitializeAvailableParameters();
+
         if (!AvailableParameters.Contains(SelectedParameter))
             SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
 
@@ -421,7 +442,30 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
     samplingRateDisplay = DeviceSamplingRate;
 
     InitializeAvailableParameters();
-    if (!AvailableParameters.Contains(SelectedParameter))
+#if IOS || MACCATALYST
+_exgBridge = shimmerDevice;
+
+// inizializza da ciò che eventualmente è già noto
+ExgModeTitle = shimmerDevice.CurrentExgModeTitle;
+ApplyModeTitleToFlags(ExgModeTitle);
+InitializeAvailableParameters();
+
+// ascolta i cambi del “pallino”
+shimmerDevice.ExgModeChanged += (_, title) =>
+{
+    Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+    {
+        ExgModeTitle = title;
+        ApplyModeTitleToFlags(title);
+        InitializeAvailableParameters();
+
+
+        UpdateChart();
+    });
+};
+#endif
+
+        if (!AvailableParameters.Contains(SelectedParameter))
         SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
 
     InitializeDataCollections();
@@ -477,6 +521,20 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
         UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
         UpdateChart();
     }
+
+
+#if IOS || MACCATALYST
+private void ApplyModeTitleToFlags(string? title)
+{
+    var t = (title ?? "").Trim();
+    exgModeECG         = t.Equals("ECG", StringComparison.OrdinalIgnoreCase);
+    exgModeEMG         = t.Equals("EMG", StringComparison.OrdinalIgnoreCase);
+    exgModeTest        = t.Equals("EXG Test", StringComparison.OrdinalIgnoreCase);
+    exgModeRespiration = t.Equals("Respiration", StringComparison.OrdinalIgnoreCase);
+    enableExg = true; // stiamo comunque mostrando EXG
+}
+#endif
+
 
     /// <summary>
     /// Imposta il baseline dell'asse X alla prima apertura della pagina.
@@ -1377,20 +1435,20 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
     }
 
 
-    public static string CleanParameterName(string displayName)
+    public static string CleanParameterName(string? displayName)
     {
+        if (string.IsNullOrWhiteSpace(displayName)) return "";
         if (displayName.StartsWith("    → ")) displayName = displayName[6..];
-
-        // elimina il suffisso della variante split (usa più pattern per robustezza)
-        displayName = displayName.Replace(" — separate charts (EXG1·EXG2)", "")
-                                 .Replace(" - separate charts (EXG1·EXG2)", "")
-                                 .Replace(" — separate charts (X·Y·Z)", "")
-                                 .Replace(" - separate charts (X·Y·Z)", "")
-                                 .Replace(" (separate charts)", "")
-                                 .Trim();
-
+        displayName = displayName
+            .Replace(" — separate charts (EXG1·EXG2)", "")
+            .Replace(" - separate charts (EXG1·EXG2)", "")
+            .Replace(" — separate charts (X·Y·Z)", "")
+            .Replace(" - separate charts (X·Y·Z)", "")
+            .Replace(" (separate charts)", "")
+            .Trim();
         return displayName;
     }
+
 
     public static string MapToInternalKey(string displayName)
     {
@@ -1403,9 +1461,13 @@ public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config
 
 
 
-private static bool IsSplitVariantLabel(string displayName) =>
-    displayName.Contains("separate charts", StringComparison.OrdinalIgnoreCase)
- || displayName.Contains("split", StringComparison.OrdinalIgnoreCase);
+    private static bool IsSplitVariantLabel(string? displayName)
+    {
+        if (string.IsNullOrWhiteSpace(displayName)) return false;
+        return displayName.Contains("separate charts", StringComparison.OrdinalIgnoreCase)
+            || displayName.Contains("split", StringComparison.OrdinalIgnoreCase);
+    }
+
 
 
     /// <summary>
@@ -1851,6 +1913,7 @@ private static bool IsSplitVariantLabel(string displayName) =>
     /// <param name="value">The newly selected parameter name.</param>
     partial void OnSelectedParameterChanged(string value)
     {
+        value ??= string.Empty;
         bool split = IsSplitVariantLabel(value);
         string cleanName = CleanParameterName(value);
 

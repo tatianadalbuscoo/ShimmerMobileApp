@@ -24,6 +24,42 @@ namespace XR2Learn_ShimmerAPI.GSR
 
         // Ultimo pacchetto instradato
         public XR2Learn_ShimmerEXGData? LatestData { get; private set; }
+// --- modalità EXG letta dal bridge (normalizzata) ---
+private string _currentExgMode = "";
+
+// 🔔 Evento che la UI può ascoltare per “stampare” la modalità
+public event EventHandler<string>? ExgModeChanged;
+
+// Titolo user-friendly per la label/console
+public string CurrentExgModeTitle => _currentExgMode switch
+{
+    "ecg" => "ECG",
+    "emg" => "EMG",
+    "test" => "EXG Test",
+    "resp" or "respiration" => "Respiration",
+    _ => ""
+};
+
+// Comodo per nascondere la label quando non c’è una modalità valida
+public bool HasExgMode => !string.IsNullOrEmpty(CurrentExgModeTitle);
+
+// Setter che normalizza e notifica la UI sul main thread
+public string CurrentExgMode
+{
+    get => _currentExgMode;
+    private set
+    {
+        var norm = (value ?? "").Trim().ToLowerInvariant();
+        if (_currentExgMode == norm) return;
+        _currentExgMode = norm;
+
+        var title = CurrentExgModeTitle;
+        RunOnMainThread(() => ExgModeChanged?.Invoke(this, title));
+        if (!string.IsNullOrEmpty(title)) D($"[UI] EXG Mode: {title}");
+
+    }
+}
+
 
 
 
@@ -51,9 +87,10 @@ namespace XR2Learn_ShimmerAPI.GSR
         private TaskCompletionSource<double>? _tcsSetSR;
 
         // ======== DEBUG ========
-        private bool _debug = false;
+        private bool _debug = true;
         private int _dbgSamplePrintEvery = 1;
         private int _dbgSampleCounter = 0;
+        private bool _loggedFirstMode = false;
 
          // ======== THROTTLE UI (aggiungi questi) ========
     private long _lastUiEmitTicks = 0;
@@ -129,15 +166,18 @@ namespace XR2Learn_ShimmerAPI.GSR
             };
         }
 
-        private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
-            d != null &&
-            (IsNumLike(d.LowNoiseAccelerometerX) || IsNumLike(d.LowNoiseAccelerometerY) || IsNumLike(d.LowNoiseAccelerometerZ) ||
-             IsNumLike(d.WideRangeAccelerometerX) || IsNumLike(d.WideRangeAccelerometerY) || IsNumLike(d.WideRangeAccelerometerZ) ||
-             IsNumLike(d.GyroscopeX) || IsNumLike(d.GyroscopeY) || IsNumLike(d.GyroscopeZ) ||
-             IsNumLike(d.MagnetometerX) || IsNumLike(d.MagnetometerY) || IsNumLike(d.MagnetometerZ) ||
-             IsNumLike(d.Temperature_BMP180) || IsNumLike(d.Pressure_BMP180) ||
-             IsNumLike(d.BatteryVoltage) ||
-             IsNumLike(d.ExtADC_A6) || IsNumLike(d.ExtADC_A7) || IsNumLike(d.ExtADC_A15));
+private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
+    d != null &&
+    (IsNumLike(d.LowNoiseAccelerometerX) || IsNumLike(d.LowNoiseAccelerometerY) || IsNumLike(d.LowNoiseAccelerometerZ) ||
+     IsNumLike(d.WideRangeAccelerometerX) || IsNumLike(d.WideRangeAccelerometerY) || IsNumLike(d.WideRangeAccelerometerZ) ||
+     IsNumLike(d.GyroscopeX) || IsNumLike(d.GyroscopeY) || IsNumLike(d.GyroscopeZ) ||
+     IsNumLike(d.MagnetometerX) || IsNumLike(d.MagnetometerY) || IsNumLike(d.MagnetometerZ) ||
+     IsNumLike(d.Temperature_BMP180) || IsNumLike(d.Pressure_BMP180) ||
+     IsNumLike(d.BatteryVoltage) ||
+     IsNumLike(d.ExtADC_A6) || IsNumLike(d.ExtADC_A7) || IsNumLike(d.ExtADC_A15) ||
+     // EXG
+     IsNumLike(d.Exg1Ch1) || IsNumLike(d.Exg2Ch1) || IsNumLike(d.ExgRespiration));
+
 
         // ======== Helper attese ACK ========
         private static async Task WaitOrThrow(TaskCompletionSource<bool> tcs, string what, int ms)
@@ -219,6 +259,9 @@ namespace XR2Learn_ShimmerAPI.GSR
 
             _subscribed = false;
             await EnsureSubscribedAsync().ConfigureAwait(false);
+            // chiedi la config al bridge per avere subito exg_mode
+            await SendJsonAsync(new { type = "get_config", mac = BridgeTargetMac }).ConfigureAwait(false);
+
 
             // Config IMU/env (EXG disatteso)
             _tcsConfig = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -330,6 +373,38 @@ namespace XR2Learn_ShimmerAPI.GSR
                         break;
                     }
 
+case "config":
+case "config_changed":
+{
+    // es: { type:"config"|"config_changed", cfg:{ "exg_mode":"ecg" } }
+    if (type == "config" && root.TryGetProperty("ok", out var okEl) && !okEl.GetBoolean())
+        break; // config non ok: esci
+
+    if (root.TryGetProperty("cfg", out var cfg) &&
+        cfg.ValueKind == JsonValueKind.Object &&
+        cfg.TryGetProperty("exg_mode", out var m) &&
+        m.ValueKind == JsonValueKind.String)
+    {
+        var raw = m.GetString();
+        var normalized = (raw ?? "").Trim().ToLowerInvariant();
+        CurrentExgMode = normalized;
+
+        D($"[EXG] exg_mode ({type}) raw='{raw}' normalized='{normalized}'");
+
+        if (normalized != "ecg" && normalized != "emg" &&
+            normalized != "test" && normalized != "resp" &&
+            normalized != "respiration")
+        {
+            D("[EXG] ⚠️ exg_mode non riconosciuto. Attesi: ecg | emg | test | resp(respiration)");
+        }
+    }
+    break;
+}
+
+
+
+
+
                     case "config_ack":
                     {
                         bool ok3 = root.TryGetProperty("ok", out var okCfg) && okCfg.GetBoolean();
@@ -345,6 +420,8 @@ namespace XR2Learn_ShimmerAPI.GSR
                         _tcsSetSR?.TrySetResult(ok ? applied : -1.0);
                         break;
                     }
+
+
 
                     case "start_ack":
                         _tcsStart?.TrySetResult(root.TryGetProperty("ok", out var ok4) && ok4.GetBoolean());
@@ -383,8 +460,37 @@ namespace XR2Learn_ShimmerAPI.GSR
                         double? a7   = N(ext, "a7");
                         double? a15  = N(ext, "a15");
 
+                                                // EXG (due canali generici dal bridge)
+                        double? exg1 = null, exg2 = null;
+
+                        // nuovi nomi
+                        if (root.TryGetProperty("exg1", out var exg1El) && exg1El.ValueKind == JsonValueKind.Number)
+                            exg1 = exg1El.GetDouble();
+                        if (root.TryGetProperty("exg2", out var exg2El) && exg2El.ValueKind == JsonValueKind.Number)
+                            exg2 = exg2El.GetDouble();
+
+                            // DEBUG: stampa cosa arriva per EXG e la modalità corrente
+if (_debug)
+{
+    var s1 = exg1.HasValue ? exg1.Value.ToString("F3", CultureInfo.InvariantCulture) : "-";
+    var s2 = exg2.HasValue ? exg2.Value.ToString("F3", CultureInfo.InvariantCulture) : "-";
+    D($"[EXG] sample mode='{CurrentExgMode}' exg1={s1} exg2={s2}");
+}
+
+
+                        // fallback alias legacy
+                        if (!exg1.HasValue && root.TryGetProperty("ExgCh1", out var exgA) && exgA.ValueKind == JsonValueKind.Number)
+                            exg1 = exgA.GetDouble();
+                        if (!exg2.HasValue && root.TryGetProperty("ExgCh2", out var exgB) && exgB.ValueKind == JsonValueKind.Number)
+                            exg2 = exgB.GetDouble();
+
                         LatestData = new XR2Learn_ShimmerEXGData(
-                            timeStamp: (uint)Math.Max(0, (int)(ts ?? 0)),
+                            // DOPO (no saturazione a 2147483647)
+                            timeStamp: ts.HasValue && ts.Value >= 0
+                                ? (uint)Math.Min(ts.Value, uint.MaxValue)
+                                : 0u,
+
+
                             // IMU/env
                             accelerometerX:      lnaX.HasValue ? new NumericPayload(lnaX.Value) : null,
                             accelerometerY:      lnaY.HasValue ? new NumericPayload(lnaY.Value) : null,
@@ -404,10 +510,19 @@ namespace XR2Learn_ShimmerAPI.GSR
                             extADC_A6:           a6.HasValue ? new NumericPayload(a6.Value) : null,
                             extADC_A7:           a7.HasValue ? new NumericPayload(a7.Value) : null,
                             extADC_A15:          a15.HasValue ? new NumericPayload(a15.Value) : null,
-                            // EXG: ignorati per ora
-                            exg1Ch1: null, exg1Ch2: null, exg2Ch1: null, exg2Ch2: null,
-                            exgRespiration: null
+
+                            // EXG: abbiamo solo due canali (EXG1, EXG2); mappiamo su ch1 di ciascuna coppia
+                            exg1Ch1:      exg1.HasValue ? new NumericPayload(exg1.Value) : null,
+                            exg1Ch2:      null,
+                            exg2Ch1:      exg2.HasValue ? new NumericPayload(exg2.Value) : null,
+                            exg2Ch2:      null,
+
+                            // Respiration: duplichiamo uno dei due canali se la modalità è "resp" o "respiration"
+                            exgRespiration: (CurrentExgMode == "resp" || CurrentExgMode == "respiration")
+                                ? new NumericPayload((exg1 ?? exg2) ?? 0.0)
+                                : null
                         );
+
 
                         try
                         {
