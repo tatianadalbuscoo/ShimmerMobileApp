@@ -172,8 +172,9 @@ private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
      IsNumLike(d.Temperature_BMP180) || IsNumLike(d.Pressure_BMP180) ||
      IsNumLike(d.BatteryVoltage) ||
      IsNumLike(d.ExtADC_A6) || IsNumLike(d.ExtADC_A7) || IsNumLike(d.ExtADC_A15) ||
-     // EXG
-     IsNumLike(d.Exg1Ch1) || IsNumLike(d.Exg2Ch1) || IsNumLike(d.ExgRespiration));
+     // EXG: solo questi due, sempre
+     IsNumLike(d.Exg1) || IsNumLike(d.Exg2));
+
 
 
         // ======== Helper attese ACK ========
@@ -456,14 +457,22 @@ case "config_changed":
                         double? a7   = N(ext, "a7");
                         double? a15  = N(ext, "a15");
 
-                                                // EXG (due canali generici dal bridge)
                         double? exg1 = null, exg2 = null;
 
-                        // nuovi nomi
+                        // 1) nomi canonici nuovi
                         if (root.TryGetProperty("exg1", out var exg1El) && exg1El.ValueKind == JsonValueKind.Number)
                             exg1 = exg1El.GetDouble();
                         if (root.TryGetProperty("exg2", out var exg2El) && exg2El.ValueKind == JsonValueKind.Number)
                             exg2 = exg2El.GetDouble();
+
+                        // 2) fallback legacy camel-case
+                        if (!exg1.HasValue && root.TryGetProperty("ExgCh1", out var exgA) && exgA.ValueKind == JsonValueKind.Number)
+                            exg1 = exgA.GetDouble();
+                        if (!exg2.HasValue && root.TryGetProperty("ExgCh2", out var exgB) && exgB.ValueKind == JsonValueKind.Number)
+                            exg2 = exgB.GetDouble();
+
+                        // (non cercare "ExgRespiration": non esiste nel sample)
+
 
                             // DEBUG: stampa cosa arriva per EXG e la modalità corrente
 if (_debug)
@@ -474,11 +483,25 @@ if (_debug)
 }
 
 
-                        // fallback alias legacy
-                        if (!exg1.HasValue && root.TryGetProperty("ExgCh1", out var exgA) && exgA.ValueKind == JsonValueKind.Number)
-                            exg1 = exgA.GetDouble();
-                        if (!exg2.HasValue && root.TryGetProperty("ExgCh2", out var exgB) && exgB.ValueKind == JsonValueKind.Number)
-                            exg2 = exgB.GetDouble();
+// fallback alias legacy
+if (!exg1.HasValue)
+{
+    if (root.TryGetProperty("ExgCh1", out JsonElement exgCh1El) &&
+        exgCh1El.ValueKind == JsonValueKind.Number)
+    {
+        exg1 = exgCh1El.GetDouble();
+    }
+}
+
+if (!exg2.HasValue)
+{
+    if (root.TryGetProperty("ExgCh2", out JsonElement exgCh2El) &&
+        exgCh2El.ValueKind == JsonValueKind.Number)
+    {
+        exg2 = exgCh2El.GetDouble();
+    }
+}
+
 
                         LatestData = new XR2Learn_ShimmerEXGData(
                             // DOPO (no saturazione a 2147483647)
@@ -507,17 +530,14 @@ if (_debug)
                             extADC_A7:           a7.HasValue ? new NumericPayload(a7.Value) : null,
                             extADC_A15:          a15.HasValue ? new NumericPayload(a15.Value) : null,
 
-                            // EXG: abbiamo solo due canali (EXG1, EXG2); mappiamo su ch1 di ciascuna coppia
-                            exg1Ch1:      exg1.HasValue ? new NumericPayload(exg1.Value) : null,
-                            exg1Ch2:      null,
-                            exg2Ch1:      exg2.HasValue ? new NumericPayload(exg2.Value) : null,
-                            exg2Ch2:      null,
-
-                            // Respiration: duplichiamo uno dei due canali se la modalità è "resp" o "respiration"
-                            exgRespiration: (CurrentExgMode == "resp" || CurrentExgMode == "respiration")
-                                ? new NumericPayload((exg1 ?? exg2) ?? 0.0)
-                                : null
+                            exg1: exg1.HasValue ? new NumericPayload(exg1.Value) : null,
+                            exg2: exg2.HasValue ? new NumericPayload(exg2.Value) : null
                         );
+
+                        // === Alias per DataPage (richiede proprietà in XR2Learn_ShimmerEXGData) ===
+                        LatestData.ExgCh1 = exg1.HasValue ? new NumericPayload(exg1.Value) : null;
+                        LatestData.ExgCh2 = exg2.HasValue ? new NumericPayload(exg2.Value) : null;
+
 
 
                         try
