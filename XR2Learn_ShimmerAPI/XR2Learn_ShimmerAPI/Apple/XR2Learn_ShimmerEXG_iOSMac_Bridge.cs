@@ -87,14 +87,11 @@ public string CurrentExgMode
         private TaskCompletionSource<double>? _tcsSetSR;
 
         // ======== DEBUG ========
-        private bool _debug = true;
+        private bool _debug = false;
         private int _dbgSamplePrintEvery = 1;
         private int _dbgSampleCounter = 0;
         private bool _loggedFirstMode = false;
 
-         // ======== THROTTLE UI (aggiungi questi) ========
-    private long _lastUiEmitTicks = 0;
-    private readonly long _uiMinIntervalTicks = TimeSpan.FromMilliseconds(30).Ticks; // ≈33 Hz
 
         private void D(string msg)
         {
@@ -299,7 +296,6 @@ private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
             await WaitOrThrow(_tcsStart, "start_ack", 12000).ConfigureAwait(false);
 
             _isStreaming = true;
-            _lastUiEmitTicks = 0;
         }
 
         private async Task StopStreamingMacAsync()
@@ -534,14 +530,9 @@ if (_debug)
                                     D($"Parsed ts={data.TimeStamp} " +
                                       $"LNA=({Fmt(data.LowNoiseAccelerometerX)}, {Fmt(data.LowNoiseAccelerometerY)}, {Fmt(data.LowNoiseAccelerometerZ)})");
                                 }
-                                var nowTicks = DateTime.UtcNow.Ticks;
-                                if (nowTicks - _lastUiEmitTicks >= _uiMinIntervalTicks)
-                                {
-                                    _lastUiEmitTicks = nowTicks;
-                                    var snapshot = data;   // o LatestData
-                                    RunOnMainThread(() => SampleReceived?.Invoke(this, snapshot));
-                                }
-                                // else: salta questo frame per non ingolfare la UI
+var snapshot = data;   // o LatestData
+RunOnMainThread(() => SampleReceived?.Invoke(this, snapshot));
+
 
                             }
                         }
