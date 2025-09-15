@@ -89,15 +89,15 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
 
     // ==== Sensor enablement flags (from current device config) ====
     // These indicate which sensors are enabled for this device/session
-    private readonly bool enableLowNoiseAccelerometer;
-    private readonly bool enableWideRangeAccelerometer;
-    private readonly bool enableGyroscope;
-    private readonly bool enableMagnetometer;
-    private readonly bool enablePressureTemperature;
-    private readonly bool enableBattery;
-    private readonly bool enableExtA6;
-    private readonly bool enableExtA7;
-    private readonly bool enableExtA15;
+    private bool enableLowNoiseAccelerometer;
+    private  bool enableWideRangeAccelerometer;
+    private  bool enableGyroscope;
+    private bool enableMagnetometer;
+    private  bool enablePressureTemperature;
+    private  bool enableBattery;
+    private  bool enableExtA6;
+    private  bool enableExtA7;
+    private bool enableExtA15;
 
     // ==== Last valid values for restoring user input ====
     private double _lastValidYAxisMin = 0;
@@ -511,8 +511,49 @@ shimmerDevice.ExgModeChanged += (_, title) =>
         ValidateAndUpdateYAxisMax(YAxisMaxText);
     }
 
+    /// <summary>
+    /// Sincronizza i flag IMU/env dal device EXG (se sono cambiati) e dice se qualcosa è cambiato.
+    /// </summary>
+    private bool SyncImuFlagsFromExgDeviceIfChanged()
+    {
+        if (shimmerExg == null) return false;
+
+        bool changed = false;
+
+        void Set(ref bool field, bool value)
+        {
+            if (field != value) { field = value; changed = true; }
+        }
+
+        Set(ref enableLowNoiseAccelerometer, shimmerExg.EnableLowNoiseAccelerometer);
+        Set(ref enableWideRangeAccelerometer, shimmerExg.EnableWideRangeAccelerometer);
+        Set(ref enableGyroscope, shimmerExg.EnableGyroscope);
+        Set(ref enableMagnetometer, shimmerExg.EnableMagnetometer);
+        Set(ref enablePressureTemperature, shimmerExg.EnablePressureTemperature);
+        Set(ref enableBattery, shimmerExg.EnableBatteryVoltage);
+        Set(ref enableExtA6, shimmerExg.EnableExtA6);
+        Set(ref enableExtA7, shimmerExg.EnableExtA7);
+        Set(ref enableExtA15, shimmerExg.EnableExtA15);
+
+        return changed;
+    }
+
+
     private void OnSampleReceived(object? sender, dynamic sample)
     {
+        // Se sono collegato via EXG, sincronizzo i flag IMU/env dal bridge.
+        // Se qualcosa è cambiato, rigenero lista parametri, sistemo la selezione e pulisco i buffer.
+        if (shimmerExg != null && SyncImuFlagsFromExgDeviceIfChanged())
+        {
+            InitializeAvailableParameters();
+
+            if (!AvailableParameters.Contains(SelectedParameter))
+                SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
+
+            ClearAllDataCollections();
+            UpdateChart();
+        }
+
         // Incrementa il contatore e calcola il tempo corrente
         sampleCounter++;
         double currentTimeSeconds = CurrentTimeInSeconds; 

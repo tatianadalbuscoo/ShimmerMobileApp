@@ -76,22 +76,6 @@ sensorConfig.IsExgModeEMG         = mode == "emg";
 sensorConfig.IsExgModeTest        = mode == "test";
 sensorConfig.IsExgModeRespiration = mode == "resp" || mode == "respiration";
 
-// Se 'mode' è vuoto (bridge non ha ancora risposto), lascia tutte e 4 a false.
-// Niente default forzato a ECG.
-
-            // 👉 QUI sotto incolla il blocco con gli Enable IMU
-    sensorConfig.EnableLowNoiseAccelerometer  = true;
-    sensorConfig.EnableWideRangeAccelerometer = true;
-    sensorConfig.EnableGyroscope              = true;
-    sensorConfig.EnableMagnetometer           = true;
-    sensorConfig.EnablePressureTemperature    = true;
-    sensorConfig.EnableBattery                = true;
-    sensorConfig.EnableExtA6 = true;
-    sensorConfig.EnableExtA7 = true;
-    sensorConfig.EnableExtA15 = true;
-
-    // (opzionale) se vuoi andare subito sul gruppo EXG in grafico:
-    // sensorConfig.SelectedExgMode = "ECG"; // è collegata ai radio
 #endif
 
         viewModel = new DataPageViewModel(shimmer, sensorConfig); // usa il ctor EXG del VM

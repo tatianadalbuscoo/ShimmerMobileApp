@@ -24,11 +24,13 @@ namespace XR2Learn_ShimmerAPI.GSR
 
         // Ultimo pacchetto instradato
         public XR2Learn_ShimmerEXGData? LatestData { get; private set; }
+
 // --- modalità EXG letta dal bridge (normalizzata) ---
 private string _currentExgMode = "";
 
 // 🔔 Evento che la UI può ascoltare per “stampare” la modalità
 public event EventHandler<string>? ExgModeChanged;
+
 
 // Titolo user-friendly per la label/console
 public string CurrentExgModeTitle => _currentExgMode switch
@@ -261,28 +263,7 @@ private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
             await SendJsonAsync(new { type = "get_config", mac = BridgeTargetMac }).ConfigureAwait(false);
 
 
-            // Config IMU/env (EXG disatteso)
-            _tcsConfig = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var cfg = new
-            {
-                type = "set_config",
-                // IMU/env: fissa a true per evitare dipendenze da proprietà mancanti
-                EnableLowNoiseAccelerometer  = true,
-                EnableWideRangeAccelerometer = true,
-                EnableGyroscope              = true,
-                EnableMagnetometer           = true,
-                EnablePressureTemperature    = true,
 
-                // opzionali ext ADC
-                EnableExtA6  = true,
-                EnableExtA7  = true,
-                EnableExtA15 = true,
-
-                // sampling rate dalla partial comune (già esistente nel tuo progetto)
-                SamplingRate = this.SamplingRate
-            };
-            await SendJsonAsync(cfg).ConfigureAwait(false);
-            _ = await WaitSoft(_tcsConfig, 6000).ConfigureAwait(false);
         }
 
         private async Task StartStreamingMacAsync()
@@ -370,31 +351,44 @@ private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
                         break;
                     }
 
-case "config":
+                    case "config":
 case "config_changed":
 {
-    // es: { type:"config"|"config_changed", cfg:{ "exg_mode":"ecg" } }
+    // 1) Se "config" fallita, esci
     if (type == "config" && root.TryGetProperty("ok", out var okEl) && !okEl.GetBoolean())
-        break; // config non ok: esci
+        break;
 
-    if (root.TryGetProperty("cfg", out var cfg) &&
-        cfg.ValueKind == JsonValueKind.Object &&
-        cfg.TryGetProperty("exg_mode", out var m) &&
-        m.ValueKind == JsonValueKind.String)
+    if (root.TryGetProperty("cfg", out var cfg) && cfg.ValueKind == JsonValueKind.Object)
     {
-        var raw = m.GetString();
-        var normalized = (raw ?? "").Trim().ToLowerInvariant();
-        CurrentExgMode = normalized;
-
-        D($"[EXG] exg_mode ({type}) raw='{raw}' normalized='{normalized}'");
-
-        if (normalized != "ecg" && normalized != "emg" &&
-            normalized != "test" && normalized != "resp" &&
-            normalized != "respiration")
+        // 2) Modalità EXG (come già facevi)
+        if (cfg.TryGetProperty("exg_mode", out var m) && m.ValueKind == JsonValueKind.String)
         {
-            D("[EXG] ⚠️ exg_mode non riconosciuto. Attesi: ecg | emg | test | resp(respiration)");
+            var raw = m.GetString();
+            var normalized = (raw ?? "").Trim().ToLowerInvariant();
+            CurrentExgMode = normalized;
+            D($"[EXG] exg_mode ({type}) raw='{raw}' normalized='{normalized}'");
         }
+
+        // 3) 🔴 COPIA LE FLAG (come nel bridge IMU)
+        bool Get(string name) => cfg.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.True;
+
+        EnableLowNoiseAccelerometer  = Get("EnableLowNoiseAccelerometer");
+        EnableWideRangeAccelerometer = Get("EnableWideRangeAccelerometer");
+        EnableGyroscope              = Get("EnableGyroscope");
+        EnableMagnetometer           = Get("EnableMagnetometer");
+        EnablePressureTemperature    = Get("EnablePressureTemperature");
+        EnableBatteryVoltage                = Get("EnableBattery");
+        EnableExtA6                  = Get("EnableExtA6");
+        EnableExtA7                  = Get("EnableExtA7");
+        EnableExtA15                 = Get("EnableExtA15");
+
+        // opzionale: aggiorna SR se presente
+        if (cfg.TryGetProperty("SamplingRate", out var srEl) && srEl.ValueKind == JsonValueKind.Number)
+            SamplingRate = srEl.GetDouble();
+        RunOnMainThread(() => SampleReceived?.Invoke(this, LatestData));
+
     }
+
     break;
 }
 
