@@ -8,6 +8,9 @@ using System.Collections.Generic;
 using CommunityToolkit.Mvvm.Input;
 using System.Threading.Tasks;
 using Microsoft.Maui.Graphics;
+using System.Reflection;
+using System.Globalization;
+
 
 #if IOS || MACCATALYST
 using Microsoft.Maui.ApplicationModel;  // MainThread
@@ -130,7 +133,7 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
     // ==== MVVM Bindable Properties ====
     // These properties are observable and used for data binding in the UI
     [ObservableProperty]
-    private string selectedParameter = "Low-Noise Accelerometer";
+    private string selectedParameter = "Low-Noise AccelerometerX";
 
     [ObservableProperty]
     private double yAxisMin = 0;
@@ -616,6 +619,73 @@ private void ApplyModeTitleToFlags(string? title)
             ResetSamplingRateText();
         }
     }
+
+    private static bool TryUnwrap(object? v, out float value)
+    {
+        value = 0;
+        if (v == null) return false;
+
+        var vt = v.GetType();
+        var dataProp = vt.GetProperty("Data", BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+        if (dataProp != null)
+        {
+            var dataVal = dataProp.GetValue(v);
+            if (dataVal is IConvertible)
+            {
+                value = Convert.ToSingle(dataVal, CultureInfo.InvariantCulture);
+                return true;
+            }
+        }
+        if (v is IConvertible)
+        {
+            value = Convert.ToSingle(v, CultureInfo.InvariantCulture);
+            return true;
+        }
+        return false;
+    }
+
+    private static bool TryGetScalar(object obj, string name, out float value)
+    {
+        value = 0;
+        var t = obj.GetType();
+        var p = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+        if (p != null)
+        {
+            var v = p.GetValue(obj);
+            return TryUnwrap(v, out value);
+        }
+        var f = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+        if (f != null)
+        {
+            var v = f.GetValue(obj);
+            return TryUnwrap(v, out value);
+        }
+        return false;
+    }
+
+    // prova su sample e (se esiste) dentro a contenitori tipici: Exg/EXG/Ecg/ECG
+    private static bool TryGetAnyEXG(object sample, string[] names, out float value)
+    {
+        foreach (var n in names)
+            if (TryGetScalar(sample, n, out value))
+                return true;
+
+        string[] containers = { "Exg", "EXG", "Ecg", "ECG" };
+        var t = sample.GetType();
+        foreach (var c in containers)
+        {
+            var containerProp = t.GetProperty(c, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
+            if (containerProp?.GetValue(sample) is object inner)
+            {
+                foreach (var n in names)
+                    if (TryGetScalar(inner, n, out value))
+                        return true;
+            }
+        }
+        value = 0;
+        return false;
+    }
+
 
     public void AttachToDevice()
     {
@@ -1835,9 +1905,11 @@ private void ApplyModeTitleToFlags(string? title)
             if (enableExtA15 && HasProp(sample, "ExtADC_A15") && sample.ExtADC_A15 != null)
                 values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data / 1000f;
             // ===== EXG: sempre due canali visibili (CH1/CH2) + opzionale respiration =====
+            // ===== EXG: 2 canali + (opz.) respiration — alias per piattaforma =====
             if (enableExg)
             {
-                // DOPO (tipo esplicito)
+#if IOS || MACCATALYST
+                // 🔒 iOS/Mac — tieni IDENTICHE le tue righe
                 if (TryGetNumeric(sample, "ExgCh1", out float vExg1))
                     values["ExgCh1"] = vExg1;
 
@@ -1848,7 +1920,25 @@ private void ApplyModeTitleToFlags(string? title)
                 if (TryGetNumeric(sample, "ExgRespiration", out float vResp))
                     values["ExgRespiration"] = vResp;
 
+#elif WINDOWS
+                if (HasProp(sample, "ExgCh1") && sample.ExgCh1 != null)
+                    values["ExgCh1"] = (float)sample.ExgCh1.Data;
+                if (HasProp(sample, "ExgCh2") && sample.ExgCh2 != null)
+                    values["ExgCh2"] = (float)sample.ExgCh2.Data;
+                if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
+                    values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
+
+#elif ANDROID
+                if (HasProp(sample, "ExgCh1") && sample.ExgCh1 != null)
+                    values["ExgCh1"] = (float)sample.ExgCh1.Data;
+                if (HasProp(sample, "ExgCh2") && sample.ExgCh2 != null)
+                    values["ExgCh2"] = (float)sample.ExgCh2.Data;
+                if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
+                    values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
+
+#endif
             }
+
 
         }
         catch (Exception ex)
