@@ -82,8 +82,34 @@ sensorConfig.IsExgModeRespiration = mode == "resp" || mode == "respiration";
         BindingContext = viewModel;
 
 #if IOS || MACCATALYST
-// Selezione immediata se il bridge ha già fornito la modalità
+// Se IMU è attiva, parti dall'IMU (Low-Noise Accelerometer in primis)
+// e NON autoselezionare il gruppo EXG
+bool anyImu =
+    sensorConfig.EnableLowNoiseAccelerometer ||
+    sensorConfig.EnableWideRangeAccelerometer ||
+    sensorConfig.EnableGyroscope ||
+    sensorConfig.EnableMagnetometer ||
+    sensorConfig.EnablePressureTemperature ||
+    sensorConfig.EnableBattery ||
+    sensorConfig.EnableExtA6 ||
+    sensorConfig.EnableExtA7 ||
+    sensorConfig.EnableExtA15;
+
+if (anyImu)
 {
+    if (sensorConfig.EnableLowNoiseAccelerometer)
+        viewModel.SelectedParameter = "Low-Noise Accelerometer";
+    else if (sensorConfig.EnableWideRangeAccelerometer)
+        viewModel.SelectedParameter = "Wide-Range Accelerometer";
+    else if (sensorConfig.EnableGyroscope)
+        viewModel.SelectedParameter = "Gyroscope";
+    else if (sensorConfig.EnableMagnetometer)
+        viewModel.SelectedParameter = "Magnetometer";
+    // Niente subscribe a OnFirstExgSampleSelectGroupOnce in questo ramo
+}
+else
+{
+    // EXG-only → mantieni la tua autoselezione in base alla modalità del bridge
     var bridgeMode2 = (_exg?.CurrentExgMode ?? "").Trim().ToLowerInvariant();
     if (bridgeMode2 == "resp" || bridgeMode2 == "respiration")
         viewModel.SelectedParameter = "Respiration";
@@ -93,12 +119,12 @@ sensorConfig.IsExgModeRespiration = mode == "resp" || mode == "respiration";
         viewModel.SelectedParameter = "EMG";
     else if (bridgeMode2 == "test")
         viewModel.SelectedParameter = "EXG Test";
-}
 
-// Se la modalità arriva qualche istante dopo, allineo al primo sample
-if (_exg != null)
-    _exg.SampleReceived += OnFirstExgSampleSelectGroupOnce;
+    if (_exg != null)
+        _exg.SampleReceived += OnFirstExgSampleSelectGroupOnce;
+}
 #endif
+
 
 
 

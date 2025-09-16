@@ -130,7 +130,7 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
     // ==== MVVM Bindable Properties ====
     // These properties are observable and used for data binding in the UI
     [ObservableProperty]
-    private string selectedParameter = "Low-Noise AccelerometerX";
+    private string selectedParameter = "Low-Noise Accelerometer";
 
     [ObservableProperty]
     private double yAxisMin = 0;
