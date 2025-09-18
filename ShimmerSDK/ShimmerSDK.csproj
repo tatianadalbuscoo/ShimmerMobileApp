@@ -11,10 +11,10 @@
   </PropertyGroup>
 	
 	<ItemGroup>
-		<Compile Remove="XR2Learn_SerialPortsManager.cs" />
+		<Compile Remove="Windows\XR2Learn_SerialPortsManager.cs" />
 	</ItemGroup>
 	<ItemGroup Condition="'$(TargetFramework)' != 'net8.0-windows10.0.19041.0'">
-		<None Include="XR2Learn_SerialPortsManager.cs">
+		<None Include="Windows\XR2Learn_SerialPortsManager.cs">
 			<Visible>true</Visible>
 		</None>
 	</ItemGroup>
@@ -29,17 +29,18 @@
 	  <ProjectReference Include="..\ShimmerAPI\ShimmerAPI.csproj" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
-    <Compile Include="XR2Learn_SerialPortsManager.cs" />
-    <PackageReference Include="System.IO.Ports" Version="5.0.1" />
-    <Reference Include="ShimmerLibrary">
-      <HintPath>libs/ShimmerClosedLibraryRev0_5.dll</HintPath>
-      <Private>true</Private>
-    </Reference>
-	  <ProjectReference Include="..\ShimmerAPI\ShimmerAPI.csproj" />
-  </ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+		<Compile Include="Windows\XR2Learn_SerialPortsManager.cs" />
+		<PackageReference Include="System.IO.Ports" Version="5.0.1" />
+		<Reference Include="ShimmerLibrary">
+			<HintPath>libs/ShimmerClosedLibraryRev0_5.dll</HintPath>
+			<Private>true</Private>
+		</Reference>
+		<ProjectReference Include="..\ShimmerAPI\ShimmerAPI.csproj" />
+	</ItemGroup>
 
-  <!-- iOS/MacCatalyst -->
+
+	<!-- iOS/MacCatalyst -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios' or '$(TargetFramework)' == 'net8.0-maccatalyst'">
 	  <ProjectReference Include="..\ShimmerAPI\ShimmerAPI.csproj" />
   </ItemGroup>
