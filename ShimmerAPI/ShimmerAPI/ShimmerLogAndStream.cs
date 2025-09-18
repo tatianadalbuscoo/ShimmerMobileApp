@@ -1,5 +1,4 @@
-﻿// Abstract class that calibrates timestamps from Shimmer data packets and tracks packet loss and reception rate.
-
+﻿
 using System;
 using System.Collections.Generic;
 using System.IO;

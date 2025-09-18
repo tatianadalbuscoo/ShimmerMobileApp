@@ -1,5 +1,4 @@
-﻿// Advanced Shimmer serial streaming class that buffers incoming data, supports timeouts, and ensures safe resource disposal.
-
+﻿
 /* * Rev 0.6
  * 
  * Changes since Rev 0.5

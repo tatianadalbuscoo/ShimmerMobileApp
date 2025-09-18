@@ -1,6 +1,4 @@
-﻿// This class is used to filter raw sensor data (e.g., from accelerometers or GSR)
-// to clean the signal or highlight specific frequency components, making it clearer and more useful for analysis.
-
+﻿
 using System;
 using System.Collections.Generic;
 

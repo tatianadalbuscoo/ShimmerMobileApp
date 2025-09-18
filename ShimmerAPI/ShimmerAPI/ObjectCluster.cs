@@ -1,5 +1,4 @@
-﻿// Represents a set of sensor data from a Shimmer device, including names, formats, units, and values.
-
+﻿
 using System;
 using System.Collections.Generic;
 

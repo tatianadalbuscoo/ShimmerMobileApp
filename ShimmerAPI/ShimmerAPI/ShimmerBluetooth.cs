@@ -1,7 +1,4 @@
-﻿// This abstract class manages serial (COM port) communication with a Shimmer device.
-// It includes methods to open, close, read from, and write to the serial connection.
-// Marked as obsolete in favor of higher-level implementations.
-
+﻿
 /*Rev 0.5
  * 
  * Copyright (c) 2014, Shimmer Research, Ltd.

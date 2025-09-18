@@ -1,5 +1,4 @@
-﻿// Enhanced version of serial Shimmer streaming that reads and buffers serial data with timeout handling.
-
+﻿
 using System;
 using System.Diagnostics;
 using System.IO;

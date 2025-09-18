@@ -1,5 +1,4 @@
-﻿// Abstract class that handles timestamp calibration and tracks packet loss from a Shimmer device.
-
+﻿
 using System;
 using static ShimmerAPI.ShimmerBluetooth;
 

@@ -1,5 +1,4 @@
-﻿// Represents a single sensor reading, including its value and unit of measurement.
-
+﻿
 using System;
 
 namespace ShimmerAPI

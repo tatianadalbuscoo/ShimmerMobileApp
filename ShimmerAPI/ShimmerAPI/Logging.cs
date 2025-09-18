@@ -1,5 +1,4 @@
-﻿// Writes Shimmer sensor data to a CSV file, including headers for signal names, formats, and units.
-
+﻿
 using System;
 using System.Collections.Generic;
 using System.IO;
