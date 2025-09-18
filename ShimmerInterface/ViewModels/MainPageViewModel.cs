@@ -15,6 +15,7 @@ using System.Threading.Tasks;
 
 #if WINDOWS
 using System.Management;
+using ShimmerSDK;
 #endif
 
 namespace ShimmerInterface.ViewModels;

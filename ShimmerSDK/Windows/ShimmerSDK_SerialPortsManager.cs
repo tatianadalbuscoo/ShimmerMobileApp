@@ -1,8 +1,13 @@
-﻿
+﻿/* 
+ * Windows-only helper that lists available COM ports and checks their availability. 
+ * It acts as a thin wrapper over System.IO.Ports to help the app discover Shimmer devices. 
+ */
+
+#if WINDOWS
 using System;
 using System.IO.Ports;
 
-namespace XR2Learn_ShimmerAPI
+namespace ShimmerSDK
 {
     public class ShimmerSDK_SerialPortsManager
     {
@@ -26,3 +31,4 @@ namespace XR2Learn_ShimmerAPI
         }
     }
 }
+#endif
