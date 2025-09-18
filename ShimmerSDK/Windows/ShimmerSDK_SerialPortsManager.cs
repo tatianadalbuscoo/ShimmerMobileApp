@@ -4,7 +4,7 @@ using System.IO.Ports;
 
 namespace XR2Learn_ShimmerAPI
 {
-    public class XR2Learn_SerialPortsManager
+    public class ShimmerSDK_SerialPortsManager
     {
         /// <summary>
         /// Returns a list of available serial ports
