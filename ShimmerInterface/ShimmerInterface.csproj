@@ -117,7 +117,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\ShimmerSDK\ShimmerSDK\ShimmerSDK.csproj" />
+		  <ProjectReference Include="..\ShimmerSDK\ShimmerSDK.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
