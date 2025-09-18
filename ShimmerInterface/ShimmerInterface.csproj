@@ -117,7 +117,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI\XR2Learn_ShimmerAPI.csproj" />
+		<ProjectReference Include="..\ShimmerSDK\ShimmerSDK\ShimmerSDK.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
