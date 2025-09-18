@@ -2,7 +2,7 @@
 using System;
 using System.Text;
 
-namespace XR2Learn_ShimmerAPI.Android
+namespace ShimmerSDK.Android
 {
     public static class Util
     {

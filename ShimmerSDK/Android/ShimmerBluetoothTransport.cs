@@ -2,7 +2,7 @@
 using System;
 using ShimmerAPI;
 
-namespace XR2Learn_ShimmerAPI.Android
+namespace ShimmerSDK.Android
 {
     /// <summary>
     /// Adattatore: espone l’API ShimmerBluetooth usando IShimmerConnection (BT).

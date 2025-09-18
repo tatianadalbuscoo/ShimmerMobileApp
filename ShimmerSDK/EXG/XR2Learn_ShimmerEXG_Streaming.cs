@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 
 
 #if ANDROID
- using XR2Learn_ShimmerAPI.Android;
+ using ShimmerSDK.Android;
 #endif
 
 namespace XR2Learn_ShimmerAPI.GSR

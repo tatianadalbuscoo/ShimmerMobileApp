@@ -1,4 +1,6 @@
-﻿#if ANDROID
+﻿
+
+#if ANDROID
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -6,11 +8,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Android.Bluetooth;
 using Java.Util;
-using Java.Lang.Reflect; // Method
 
-namespace XR2Learn_ShimmerAPI.Android
+namespace ShimmerSDK.Android
 {
-    /// <summary>Connessione RFCOMM SPP verso Shimmer con retry/fallback e timeout.</summary>
     internal sealed class AndroidBluetoothConnection : IShimmerConnection
     {
         private static readonly UUID SPP_UUID =

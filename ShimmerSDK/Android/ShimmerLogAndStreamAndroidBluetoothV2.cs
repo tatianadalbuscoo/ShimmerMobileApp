@@ -4,7 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using ShimmerAPI;
 
-namespace XR2Learn_ShimmerAPI.Android
+namespace ShimmerSDK.Android
 {
     /// <summary>
     /// Wrapper Android con stesse API del V2 Windows (cambia solo il trasporto).

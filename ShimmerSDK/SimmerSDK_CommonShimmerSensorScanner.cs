@@ -1,3 +1,4 @@
+
 #if WINDOWS || ANDROID
 using System;
 using System.Linq;
@@ -7,7 +8,7 @@ using ShimmerAPI;
 
 #if ANDROID
 using Log = global::Android.Util.Log;
-using ShimmerDroid = XR2Learn_ShimmerAPI.Android; // alias del tuo namespace Android
+using ShimmerDroid = ShimmerSDK.Android;
 using System.Collections;
 using System.Collections.Generic;
 #endif
@@ -19,9 +20,7 @@ namespace XR2Learn_ShimmerAPI
         // Unica definizione valida su entrambe le piattaforme
         public enum BoardKind { Unknown, EXG, IMU }
 
-        // =========================
-        // WINDOWS (NON TOCCARE)
-        // =========================
+
 #if WINDOWS
         /// Tenta di leggere la daughter-card (reflection su API Windows).
         public static bool TryDetectBoardKind(
@@ -191,15 +190,12 @@ namespace XR2Learn_ShimmerAPI
             {
                 if (shim == null)
                 {
-                    Log.Debug("Shimmer", "[Detect/Android] shim NULL");
                     return false;
                 }
 
-                Log.Debug("Shimmer", $"[Detect/Android] shimType={shim.GetType().FullName}, connected={shim.IsConnected()}");
 
                 if (!shim.IsConnected())
                 {
-                    Log.Debug("Shimmer", "[Detect/Android] not connected");
                     return false;
                 }
 
@@ -207,7 +203,6 @@ namespace XR2Learn_ShimmerAPI
                 var target = FindExpansionTarget(shim, maxDepth: 3);
                 if (target == null)
                 {
-                    Log.Debug("Shimmer", "[Detect/Android] expansion target not found");
                     return false;
                 }
 
@@ -223,12 +218,10 @@ namespace XR2Learn_ShimmerAPI
                 // 4) Ritenta una volta se vuoto
                 if (!ok)
                 {
-                    Log.Debug("Shimmer", "[Detect/Android] retry ReadExpansionBoard");
                     InvokeNoArgIfExists(target, "ReadExpansionBoard");
                     ok = TryWaitExpansionString(target, out boardStr, timeoutMs: 1400);
                 }
 
-                Log.Debug("Shimmer", $"[Detect/Android] GetExpansionBoard() -> '{boardStr ?? "<null>"}'");
 
                 if (!ok || string.IsNullOrWhiteSpace(boardStr))
                 {
@@ -240,13 +233,10 @@ namespace XR2Learn_ShimmerAPI
 
                 rawId = boardStr;
                 kind  = MapBoardStringToKind(boardStr);
-
-                Log.Debug("Shimmer", $"[Detect/Android] classified kind={kind}");
                 return true;
             }
             catch (System.Exception ex)
             {
-                Log.Debug("Shimmer", $"[Detect/Android][ERR] {ex.GetType().Name}: {ex.Message}");
                 kind  = BoardKind.Unknown;
                 rawId = "";
                 return false;
@@ -412,7 +402,6 @@ namespace XR2Learn_ShimmerAPI
                 try
                 {
                     var res = m.Invoke(instance, null);
-                    Log.Debug("Shimmer", $"[Detect/Android] {methodName} invoked on {t.Name} -> {(res == null ? "-" : res.ToString())}");
                     return res;
                 }
                 catch (Exception ex)
@@ -422,7 +411,6 @@ namespace XR2Learn_ShimmerAPI
             }
             else
             {
-                Log.Debug("Shimmer", $"[Detect/Android] {methodName} not found on {t.FullName}");
             }
             return null;
         }
