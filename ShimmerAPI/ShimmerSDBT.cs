@@ -1,5 +1,4 @@
-﻿
-/* * Rev 0.6
+﻿/* * Rev 0.6
  * 
  * Changes since Rev 0.5
  * - Removed startstreamandlog when Shimmer button pressed

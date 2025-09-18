@@ -1,5 +1,4 @@
-﻿// Utility class for listing and checking available serial (COM) ports on the system.
-
+﻿
 using System;
 using System.IO.Ports;
 

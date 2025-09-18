@@ -1,5 +1,4 @@
-﻿
-using System;
+﻿using System;
 using static ShimmerAPI.ShimmerBluetooth;
 
 namespace ShimmerAPI

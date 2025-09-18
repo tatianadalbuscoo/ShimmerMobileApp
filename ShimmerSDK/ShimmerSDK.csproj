@@ -12,12 +12,6 @@
 
   <!-- 1) RIMUOVI dallo "glob" implicito i file specifici piattaforma
          (così non entrano due volte quando li includiamo condizionati) -->
-  <ItemGroup>
-    <!-- Android-only da rimuovere dall'inclusione implicita -->
-
-    <!-- Windows-only da rimuovere dall'implicito (lo includiamo sotto Windows) -->
-    <Compile Remove="XR2Learn_SerialPortsManager.cs" />
-  </ItemGroup>
 
   <!-- 2) Includi i file specifici SOLO nel TFM corretto -->
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android'">

@@ -1,5 +1,4 @@
-﻿
-/*Rev 0.5
+﻿/*Rev 0.5
  * 
  * Copyright (c) 2014, Shimmer Research, Ltd.
  * All rights reserved
