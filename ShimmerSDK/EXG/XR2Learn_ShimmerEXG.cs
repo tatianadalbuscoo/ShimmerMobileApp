@@ -632,7 +632,6 @@ public async Task<double> ApplySamplingRateWithSafeRestartAsync(double requested
     // riallineo ranges/power (come fai sull’IMU)
     shimmerAndroid.WriteAccelRange(0);
     shimmerAndroid.WriteGyroRange(0);
-    shimmerAndroid.WriteGSRRange(0);
     shimmerAndroid.SetLowPowerAccel(false);
     shimmerAndroid.SetLowPowerGyro(false);
     shimmerAndroid.WriteInternalExpPower(0);

@@ -145,7 +145,6 @@ private async System.Threading.Tasks.Task StartStreamingAndroidSequenceAsync()
 
         shimmerAndroid.WriteAccelRange(0);
         shimmerAndroid.WriteGyroRange(0);
-        shimmerAndroid.WriteGSRRange(0);
         shimmerAndroid.SetLowPowerAccel(false);
         shimmerAndroid.SetLowPowerGyro(false);
         shimmerAndroid.WriteInternalExpPower(0);
