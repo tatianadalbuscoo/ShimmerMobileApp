@@ -10,6 +10,9 @@ using Microsoft.Maui.ApplicationModel; // per MainThread.InvokeOnMainThreadAsync
 using System.Linq;
 using System.Threading.Tasks;
 
+#if ANDROID
+using ShimmerSDK;
+#endif
 
 
 
