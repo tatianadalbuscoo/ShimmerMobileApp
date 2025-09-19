@@ -130,7 +130,7 @@ public partial class MainPageViewModel : ObservableObject
     {
         var list = new List<ShimmerDevice>();
 
-        var ports = ShimmerSDK_SerialPortsManager
+        var ports = SerialPortsManager
             .GetAvailableSerialPortsNames()
             .OrderBy(p => p)
             .ToList();

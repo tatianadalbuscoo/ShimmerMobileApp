@@ -11,12 +11,19 @@ using Java.Util;
 
 namespace ShimmerSDK.Android
 {
+
+    /// <summary>
+    /// Android Bluetooth RFCOMM connection (SPP) implementing IShimmerConnection.
+    /// Handles connect/close, I/O streams and basic retries.
+    /// </summary>
     internal sealed class AndroidBluetoothConnection : IShimmerConnection
     {
+
+        // Standard Serial Port Profile UUID used by classic Bluetooth devices
         private static readonly UUID SPP_UUID =
             UUID.FromString("00001101-0000-1000-8000-00805F9B34FB");
 
-        // serializza i connect per stabilità multi-device
+        // Global gate to serialize connect attempts
         private static readonly SemaphoreSlim ConnectGate = new(1, 1);
 
         private readonly string _mac;
@@ -25,6 +32,7 @@ namespace ShimmerSDK.Android
         private BluetoothSocket? _socket;
         private Stream? _in;
         private Stream? _out;
+
 
         public AndroidBluetoothConnection(string mac, int connectTimeoutMs = 8000)
         {

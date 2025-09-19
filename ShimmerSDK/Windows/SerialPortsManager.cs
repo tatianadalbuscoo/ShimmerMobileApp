@@ -9,7 +9,7 @@ using System.IO.Ports;
 
 namespace ShimmerSDK
 {
-    public class ShimmerSDK_SerialPortsManager
+    public class SerialPortsManager
     {
         /// <summary>
         /// Returns a list of available serial ports
