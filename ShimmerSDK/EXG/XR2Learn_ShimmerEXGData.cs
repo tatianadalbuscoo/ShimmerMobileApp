@@ -50,8 +50,8 @@ namespace XR2Learn_ShimmerAPI.GSR
         public readonly SensorData ExgRespiration;
 
         // --- Alias legacy (compat) ---
-        public readonly SensorData ExgCh1;    // alias di Exg1Ch1
-        public readonly SensorData ExgCh2;    // alias di Exg1Ch2
+        public readonly SensorData Exg1;    
+        public readonly SensorData Exg2;    
 
         // === Costruttore NUOVO (4 canali EXG) ===
         public XR2Learn_ShimmerEXGData(
@@ -103,9 +103,6 @@ namespace XR2Learn_ShimmerAPI.GSR
             Exg2Ch2 = exg2Ch2;
             ExgRespiration = exgRespiration;
 
-            // alias legacy
-            ExgCh1 = Exg1Ch1;
-            ExgCh2 = Exg1Ch2;
         }
 
         // === Costruttore LEGACY (2 canali EXG → mappa su EXG1) ===
@@ -118,7 +115,7 @@ namespace XR2Learn_ShimmerAPI.GSR
             SensorData temperatureBMP180, SensorData pressureBMP180,
             SensorData batteryVoltage,
             SensorData extADC_A6, SensorData extADC_A7, SensorData extADC_A15,
-            SensorData exgCh1, SensorData exgCh2, SensorData exgRespiration = null
+            SensorData exg1, SensorData exg2, SensorData exgRespiration = null
         )
         : this(
             timeStamp,
@@ -130,7 +127,7 @@ namespace XR2Learn_ShimmerAPI.GSR
             batteryVoltage,
             extADC_A6, extADC_A7, extADC_A15,
             // EXG1 popolato dai vecchi parametri
-            exgCh1, exgCh2,
+            exg1, exg2,
             // EXG2 assenti nello schema legacy
             null, null,
             exgRespiration
@@ -175,8 +172,6 @@ public readonly object ExtADC_A15;
         // === EXG (come PROPRIETÀ, NON campi) ===
         public object Exg1 { get; set; }
         public object Exg2 { get; set; }
-        public object ExgCh1 { get; set; }   // alias di Exg1 (la VM cerca questi nomi)
-        public object ExgCh2 { get; set; }   // alias di Exg2
         public object ExgRespiration { get; set; }   // opzionale; puoi lasciarlo ma il bridge non lo invia
 
 
@@ -222,8 +217,6 @@ public readonly object ExtADC_A15;
     // EXG + alias per il ViewModel
     Exg1 = exg1;
     Exg2 = exg2;
-    ExgCh1 = exg1;                 // alias
-    ExgCh2 = exg2;                 // alias
     ExgRespiration = exgRespiration;
 }
 #endif

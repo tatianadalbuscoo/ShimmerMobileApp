@@ -785,15 +785,15 @@ private void ApplyModeTitleToFlags(string? title)
         // EXG
         if (enableExg)
         {
-            if (!dataPointsCollections.ContainsKey("ExgCh1"))
+            if (!dataPointsCollections.ContainsKey("Exg1"))
             {
-                dataPointsCollections["ExgCh1"] = new List<float>();
-                timeStampsCollections["ExgCh1"] = new List<int>();
+                dataPointsCollections["Exg1"] = new List<float>();
+                timeStampsCollections["Exg1"] = new List<int>();
             }
-            if (!dataPointsCollections.ContainsKey("ExgCh2"))
+            if (!dataPointsCollections.ContainsKey("Exg2"))
             {
-                dataPointsCollections["ExgCh2"] = new List<float>();
-                timeStampsCollections["ExgCh2"] = new List<int>();
+                dataPointsCollections["Exg2"] = new List<float>();
+                timeStampsCollections["Exg2"] = new List<int>();
                             }
             // opzionale: se un domani vuoi traccia separata per la respirazione
             // dopo
@@ -1606,8 +1606,8 @@ private void ApplyModeTitleToFlags(string? title)
     {
         try
         {
-            var has1 = values.TryGetValue("ExgCh1", out var v1);
-            var has2 = values.TryGetValue("ExgCh2", out var v2);
+            var has1 = values.TryGetValue("Exg1", out var v1);
+            var has2 = values.TryGetValue("Exg2", out var v2);
                         if (has1 || has2)
             {
                 string mode = exgModeRespiration ? "Respiration"
@@ -1620,7 +1620,7 @@ private void ApplyModeTitleToFlags(string? title)
                             }
                         else if (enableExg && sampleCounter % 50 == 0)
                             {
-                System.Diagnostics.Debug.WriteLine("[EXG] nessun campo EXG trovato nel sample (ExgCh1/ExgCh2/ExgRespiration).");
+                System.Diagnostics.Debug.WriteLine("[EXG] nessun campo EXG trovato nel sample (Exg1/Exg2/ExgRespiration).");
                             }
         }
         catch { }
@@ -1649,7 +1649,7 @@ private void ApplyModeTitleToFlags(string? title)
             "Wide-Range Accelerometer" => new List<string> { "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" },
             "Gyroscope" => new List<string> { "GyroscopeX", "GyroscopeY", "GyroscopeZ" },
             "Magnetometer" => new List<string> { "MagnetometerX", "MagnetometerY", "MagnetometerZ" },
-            "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration" => new List<string> { "ExgCh1", "ExgCh2" },
+            "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration" => new List<string> { "Exg1", "Exg2" },
             _ => new List<string>()  // Return empty if group not recognized
         };
 
@@ -1660,13 +1660,13 @@ private void ApplyModeTitleToFlags(string? title)
     {
         var group = CleanParameterName(groupParameter);
 
-        // Nei gruppi EXG vogliamo "EXG1/EXG2" al posto di ExgCh1/ExgCh2
+        // Nei gruppi EXG vogliamo "EXG1/EXG2" al posto di Exg1/Exg2
         if (group is "ECG" or "EMG" or "EXG Test" or "Respiration" or "EXG")
         {
             return subParameter switch
             {
-                "ExgCh1" => "EXG1",
-                "ExgCh2" => "EXG2",
+                "Exg1" => "EXG1",
+                "Exg2" => "EXG2",
                 _ => subParameter
             };
         }
@@ -1774,8 +1774,8 @@ private void ApplyModeTitleToFlags(string? title)
         {
             return slotIndex switch
             {
-                0 => "ExgCh1",
-                1 => "ExgCh2",
+                0 => "Exg1",
+                1 => "Exg2",
                 _ => "" // il terzo grafico (Z) resta vuoto/nascosto
             };
         }
@@ -1910,29 +1910,29 @@ private void ApplyModeTitleToFlags(string? title)
             {
 #if IOS || MACCATALYST
                 // 🔒 iOS/Mac — tieni IDENTICHE le tue righe
-                if (TryGetNumeric(sample, "ExgCh1", out float vExg1))
-                    values["ExgCh1"] = vExg1;
+                if (TryGetNumeric(sample, "Exg1", out float vExg1))
+                    values["Exg1"] = vExg1;
 
-                if (TryGetNumeric(sample, "ExgCh2", out float vExg2))
-                    values["ExgCh2"] = vExg2;
+                if (TryGetNumeric(sample, "Exg2", out float vExg2))
+                    values["Exg2"] = vExg2;
 
                 // opzionale, solo se usi davvero Respiration
                 if (TryGetNumeric(sample, "ExgRespiration", out float vResp))
                     values["ExgRespiration"] = vResp;
 
 #elif WINDOWS
-                if (HasProp(sample, "ExgCh1") && sample.ExgCh1 != null)
-                    values["ExgCh1"] = (float)sample.ExgCh1.Data;
-                if (HasProp(sample, "ExgCh2") && sample.ExgCh2 != null)
-                    values["ExgCh2"] = (float)sample.ExgCh2.Data;
+                if (HasProp(sample, "Exg1") && sample.Exg1 != null)
+                    values["Exg1"] = (float)sample.Exg1.Data;
+                if (HasProp(sample, "Exg2") && sample.Exg2 != null)
+                    values["Exg2"] = (float)sample.Exg2.Data;
                 if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
                     values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
 
 #elif ANDROID
-                if (HasProp(sample, "ExgCh1") && sample.ExgCh1 != null)
-                    values["ExgCh1"] = (float)sample.ExgCh1.Data;
-                if (HasProp(sample, "ExgCh2") && sample.ExgCh2 != null)
-                    values["ExgCh2"] = (float)sample.ExgCh2.Data;
+                if (HasProp(sample, "Exg1") && sample.Exg1 != null)
+                    values["Exg1"] = (float)sample.Exg1.Data;
+                if (HasProp(sample, "Exg2") && sample.Exg2 != null)
+                    values["Exg2"] = (float)sample.Exg2.Data;
                 if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
                     values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
 

@@ -76,8 +76,8 @@ namespace ShimmerInterface.Models
             // Aggiorna helper correlati
             OnPropertyChanged(nameof(PortDisplay));
             OnPropertyChanged(nameof(WantsExg));
-            OnPropertyChanged(nameof(WantExgCh1));
-            OnPropertyChanged(nameof(WantExgCh2));
+            OnPropertyChanged(nameof(WantExg1));
+            OnPropertyChanged(nameof(WantExg2));
             OnPropertyChanged(nameof(WantRespiration));
 #if WINDOWS
             OnPropertyChanged(nameof(ExgModeEnum));
@@ -208,11 +208,11 @@ namespace ShimmerInterface.Models
         public bool WantsExg => IsExg && EnableExg;
 
         /// <summary>Ch1 richiesto per ECG/EMG/Test</summary>
-        public bool WantExgCh1 =>
+        public bool WantExg1 =>
             WantsExg && (IsExgModeECG || IsExgModeEMG || IsExgModeTest);
 
         /// <summary>Ch2 richiesto per ECG/EMG/Test</summary>
-        public bool WantExgCh2 =>
+        public bool WantExg2 =>
             WantsExg && (IsExgModeECG || IsExgModeEMG || IsExgModeTest);
 
         /// <summary>Segnale respirazione richiesto in modalità Respiration</summary>
@@ -226,8 +226,8 @@ namespace ShimmerInterface.Models
         /// <summary>Alza le PropertyChanged per gli helper EXG</summary>
         private void RaiseExgHelpersChanged()
         {
-            OnPropertyChanged(nameof(WantExgCh1));
-            OnPropertyChanged(nameof(WantExgCh2));
+            OnPropertyChanged(nameof(WantExg1));
+            OnPropertyChanged(nameof(WantExg2));
             OnPropertyChanged(nameof(WantRespiration));
             OnPropertyChanged(nameof(SuggestedExgSamplingHz));
         }

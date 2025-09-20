@@ -61,7 +61,7 @@ private readonly XR2Learn_ShimmerEXG? _exg;
 
         // 🟢 iOS/MacCatalyst: assicura che i flag EXG risultino “accesi”
 #if IOS || MACCATALYST
-    // Identifica la board come EXG (questo fa scattare i computed WantsExg/WantExgCh1/2)
+    // Identifica la board come EXG (questo fa scattare i computed WantsExg/WantExg1/2)
     sensorConfig.IsExg = true;
 
     // Abilita proprio lo streaming EXG
@@ -288,8 +288,8 @@ private void OnFirstExgSampleSelectGroupOnce(object? sender, dynamic e)
             "ExtADC_A15" => config.EnableExtA15,
 
             // EXG singoli canali (abilitati dal ViewModel/Config)
-            "ExgCh1" => config.WantsExg && config.WantExgCh1,
-            "ExgCh2" => config.WantsExg && config.WantExgCh2,
+            "Exg1" => config.WantsExg && config.WantExg1,
+            "Exg2" => config.WantsExg && config.WantExg2,
             "ExgRespiration" => config.WantsExg && config.WantRespiration,
 
                         // Gruppi EXG a 2 canali (mostriamo EXG1/EXG2 dentro ECG/EMG/EXG Test/Respiration)
@@ -689,8 +689,8 @@ private void OnFirstExgSampleSelectGroupOnce(object? sender, dynamic e)
         if (viewModel.IsExgSplit)
         {
             // 0 -> EXG1 (rosso), 1 -> EXG2 (blu), 2 -> nessun grafico
-            key = axisIndex == 0 ? "ExgCh1" :
-                  axisIndex == 1 ? "ExgCh2" : "";
+            key = axisIndex == 0 ? "Exg1" :
+                  axisIndex == 1 ? "Exg2" : "";
             if (string.IsNullOrEmpty(key)) return; // niente terzo grafico in split EXG
             strokeColor = axisIndex == 0 ? SKColors.Red : SKColors.Blue;
         }

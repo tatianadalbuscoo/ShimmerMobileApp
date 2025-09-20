@@ -460,9 +460,9 @@ case "config_changed":
                             exg2 = exg2El.GetDouble();
 
                         // 2) fallback legacy camel-case
-                        if (!exg1.HasValue && root.TryGetProperty("ExgCh1", out var exgA) && exgA.ValueKind == JsonValueKind.Number)
+                        if (!exg1.HasValue && root.TryGetProperty("Exg1", out var exgA) && exgA.ValueKind == JsonValueKind.Number)
                             exg1 = exgA.GetDouble();
-                        if (!exg2.HasValue && root.TryGetProperty("ExgCh2", out var exgB) && exgB.ValueKind == JsonValueKind.Number)
+                        if (!exg2.HasValue && root.TryGetProperty("Exg2", out var exgB) && exgB.ValueKind == JsonValueKind.Number)
                             exg2 = exgB.GetDouble();
 
                         // (non cercare "ExgRespiration": non esiste nel sample)
@@ -476,25 +476,13 @@ if (_debug)
     D($"[EXG] sample mode='{CurrentExgMode}' exg1={s1} exg2={s2}");
 }
 
+// fallback alias legacy (riassegno, non ridichiaro)
+if (!exg1.HasValue && root.TryGetProperty("Exg1", out var exg1Legacy) && exg1Legacy.ValueKind == JsonValueKind.Number)
+    exg1 = exg1Legacy.GetDouble();
 
-// fallback alias legacy
-if (!exg1.HasValue)
-{
-    if (root.TryGetProperty("ExgCh1", out JsonElement exgCh1El) &&
-        exgCh1El.ValueKind == JsonValueKind.Number)
-    {
-        exg1 = exgCh1El.GetDouble();
-    }
-}
+if (!exg2.HasValue && root.TryGetProperty("Exg2", out var exg2Legacy) && exg2Legacy.ValueKind == JsonValueKind.Number)
+    exg2 = exg2Legacy.GetDouble();
 
-if (!exg2.HasValue)
-{
-    if (root.TryGetProperty("ExgCh2", out JsonElement exgCh2El) &&
-        exgCh2El.ValueKind == JsonValueKind.Number)
-    {
-        exg2 = exgCh2El.GetDouble();
-    }
-}
 
 
                         LatestData = new XR2Learn_ShimmerEXGData(
@@ -529,8 +517,8 @@ if (!exg2.HasValue)
                         );
 
                         // === Alias per DataPage (richiede proprietà in XR2Learn_ShimmerEXGData) ===
-                        LatestData.ExgCh1 = exg1.HasValue ? new NumericPayload(exg1.Value) : null;
-                        LatestData.ExgCh2 = exg2.HasValue ? new NumericPayload(exg2.Value) : null;
+                        LatestData.Exg1 = exg1.HasValue ? new NumericPayload(exg1.Value) : null;
+                        LatestData.Exg2 = exg2.HasValue ? new NumericPayload(exg2.Value) : null;
 
 
 

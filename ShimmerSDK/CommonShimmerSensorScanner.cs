@@ -347,7 +347,7 @@ namespace ShimmerSDK
         /// <param name="instance">Object to inspect.</param>
         /// <param name="methodName">Target method name.</param>
         /// <returns><c>true</c> if such a method exists; otherwise <c>false</c>.</returns>
-                private static bool HasMethod(object instance, string methodName)
+        private static bool HasMethod(object instance, string methodName)
         {
             var t = instance.GetType();
             var m = t.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);

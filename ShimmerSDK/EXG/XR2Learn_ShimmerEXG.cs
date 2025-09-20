@@ -55,8 +55,8 @@ namespace XR2Learn_ShimmerAPI.GSR
         private int indexExtA15;
 
         // EXG (2 linee da mostrare sempre)
-        private int indexExgCh1;   // CH1 generico (EXG_CH1/EXG1_CH1/ECG_CH1/EMG_CH1…)
-        private int indexExgCh2;   // CH2 generico (EXG_CH2/EXG2_CH1/ECG_CH2/EMG_CH2…)
+        private int indexExg1;   // CH1 generico (EXG_CH1/EXG1_CH1/ECG_CH1/EMG_CH1…)
+        private int indexExg2;   // CH2 generico (EXG_CH2/EXG2_CH1/ECG_CH2/EMG_CH2…)
         private int indexExgResp;  // opzionale, solo in modalità Respiration
 #endif
 
@@ -88,8 +88,8 @@ private int indexExtA7;
 private int indexExtA15;
 
 // EXG (due linee + eventuale respiration)
-private int indexExgCh1;
-private int indexExgCh2;
+private int indexExg1;
+private int indexExg2;
 private int indexExgResp;
 
 // Bitmap sensori calcolata in ConfigureAndroid (speculare a Windows)
@@ -350,13 +350,13 @@ private static (int idx, string? name, string? fmt) FindSignalA(ObjectCluster oc
                     });
                     var rr = FindSignal(oc, new[] { "RESPIRATION","EXG_RESPIRATION","RESP","Respiration" });
 
-                    indexExgCh1 = ch1.idx;
-                    indexExgCh2 = ch2.idx;
+                    indexExg1 = ch1.idx;
+                    indexExg2 = ch2.idx;
                     indexExgResp = rr.idx;
 
                     System.Diagnostics.Debug.WriteLine(
-                        $"[EXG map] CH1 idx={indexExgCh1} name={ch1.name} fmt={ch1.fmt} | " +
-                        $"CH2 idx={indexExgCh2} name={ch2.name} fmt={ch2.fmt} | " +
+                        $"[EXG map] CH1 idx={indexExg1} name={ch1.name} fmt={ch1.fmt} | " +
+                        $"CH2 idx={indexExg2} name={ch2.name} fmt={ch2.fmt} | " +
                         $"RESP idx={indexExgResp} name={rr.name} fmt={rr.fmt}");
 
                     firstDataPacket = false;
@@ -384,8 +384,8 @@ private static (int idx, string? name, string? fmt) FindSignalA(ObjectCluster oc
                     GetSafe(oc, indexExtA15),
 
                     // DUE TRACCE sempre presenti (se EXG abilitato)
-                    _enableExg ? GetSafe(oc, indexExgCh1) : null,
-                    _enableExg ? GetSafe(oc, indexExgCh2) : null,
+                    _enableExg ? GetSafe(oc, indexExg1) : null,
+                    _enableExg ? GetSafe(oc, indexExg2) : null,
 
                     // Respiration solo nella modalità dedicata
                     (_enableExg && _exgMode == ExgMode.Respiration) ? GetSafe(oc, indexExgResp) : null
@@ -470,13 +470,13 @@ private void HandleEventAndroid(object sender, EventArgs args)
             });
             var rr = FindSignalA(oc, new[] { "RESPIRATION","EXG_RESPIRATION","RESP","Respiration" });
 
-            indexExgCh1  = ch1.idx;
-            indexExgCh2  = ch2.idx;
+            indexExg1  = ch1.idx;
+            indexExg2  = ch2.idx;
             indexExgResp = rr.idx;
 
             global::Android.Util.Log.Info(TAG,
-                $"[EXG map ANDROID] CH1 idx={indexExgCh1} name={ch1.name} fmt={ch1.fmt} | " +
-                $"CH2 idx={indexExgCh2} name={ch2.name} fmt={ch2.fmt} | " +
+                $"[EXG map ANDROID] CH1 idx={indexExg1} name={ch1.name} fmt={ch1.fmt} | " +
+                $"CH2 idx={indexExg2} name={ch2.name} fmt={ch2.fmt} | " +
                 $"RESP idx={indexExgResp} name={rr.name} fmt={rr.fmt}");
 
             firstDataPacketAndroid = false;
@@ -504,8 +504,8 @@ private void HandleEventAndroid(object sender, EventArgs args)
             GetSafeA(oc, indexExtA15),
 
             // EXG (solo se abilitato)
-            _enableExg ? GetSafeA(oc, indexExgCh1) : null,
-            _enableExg ? GetSafeA(oc, indexExgCh2) : null,
+            _enableExg ? GetSafeA(oc, indexExg1) : null,
+            _enableExg ? GetSafeA(oc, indexExg2) : null,
 
             // Respiration solo in modalità dedicata
             (_enableExg && _exgMode == ExgMode.Respiration) ? GetSafeA(oc, indexExgResp) : null
@@ -593,7 +593,7 @@ public void ConfigureAndroid(
     indexMagX = indexMagY = indexMagZ =
     indexBMP180Temperature = indexBMP180Pressure =
     indexBatteryVoltage = indexExtA6 = indexExtA7 = indexExtA15 =
-    indexExgCh1 = indexExgCh2 = indexExgResp = -1;
+    indexExg1 = indexExg2 = indexExgResp = -1;
 }
 #endif
 
