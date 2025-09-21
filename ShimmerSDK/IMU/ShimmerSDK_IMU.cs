@@ -1,4 +1,9 @@
-﻿
+﻿/* 
+ * ShimmerSDK_IMU — Cross-platform wrapper for Shimmer3 IMU devices.
+ * Handles sensor configuration, firmware-quantized sampling rate, connection/stream lifecycle,
+ * CAL index mapping, and event-driven delivery of samples via LatestData/SampleReceived.
+ * Backends: Windows (serial V2) and Android (Bluetooth RFCOMM V2).
+ */
 
 
 using System;
@@ -17,21 +22,34 @@ using ShimmerSDK.Android;
 namespace ShimmerSDK.IMU
 {
 
+    /// <summary>
+    /// Cross-platform IMU wrapper for Shimmer3 devices:
+    /// configures sensors, sets the firmware-quantized sampling rate,
+    /// handles connect/stream lifecycle, maps CAL signals, and exposes data
+    /// via LatestData and the SampleReceived event.
+    /// </summary>
     public partial class ShimmerSDK_IMU
     {
+
+        // Raised for each incoming IMU packet with the latest parsed sample.
         public event EventHandler<dynamic>? SampleReceived;
 
 
 #if WINDOWS
-private int _winEnabledSensors;
-private ShimmerLogAndStreamSystemSerialPortV2? shimmer;
-private volatile bool _reconfigInProgress = false;
+        
+        // Enabled sensor bitmap
+        private int _winEnabledSensors;
 
-#endif
+        // Windows buffered serial driver 
+        private ShimmerLogAndStreamSystemSerialPortV2? shimmer;
 
+        // Guards reconfiguration; ignore events while true
+        private volatile bool _reconfigInProgress = false;
 
-#if WINDOWS
+        // Map indices on first received packet
         private bool firstDataPacket = true;
+
+        // Signal indices in ObjectCluster (CAL), set on first packet
         private int indexTimeStamp;
         private int indexLowNoiseAccX;
         private int indexLowNoiseAccY;
@@ -51,12 +69,24 @@ private volatile bool _reconfigInProgress = false;
         private int indexExtA6;
         private int indexExtA7;
         private int indexExtA15;
+
 #endif
 
 #if ANDROID
-        // Wrapper Android V2 (trasporto BT, API identiche a Windows)
+
+        // Android Bluetooth wrapper
         private ShimmerLogAndStreamAndroidBluetoothV2 shimmerAndroid;
+
+        // Enabled sensor bitmap
+        private int _androidEnabledSensors;
+
+        // True while device is streaming
+        private volatile bool _androidIsStreaming = false;
+
+        // Map indices on first received packet
         private bool firstDataPacketAndroid = true;
+
+        // Signal indices in ObjectCluster (CAL), set on first packet
         private int indexTimeStamp;
         private int indexLowNoiseAccX;
         private int indexLowNoiseAccY;
@@ -77,18 +107,23 @@ private volatile bool _reconfigInProgress = false;
         private int indexExtA7;
         private int indexExtA15;
 
-        // Bitmap sensori calcolato in ConfigureAndroid (speculare a Windows)
-        private int _androidEnabledSensors;
-
-        private volatile bool _androidIsStreaming = false;
-
+        // Awaitables for state/ack/first-packet synchronization
         private System.Threading.Tasks.TaskCompletionSource<bool>? _androidConnectedTcs;
         private System.Threading.Tasks.TaskCompletionSource<bool>? _androidStreamingAckTcs;
         private System.Threading.Tasks.TaskCompletionSource<bool>? _androidFirstPacketTcs;
+
 #endif
 
+
+        // Last parsed IMU sample (CAL values for enabled sensors)
         public ShimmerSDK_IMUData LatestData { get; private set; }
 
+
+        /// <summary>
+        /// Initializes the IMU wrapper with sensible defaults:
+        /// sampling at ~51.2 Hz and all key sensors enabled (LNA, WRA, gyro, mag,
+        /// pressure/temperature, battery, and external ADCs A6/A7/A15).
+        /// </summary>
         public ShimmerSDK_IMU()
         {
             _samplingRate = 51.2;
@@ -103,49 +138,70 @@ private volatile bool _reconfigInProgress = false;
             _enableExtA15 = true;
         }
 
+
         /// <summary>
-        /// Imposta nel firmware la frequenza più vicina rappresentabile dall’hardware
-        /// e restituisce il valore effettivamente applicato (es. 51.2 Hz).
+        /// Sets the nearest firmware-representable sampling rate to <paramref name="requestedHz"/>,
+        /// writes it to the device, updates <c>SamplingRate</c>, and returns the applied value.
         /// </summary>
+        /// <param name="requestedHz">Desired sampling rate in Hz (must be &gt; 0).</param>
+        /// <returns>The actual rate applied after firmware quantization (e.g., 51.2 Hz).</returns>
         public double SetFirmwareSamplingRateNearest(double requestedHz)
         {
             if (requestedHz <= 0) throw new ArgumentOutOfRangeException(nameof(requestedHz));
 
-            // Shimmer3 usa clock 32768 Hz, Shimmer2 1024 Hz
+            // Base clock: Shimmer3 = 32768
             double clock = 32768.0;
+
 #if IOS || MACCATALYST
+
+    // Avoid blocking
     if (!string.IsNullOrWhiteSpace(BridgeTargetMac))
         return SetFirmwareSamplingRateNearestAsync(requestedHz).GetAwaiter().GetResult();
+
 #endif
 
-#if WINDOWS
-            try
-            {
-                if (shimmer != null && !shimmer.isShimmer3withUpdatedSensors())
-                    clock = 1024.0;
-            }
-            catch { /* fallback 32768 */ }
-#endif
-            // quantizzazione al più vicino: clock / round(clock / f_desiderata)
+            // Quantize to nearest: divider = round(clock / f_request), f_applied = clock / divider
             int divider = Math.Max(1, (int)Math.Round(clock / requestedHz, MidpointRounding.AwayFromZero));
             double applied = clock / divider;
 
-            // Scrittura nel firmware
+            // Write to firmware
+
 #if WINDOWS
+
+            // Windows API accepts the effective frequency directly (double)
             shimmer?.WriteSamplingRate(applied);
+
 #elif ANDROID
-            // allineato a Windows: passa un double, non fare cast a int
-            shimmerAndroid?.WriteSamplingRate(divider);
-            //shimmerAndroid?.WriteSamplingRate((int)Math.Round(applied, MidpointRounding.AwayFromZero));
+
+            // Android wrapper uses a divider-based API
+            shimmerAndroid?.WriteSamplingRate(divider);     
 
 #endif
 
-            // Allinea la proprietà esposta dal wrapper (se la usi altrove)
+            // Sync the public property with the actually applied rate
             SamplingRate = applied;
             return applied;
         }
 
+
 #if WINDOWS
+
+
+        /// <summary>
+        /// Configure the Windows serial backend: apply sensor flags, rebuild the bitmap,
+        /// reset index mapping, and subscribe to data events.
+        /// </summary>
+        /// <param name="deviceName">Device name.</param>
+        /// <param name="comPort">Serial COM port.</param>
+        /// <param name="enableLowNoiseAcc">Enable low-noise accelerometer.</param>
+        /// <param name="enableWideRangeAcc">Enable wide-range accelerometer.</param>
+        /// <param name="enableGyro">Enable gyroscope.</param>
+        /// <param name="enableMag">Enable magnetometer.</param>
+        /// <param name="enablePressureTemp">Enable pressure/temperature sensor.</param>
+        /// <param name="enableBattery">Enable battery voltage sensing.</param>
+        /// <param name="enableExtA6">Enable external ADC A6.</param>
+        /// <param name="enableExtA7">Enable external ADC A7.</param>
+        /// <param name="enableExtA15">Enable external ADC A15.</param>
         public void ConfigureWindows(
             string deviceName,
             string comPort,
@@ -159,19 +215,20 @@ private volatile bool _reconfigInProgress = false;
             bool enableExtA7,
             bool enableExtA15)
         {
+
             _reconfigInProgress = true;
             try
             {
-                // 1) Detach & cleanup eventuale istanza precedente per evitare handler duplicati
+                // Detach & dispose previous instance to avoid duplicate event handlers or stale streams
                 if (shimmer != null)
                 {
-                    try { shimmer.UICallback -= this.HandleEvent; } catch { /* no-op */ }
-                    try { shimmer.StopStreaming(); } catch { /* no-op */ }
-                    try { shimmer.Disconnect(); } catch { /* no-op */ }
+                    try { shimmer.UICallback -= this.HandleEvent; } catch {}
+                    try { shimmer.StopStreaming(); } catch {}
+                    try { shimmer.Disconnect(); } catch {}
                     shimmer = null;
                 }
 
-                // 2) Memorizza i flag come già fai
+                // Persist sensor flags
                 _enableLowNoiseAccelerometer = enableLowNoiseAcc;
                 _enableWideRangeAccelerometer = enableWideRangeAcc;
                 _enableGyroscope = enableGyro;
@@ -182,7 +239,7 @@ private volatile bool _reconfigInProgress = false;
                 _enableExtA7 = enableExtA7;
                 _enableExtA15 = enableExtA15;
 
-                // 3) Ricostruisci la bitmap sensori
+                // Rebuild sensor bitmap
                 int enabledSensors = 0;
                 if (_enableLowNoiseAccelerometer)
                     enabledSensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
@@ -205,16 +262,13 @@ private volatile bool _reconfigInProgress = false;
 
                 _winEnabledSensors = enabledSensors;
 
-                // 4) Forza il ricalcolo degli indici al prossimo pacchetto
+                // Force index remapping on next packet
                 firstDataPacket = true;
 
-                // 5) Nuova istanza + sottoscrizione **senza duplicati**
+                // Create new driver instance and subscribe exactly once
                 shimmer = new ShimmerLogAndStreamSystemSerialPortV2(deviceName, comPort);
-                try { shimmer.UICallback -= this.HandleEvent; } catch { /* no-op */ }
+                try { shimmer.UICallback -= this.HandleEvent; } catch {}
                 shimmer.UICallback += this.HandleEvent;
-
-                // Se avevi un Thread.Sleep, non serve; se proprio ti è utile per il seriale:
-                // Thread.Sleep(100);
             }
             finally
             {
@@ -223,76 +277,111 @@ private volatile bool _reconfigInProgress = false;
         }
 
 
+        /// <summary>Safely gets a signal by index.</summary>
+        /// <param name="oc">Source <see cref="ObjectCluster"/>.</param>
+        /// <param name="idx">Signal index, returns null if &lt; 0.</param>
+        /// <returns><see cref="SensorData"/> if present; otherwise null.</returns>
         private static SensorData? GetSafe(ObjectCluster oc, int idx)
         {
             return idx >= 0 ? oc.GetData(idx) : null;
         }
 
-    private void HandleEvent(object sender, EventArgs args)
-    {
-        if (_reconfigInProgress) return; // ignora eventi durante la reconfig
 
-        var eventArgs = (CustomEventArgs)args;
-
-        if (eventArgs.getIndicator() == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
+        /// <summary>
+        /// Windows event sink: on DATA_PACKET, map indices (first packet), build <see cref="LatestData"/>,
+        /// and raise <see cref="SampleReceived"/>.
+        /// </summary>
+        /// <param name="sender">Event source (driver instance).</param>
+        /// <param name="args">Event payload (<see cref="CustomEventArgs"/>).</param>
+        private void HandleEvent(object sender, EventArgs args)
         {
-            ObjectCluster oc = (ObjectCluster)eventArgs.getObject();
 
-            if (firstDataPacket)
+            // Ignore packets while reconfiguring
+            if (_reconfigInProgress) return;
+
+            // Cast event, check for DATA_PACKET, and extract the ObjectCluster payload
+            var eventArgs = (CustomEventArgs)args;
+            if (eventArgs.getIndicator() == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
             {
-                indexTimeStamp = oc.GetIndex(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL);
-                indexLowNoiseAccX = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
-                indexLowNoiseAccY = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
-                indexLowNoiseAccZ = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
-                indexWideAccX     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
-                indexWideAccY     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
-                indexWideAccZ     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
-                indexGyroX        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_X, ShimmerConfiguration.SignalFormats.CAL);
-                indexGyroY        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Y, ShimmerConfiguration.SignalFormats.CAL);
-                indexGyroZ        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Z, ShimmerConfiguration.SignalFormats.CAL);
-                indexMagX         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_X, ShimmerConfiguration.SignalFormats.CAL);
-                indexMagY         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
-                indexMagZ         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
-                indexBMP180Temperature = oc.GetIndex(Shimmer3Configuration.SignalNames.TEMPERATURE, ShimmerConfiguration.SignalFormats.CAL);
-                indexBMP180Pressure    = oc.GetIndex(Shimmer3Configuration.SignalNames.PRESSURE, ShimmerConfiguration.SignalFormats.CAL);
-                indexBatteryVoltage    = oc.GetIndex(Shimmer3Configuration.SignalNames.V_SENSE_BATT, ShimmerConfiguration.SignalFormats.CAL);
-                indexExtA6             = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6, ShimmerConfiguration.SignalFormats.CAL);
-                indexExtA7             = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7, ShimmerConfiguration.SignalFormats.CAL);
-                indexExtA15            = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15, ShimmerConfiguration.SignalFormats.CAL);
+                ObjectCluster oc = (ObjectCluster)eventArgs.getObject();
 
-                firstDataPacket = false;
+                if (firstDataPacket)
+                {
+
+                    // Map CAL indices once (signal name → column index)
+                    indexTimeStamp = oc.GetIndex(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL);
+                    indexLowNoiseAccX = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
+                    indexLowNoiseAccY = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
+                    indexLowNoiseAccZ = oc.GetIndex(Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
+                    indexWideAccX     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X, ShimmerConfiguration.SignalFormats.CAL);
+                    indexWideAccY     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
+                    indexWideAccZ     = oc.GetIndex(Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
+                    indexGyroX        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_X, ShimmerConfiguration.SignalFormats.CAL);
+                    indexGyroY        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Y, ShimmerConfiguration.SignalFormats.CAL);
+                    indexGyroZ        = oc.GetIndex(Shimmer3Configuration.SignalNames.GYROSCOPE_Z, ShimmerConfiguration.SignalFormats.CAL);
+                    indexMagX         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_X, ShimmerConfiguration.SignalFormats.CAL);
+                    indexMagY         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Y, ShimmerConfiguration.SignalFormats.CAL);
+                    indexMagZ         = oc.GetIndex(Shimmer3Configuration.SignalNames.MAGNETOMETER_Z, ShimmerConfiguration.SignalFormats.CAL);
+                    indexBMP180Temperature = oc.GetIndex(Shimmer3Configuration.SignalNames.TEMPERATURE, ShimmerConfiguration.SignalFormats.CAL);
+                    indexBMP180Pressure    = oc.GetIndex(Shimmer3Configuration.SignalNames.PRESSURE, ShimmerConfiguration.SignalFormats.CAL);
+                    indexBatteryVoltage    = oc.GetIndex(Shimmer3Configuration.SignalNames.V_SENSE_BATT, ShimmerConfiguration.SignalFormats.CAL);
+                    indexExtA6             = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6, ShimmerConfiguration.SignalFormats.CAL);
+                    indexExtA7             = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7, ShimmerConfiguration.SignalFormats.CAL);
+                    indexExtA15            = oc.GetIndex(Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15, ShimmerConfiguration.SignalFormats.CAL);
+
+                    firstDataPacket = false;
+                }
+
+                // Build snapshot with CAL values (null-safe via GetSafe)
+                LatestData = new ShimmerSDK_IMUData(
+                    GetSafe(oc, indexTimeStamp),
+                    GetSafe(oc, indexLowNoiseAccX),
+                    GetSafe(oc, indexLowNoiseAccY),
+                    GetSafe(oc, indexLowNoiseAccZ),
+                    GetSafe(oc, indexWideAccX),
+                    GetSafe(oc, indexWideAccY),
+                    GetSafe(oc, indexWideAccZ),
+                    GetSafe(oc, indexGyroX),
+                    GetSafe(oc, indexGyroY),
+                    GetSafe(oc, indexGyroZ),
+                    GetSafe(oc, indexMagX),
+                    GetSafe(oc, indexMagY),
+                    GetSafe(oc, indexMagZ),
+                    GetSafe(oc, indexBMP180Temperature),
+                    GetSafe(oc, indexBMP180Pressure),
+                    GetSafe(oc, indexBatteryVoltage),
+                    GetSafe(oc, indexExtA6),
+                    GetSafe(oc, indexExtA7),
+                    GetSafe(oc, indexExtA15)
+                );
+
+                // Notify subscribers with the latest parsed sample
+                if (LatestData != null)
+                SampleReceived?.Invoke(this, LatestData);
             }
-
-            LatestData = new ShimmerSDK_IMUData(
-                GetSafe(oc, indexTimeStamp),
-                GetSafe(oc, indexLowNoiseAccX),
-                GetSafe(oc, indexLowNoiseAccY),
-                GetSafe(oc, indexLowNoiseAccZ),
-                GetSafe(oc, indexWideAccX),
-                GetSafe(oc, indexWideAccY),
-                GetSafe(oc, indexWideAccZ),
-                GetSafe(oc, indexGyroX),
-                GetSafe(oc, indexGyroY),
-                GetSafe(oc, indexGyroZ),
-                GetSafe(oc, indexMagX),
-                GetSafe(oc, indexMagY),
-                GetSafe(oc, indexMagZ),
-                GetSafe(oc, indexBMP180Temperature),
-                GetSafe(oc, indexBMP180Pressure),
-                GetSafe(oc, indexBatteryVoltage),
-                GetSafe(oc, indexExtA6),
-                GetSafe(oc, indexExtA7),
-                GetSafe(oc, indexExtA15)
-            );
-
-            if (LatestData != null)
-            SampleReceived?.Invoke(this, LatestData);
-
         }
-    }
+
 #endif
 
+
 #if ANDROID
+
+
+        /// <summary>
+        /// Configure the Android Bluetooth backend: apply sensor flags, validate MAC,
+        /// compute the sensor bitmap, create the V2 wrapper, and (re)wire callbacks.
+        /// </summary>
+        /// <param name="deviceId">Device name.</param>
+        /// <param name="mac">Bluetooth MAC address (validated).</param>
+        /// <param name="enableLowNoiseAcc">Enable low-noise accelerometer.</param>
+        /// <param name="enableWideRangeAcc">Enable wide-range accelerometer.</param>
+        /// <param name="enableGyro">Enable gyroscope.</param>
+        /// <param name="enableMag">Enable magnetometer.</param>
+        /// <param name="enablePressureTemp">Enable pressure/temperature.</param>
+        /// <param name="enableBattery">Enable battery sensing.</param>
+        /// <param name="enableExtA6">Enable external ADC A6.</param>
+        /// <param name="enableExtA7">Enable external ADC A7.</param>
+        /// <param name="enableExtA15">Enable external ADC A15.</param>
         public void ConfigureAndroid(
             string deviceId,
             string mac,
@@ -306,7 +395,8 @@ private volatile bool _reconfigInProgress = false;
             bool enableExtA7,
             bool enableExtA15)
         {
-            // 1) Salva flag (identico a Windows)
+
+            // Persist sensor flags
             _enableLowNoiseAccelerometer = enableLowNoiseAcc;
             _enableWideRangeAccelerometer = enableWideRangeAcc;
             _enableGyroscope = enableGyro;
@@ -317,13 +407,12 @@ private volatile bool _reconfigInProgress = false;
             _enableExtA7 = enableExtA7;
             _enableExtA15 = enableExtA15;
 
-            // 2) Valida MAC + log (usa SEMPRE global::Android.* per evitare shadowing)
+            // Validate MAC 
             mac = (mac ?? "").Trim();
             if (!global::Android.Bluetooth.BluetoothAdapter.CheckBluetoothAddress(mac))
                 throw new ArgumentException($"Invalid MAC '{mac}'");
-            global::Android.Util.Log.Debug("ShimmerBT", $"ConfigureAndroid: deviceId={deviceId}, mac={mac}");
 
-            // 2.5) Calcola bitmap sensori (speculare a Windows) e memorizzalo
+            // Build sensor bitmap
             int sensors = 0;
             if (_enableLowNoiseAccelerometer) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
             if (_enableWideRangeAccelerometer) sensors |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
@@ -337,14 +426,14 @@ private volatile bool _reconfigInProgress = false;
 
             _androidEnabledSensors = sensors;
 
-            // 3) Istanzia il wrapper V2 (trasporto BT, API identiche a Windows)
+            // Create V2-style Android wrapper (RFCOMM transport)
             shimmerAndroid = new ShimmerLogAndStreamAndroidBluetoothV2(deviceId, mac);
 
-            // 4) Callback eventi: evita doppia sottoscrizione
+            // Subscribe once to events (avoid duplicates)
             shimmerAndroid.UICallback -= HandleEventAndroid;
             shimmerAndroid.UICallback += HandleEventAndroid;
 
-            // Forza la rimappatura degli indici al prossimo DATA_PACKET
+            // Force index remap on next DATA_PACKET
             firstDataPacketAndroid = true;
             indexTimeStamp = indexLowNoiseAccX = indexLowNoiseAccY = indexLowNoiseAccZ =
             indexWideAccX = indexWideAccY = indexWideAccZ =
@@ -352,105 +441,151 @@ private volatile bool _reconfigInProgress = false;
             indexMagX = indexMagY = indexMagZ =
             indexBMP180Temperature = indexBMP180Pressure =
             indexBatteryVoltage = indexExtA6 = indexExtA7 = indexExtA15 = -1;
-
         }
 
+
+        /// <summary>
+        /// Connects the Android Bluetooth transport and reports the connection state.
+        /// </summary>
+        /// <returns><c>true</c> if connected; otherwise <c>false</c>.</returns>
         public bool ConnectInternalAndroid()
         {
             if (shimmerAndroid == null)
-                throw new InvalidOperationException("Shimmer Android non configurato. Chiama ConfigureAndroid() prima.");
+                throw new InvalidOperationException("Shimmer Android is not configured. Call ConfigureAndroid() first.");
 
             shimmerAndroid.Connect();
             return shimmerAndroid.IsConnected();
         }
 
+
+        /// <summary>
+        /// Applies a new sampling rate on Android safely: stops streaming if needed,
+        /// disables sensors, sets the nearest firmware rate, restores config, and resumes.
+        /// </summary>
+        /// <param name="requestedHz">Desired sampling rate in Hz (must be &gt; 0).</param>
+        /// <returns>The effective (quantized) sampling rate now in use.</returns>
         public async Task<double> ApplySamplingRateWithSafeRestartAsync(double requestedHz)
-{
-    if (requestedHz <= 0) throw new ArgumentOutOfRangeException(nameof(requestedHz));
-    if (shimmerAndroid == null) throw new InvalidOperationException("ConfigureAndroid non chiamata");
+        {
+            if (requestedHz <= 0) throw new ArgumentOutOfRangeException(nameof(requestedHz));
+            if (shimmerAndroid == null) throw new InvalidOperationException("ConfigureAndroid was not called.");
 
-    var wasStreaming = _androidIsStreaming;
+            var wasStreaming = _androidIsStreaming;
 
-    // se stava streammando → fermo
-    if (wasStreaming)
-    {
-        shimmerAndroid.StopStreaming();
-        await Task.Delay(150);
-        _androidIsStreaming = false;
-    }
+            // If streaming, stop first
+            if (wasStreaming)
+            {
+                shimmerAndroid.StopStreaming();
+                await Task.Delay(150);
+                _androidIsStreaming = false;
+            }
 
-    // metto sensori a 0 per evitare pacchetti “a metà”
-    shimmerAndroid.WriteSensors(0);
-    await Task.Delay(150);
+            // Disable sensors to avoid partial packets
+            shimmerAndroid.WriteSensors(0);
+            await Task.Delay(150);
 
-    // applico SR nel FW (come fai su Windows)
-    var applied = SetFirmwareSamplingRateNearest(requestedHz);
-    await Task.Delay(180);
+            // Apply SR in firmware
+            var applied = SetFirmwareSamplingRateNearest(requestedHz);
+            await Task.Delay(180);
 
-    // (facoltativo ma sicuro) riallineo ranges/power
-    shimmerAndroid.WriteAccelRange(0);
-    shimmerAndroid.WriteGyroRange(0);
-    shimmerAndroid.SetLowPowerAccel(false);
-    shimmerAndroid.SetLowPowerGyro(false);
-    shimmerAndroid.WriteInternalExpPower(0);
-    await Task.Delay(150);
+            // Re-apply ranges/power defaults
+            shimmerAndroid.WriteAccelRange(0);
+            shimmerAndroid.WriteGyroRange(0);
+            shimmerAndroid.SetLowPowerAccel(false);
+            shimmerAndroid.SetLowPowerGyro(false);
+            shimmerAndroid.WriteInternalExpPower(0);
+            await Task.Delay(150);
 
-    // riattivo i sensori selezionati e aggiorno la mappa nomi/indici
-    shimmerAndroid.WriteSensors(_androidEnabledSensors);
-    await Task.Delay(180);
+            // Re-enable selected sensors and refresh metadata
+            shimmerAndroid.WriteSensors(_androidEnabledSensors);
+            await Task.Delay(180);
 
-    shimmerAndroid.Inquiry();
-    await Task.Delay(350);
+            shimmerAndroid.Inquiry();
+            await Task.Delay(350);
 
-    // (opzionale) ricarico le calibrazioni
-    shimmerAndroid.ReadCalibrationParameters("All");
-    await Task.Delay(250);
+            // Reload calibrations
+            shimmerAndroid.ReadCalibrationParameters("All");
+            await Task.Delay(250);
 
-    // se prima streammava → riparto e attendo ACK + 1° pacchetto
-    if (wasStreaming)
-    {
-        _androidStreamingAckTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _androidFirstPacketTcs  = new System.Threading.Tasks.TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            // If we were streaming, start again and wait for ACK + first packet
+            if (wasStreaming)
+            {
+                _androidStreamingAckTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _androidFirstPacketTcs  = new System.Threading.Tasks.TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        firstDataPacketAndroid = true;
-        shimmerAndroid.StartStreaming();
+                firstDataPacketAndroid = true;
+                shimmerAndroid.StartStreaming();
 
-        await Task.WhenAny(_androidStreamingAckTcs.Task, Task.Delay(2000));
-        await Task.WhenAny(_androidFirstPacketTcs.Task,  Task.Delay(2000));
-    }
+                await Task.WhenAny(_androidStreamingAckTcs.Task, Task.Delay(2000));
+                await Task.WhenAny(_androidFirstPacketTcs.Task,  Task.Delay(2000));
+            }
 
-    return SamplingRate; // valore effettivo applicato (quantizzato)
-}
+            return SamplingRate; // Effective quantized value
+        }
 
 
-
+        /// <summary>Android event sink: route state changes, map indices on first packet, update <see cref="LatestData"/>, and raise <see cref="SampleReceived"/>.</summary>
+        /// <param name="sender">Event source.</param>
+        /// <param name="args">Event payload (<see cref="CustomEventArgs"/>).</param>
         private void HandleEventAndroid(object sender, EventArgs args)
         {
-            const string TAG = "ShimmerBT";
-
             try
             {
+
+                // Ensure the expected payload type
                 if (args is not CustomEventArgs ev)
-                {
-                    global::Android.Util.Log.Warn(TAG, $"Evento sconosciuto: {args?.GetType().Name}");
                     return;
-                }
 
                 int indicator = ev.getIndicator();
 
-
-                // Sblocca attese su ACK di start streaming e sul primo pacchetto dati
+                // Fast path: unblock waiters when streaming state is confirmed
                 if (indicator == (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE)
                 {
-                    // L'oggetto dell'evento è un Int32 con lo stato corrente
                     if (ev.getObject() is int st && st == 3 /* SHIMMER_STATE_STREAMING */)
                         _androidStreamingAckTcs?.TrySetResult(true);
                 }
 
+                // Route non-data events that do not require further handling
+                switch (indicator)
+                {
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE:
+                        if (ev.getObject() is int st)
+                        {
+                            if (st == ShimmerBluetooth.SHIMMER_STATE_CONNECTED)
+                            {
+                                _androidConnectedTcs?.TrySetResult(true);
+                                _androidIsStreaming = false; // connected, not streaming
+                            }
+                            else if (st == ShimmerBluetooth.SHIMMER_STATE_STREAMING)
+                            {
+                                _androidStreamingAckTcs?.TrySetResult(true);
+                                _androidIsStreaming = true;
+                                firstDataPacketAndroid = true; // remap indices on resume
+                            }
+                            else
+                            {
+                                _androidIsStreaming = false;
+                            }
+                        }
+                        return;
 
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_NOTIFICATION_MESSAGE:
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_PACKET_RECEPTION_RATE:
+                        return;
 
+                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET:
+                        _androidFirstPacketTcs?.TrySetResult(true);
+                        break; // handle packet below
 
-                // helper locali
+                    default:
+                        return;
+                }
+
+                // ----- DATA_PACKET -----
+
+                var oc = ev.getObject() as ObjectCluster;
+                if (oc == null) return;
+
+                // Local helpers: safe index lookup and null-safe data access
                 static int SafeIdx(ObjectCluster c, string name, string fmt)
                 {
                     var i = c.GetIndex(name, fmt);
@@ -458,72 +593,7 @@ private volatile bool _reconfigInProgress = false;
                 }
                 static SensorData SafeGet(ObjectCluster c, int idx) => idx >= 0 ? c.GetData(idx) : null;
 
-                static string Val(SensorData s)
-                {
-                    try
-                    {
-                        if (s == null) return "—";
-                        var u = (s.Unit ?? "").ToString();
-                        return string.IsNullOrWhiteSpace(u) ? $"{s.Data:0.###}" : $"{s.Data:0.###} {u}";
-                    }
-                    catch { return s?.ToString() ?? "—"; }
-                }
-
-                // log di servizio sugli indicator
-                switch (indicator)
-                {
-                   case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE:
-                        global::Android.Util.Log.Info(TAG, $"EVENT STATE_CHANGE ({indicator}) obj={ev.getObject()?.GetType().Name ?? "null"}");
-                        if (ev.getObject() is int st)
-                        {
-                            if (st == ShimmerBluetooth.SHIMMER_STATE_CONNECTED)
-                            {
-                                _androidConnectedTcs?.TrySetResult(true);
-                                _androidIsStreaming = false; // connesso ma non streamma
-                            }
-                            else if (st == ShimmerBluetooth.SHIMMER_STATE_STREAMING)
-                            {
-                                _androidStreamingAckTcs?.TrySetResult(true);
-                                _androidIsStreaming = true;
-                                // quando riparte lo stream, rifai mappatura al primo pacchetto
-                                firstDataPacketAndroid = true;
-                            }
-                            else
-                            {
-                                _androidIsStreaming = false; // ogni altro stato = non streaming
-                            }
-                        }
-                        return;
-
-
-                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_NOTIFICATION_MESSAGE:
-                        global::Android.Util.Log.Info(TAG, $"EVENT NOTIFICATION ({indicator}) obj={ev.getObject() ?? "null"}");
-                        return;
-
-                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_PACKET_RECEPTION_RATE:
-                        global::Android.Util.Log.Info(TAG, $"EVENT PRR ({indicator}) value={ev.getObject() ?? "null"}");
-                        return;
-
-                    case (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET:
-                    _androidFirstPacketTcs?.TrySetResult(true);
-
-                        // gestito sotto
-                        break;
-
-                    default:
-                        global::Android.Util.Log.Info(TAG, $"EVENT {indicator} obj={ev.getObject()?.GetType().Name ?? "null"}");
-                        return;
-                }
-
-                // --- DATA_PACKET ---
-                var oc = ev.getObject() as ObjectCluster;
-                if (oc == null)
-                {
-                    global::Android.Util.Log.Warn(TAG, "ObjectCluster null su DATA_PACKET");
-                    return;
-                }
-
-                // mappa indici al primo pacchetto
+                // On first packet, resolve and cache CAL indices once
                 if (firstDataPacketAndroid)
                 {
                     indexTimeStamp         = SafeIdx(oc, ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, "CAL");
@@ -546,11 +616,10 @@ private volatile bool _reconfigInProgress = false;
                     indexExtA7             = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7, "CAL");
                     indexExtA15            = SafeIdx(oc, Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15, "CAL");
 
-                    global::Android.Util.Log.Info(TAG, "Indici mappati (CAL) al primo pacchetto.");
                     firstDataPacketAndroid = false;
                 }
 
-                // aggiorna LatestData (usa CAL)
+                // Update the latest data snapshot (CAL values), null-safe
                 LatestData = new ShimmerSDK_IMUData(
                     SafeGet(oc, indexTimeStamp),
                     SafeGet(oc, indexLowNoiseAccX), SafeGet(oc, indexLowNoiseAccY), SafeGet(oc, indexLowNoiseAccZ),
@@ -562,66 +631,13 @@ private volatile bool _reconfigInProgress = false;
                     SafeGet(oc, indexExtA6), SafeGet(oc, indexExtA7), SafeGet(oc, indexExtA15)
                 );
 
-                try { SampleReceived?.Invoke(this, LatestData); } catch {  }
-
-
-
-                // riga sintetica compatta
-                string S(params SensorData[] ds) => string.Join(",", Array.ConvertAll(ds, Val));
-                global::Android.Util.Log.Info(TAG,
-                    $"DATA_PACKET(ts={Val(SafeGet(oc, indexTimeStamp))}) " +
-                    $"LNA=({S(SafeGet(oc, indexLowNoiseAccX), SafeGet(oc, indexLowNoiseAccY), SafeGet(oc, indexLowNoiseAccZ))}) " +
-                    $"WRA=({S(SafeGet(oc, indexWideAccX), SafeGet(oc, indexWideAccY), SafeGet(oc, indexWideAccZ))}) " +
-                    $"GYRO=({S(SafeGet(oc, indexGyroX), SafeGet(oc, indexGyroY), SafeGet(oc, indexGyroZ))}) " +
-                    $"MAG=({S(SafeGet(oc, indexMagX), SafeGet(oc, indexMagY), SafeGet(oc, indexMagZ))}) " +
-                    $"TEMP={Val(SafeGet(oc, indexBMP180Temperature))} " +
-                    $"PRESS={Val(SafeGet(oc, indexBMP180Pressure))} " +
-                    $"VBATT={Val(SafeGet(oc, indexBatteryVoltage))} " +
-                    $"EXT=({S(SafeGet(oc, indexExtA6), SafeGet(oc, indexExtA7), SafeGet(oc, indexExtA15))})"
-                );
-
-                // dump completo CAL/RAW dei segnali che ti interessano
-                void DumpOne(ObjectCluster c, string name)
-                {
-                    var iCal = SafeIdx(c, name, "CAL");
-                    if (iCal >= 0) global::Android.Util.Log.Info(TAG, $"{name} [CAL] = {Val(SafeGet(c, iCal))}");
-                    var iRaw = SafeIdx(c, name, "RAW");
-                    if (iRaw >= 0) global::Android.Util.Log.Info(TAG, $"{name} [RAW] = {Val(SafeGet(c, iRaw))}");
-                }
-
-                global::Android.Util.Log.Info(TAG, "---- FULL ObjectCluster DUMP (CAL/RAW) ----");
-                string[] names =
-                {
-                    ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP,
-                    Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X,
-                    Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Y,
-                    Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_Z,
-                    Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_X,
-                    Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Y,
-                    Shimmer3Configuration.SignalNames.WIDE_RANGE_ACCELEROMETER_Z,
-                    Shimmer3Configuration.SignalNames.GYROSCOPE_X,
-                    Shimmer3Configuration.SignalNames.GYROSCOPE_Y,
-                    Shimmer3Configuration.SignalNames.GYROSCOPE_Z,
-                    Shimmer3Configuration.SignalNames.MAGNETOMETER_X,
-                    Shimmer3Configuration.SignalNames.MAGNETOMETER_Y,
-                    Shimmer3Configuration.SignalNames.MAGNETOMETER_Z,
-                    Shimmer3Configuration.SignalNames.TEMPERATURE,
-                    Shimmer3Configuration.SignalNames.PRESSURE,
-                    Shimmer3Configuration.SignalNames.V_SENSE_BATT,
-                    Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A6,
-                    Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A7,
-                    Shimmer3Configuration.SignalNames.EXTERNAL_ADC_A15
-                };
-                foreach (var n in names) DumpOne(oc, n);
-                global::Android.Util.Log.Info(TAG, "---- END ObjectCluster DUMP --------------");
+                // Notify subscribers with the latest parsed sample
+                try { SampleReceived?.Invoke(this, LatestData); } catch {}
             }
-            catch (Exception ex)
-            {
-                global::Android.Util.Log.Error(TAG, "HandleEventAndroid error:");
-                global::Android.Util.Log.Error(TAG, ex.ToString());
-                System.Diagnostics.Debug.WriteLine(ex);
-            }
+            catch {}
         }
+
+
 #endif
 
     }
