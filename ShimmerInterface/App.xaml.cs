@@ -5,12 +5,12 @@ using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Maui.ApplicationModel; // MainThread
-using XR2Learn_ShimmerAPI.IMU;
+using ShimmerSDK.IMU;
 using ShimmerInterface.Models;
 #endif
 
 #if IOS || MACCATALYST
-using XR2Learn_ShimmerAPI.GSR;   // <-- AGGIUNGI QUESTO
+using ShimmerSDK.EXG;   // <-- AGGIUNGI QUESTO
 #endif
 
 namespace ShimmerInterface;
@@ -97,7 +97,7 @@ foreach (var mac in activeMacs)
     if (exgOn)
     {
         // ======== SOLO EXG ========
-        var exg = new XR2Learn_ShimmerEXG
+        var exg = new ShimmerSDK_EXG
         {
             BridgeHost = BridgeHost,
             BridgePort = BridgePort,
@@ -128,7 +128,7 @@ foreach (var mac in activeMacs)
     else
     {
         // ======== SOLO IMU ========
-        var imu = new XR2Learn_ShimmerIMU
+        var imu = new ShimmerSDK_IMU
         {
             EnableLowNoiseAccelerometer  = cfgMap.TryGetValue("lna",  out var b1) && b1,
             EnableWideRangeAccelerometer = cfgMap.TryGetValue("wra",  out var b2) && b2,

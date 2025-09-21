@@ -1,9 +1,9 @@
-namespace XR2Learn_ShimmerAPI.GSR
+namespace ShimmerSDK.EXG
 {
     /// <summary>
     /// Partial class with configuration/flags for GSR device sensors.
     /// </summary>
-    public partial class XR2Learn_ShimmerEXG
+    public partial class ShimmerSDK_EXG
     {
         private double _samplingRate;
 

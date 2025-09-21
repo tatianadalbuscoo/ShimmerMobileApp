@@ -1,6 +1,6 @@
 ﻿using ShimmerInterface.ViewModels;
-using XR2Learn_ShimmerAPI.IMU;
-using XR2Learn_ShimmerAPI.GSR;
+using ShimmerSDK.IMU;
+using ShimmerSDK.EXG;
 using SkiaSharp.Views.Maui;
 using SkiaSharp;
 using ShimmerInterface.Models;
@@ -20,12 +20,12 @@ public partial class DataPage : ContentPage
     private readonly DataPageViewModel viewModel;
 
     private bool _firstOpen = true;
-    private XR2Learn_ShimmerIMU? _imu;
+    private ShimmerSDK_IMU? _imu;
 
 
 
 
-private readonly XR2Learn_ShimmerEXG? _exg;
+private readonly ShimmerSDK_EXG? _exg;
 
 
 
@@ -35,7 +35,7 @@ private readonly XR2Learn_ShimmerEXG? _exg;
     /// </summary>
     /// <param name="shimmer">An instance of <see cref="XR2Learn_ShimmerIMU"/> representing the connected sensor device.</param>
     /// <param name="sensorConfig">A <see cref="ShimmerDevice"/> object containing the current sensor configuration flags.</param>
-    public DataPage(XR2Learn_ShimmerIMU shimmer, ShimmerDevice sensorConfig)
+    public DataPage(ShimmerSDK_IMU shimmer, ShimmerDevice sensorConfig)
     {
         InitializeComponent();
         NavigationPage.SetHasBackButton(this, false);
@@ -52,7 +52,7 @@ private readonly XR2Learn_ShimmerEXG? _exg;
         viewModel.ShowAlertRequested += OnShowAlertRequested;
     }
 
-    public DataPage(XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG shimmer, ShimmerDevice sensorConfig)
+    public DataPage(ShimmerSDK.EXG.ShimmerSDK_EXG shimmer, ShimmerDevice sensorConfig)
     {
         InitializeComponent();
         NavigationPage.SetHasBackButton(this, false);

@@ -3,7 +3,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ShimmerInterface.Models;
 using ShimmerInterface.Views;
-using XR2Learn_ShimmerAPI;
+using ShimmerSDK;
+using ShimmerSDK.IMU;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using Microsoft.Maui.ApplicationModel; // per MainThread.InvokeOnMainThreadAsync
@@ -375,13 +376,13 @@ public partial class MainPageViewModel : ObservableObject
 
 
 #if WINDOWS || ANDROID
-    if (shimmer is XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU sImu)
+    if (shimmer is ShimmerSDK.IMU.ShimmerSDK_IMU sImu)
     {
         var page = new DataPage(sImu, device);
         page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
         tabbedPage.Children.Add(page);
     }
-    else if (shimmer is XR2Learn_ShimmerAPI.GSR.XR2Learn_ShimmerEXG sExg)
+    else if (shimmer is ShimmerSDK.EXG.ShimmerSDK_EXG sExg)
     {
         var page = new DataPage(sExg, device); // costruttore EXG in DataPage
         page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device))) + " (EXG)";
@@ -389,7 +390,7 @@ public partial class MainPageViewModel : ObservableObject
     }
 #else
             // Android/iOS: solo IMU
-            if (shimmer is XR2Learn_ShimmerAPI.IMU.XR2Learn_ShimmerIMU sImuDroid)
+            if (shimmer is ShimmerSDK_IMU sImuDroid)
             {
                 var page = new DataPage(sImuDroid, device);
                 page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));

@@ -1,19 +1,23 @@
-﻿using System;
+﻿
+
+
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+
 #if WINDOWS || ANDROID
 using ShimmerAPI;
 #endif
+
 #if ANDROID
-using ShimmerSDK.Android;   // ShimmerLogAndStreamAndroidBluetoothV2
+using ShimmerSDK.Android;
 #endif
 
-namespace XR2Learn_ShimmerAPI.IMU
+
+namespace ShimmerSDK.IMU
 {
 
-
-
-    public partial class XR2Learn_ShimmerIMU
+    public partial class ShimmerSDK_IMU
     {
         public event EventHandler<dynamic>? SampleReceived;
 
@@ -83,9 +87,9 @@ private volatile bool _reconfigInProgress = false;
         private System.Threading.Tasks.TaskCompletionSource<bool>? _androidFirstPacketTcs;
 #endif
 
-        public XR2Learn_ShimmerIMUData LatestData { get; private set; }
+        public ShimmerSDK_IMUData LatestData { get; private set; }
 
-        public XR2Learn_ShimmerIMU()
+        public ShimmerSDK_IMU()
         {
             _samplingRate = 51.2;
             _enableLowNoiseAccelerometer = true;
@@ -259,7 +263,7 @@ private volatile bool _reconfigInProgress = false;
                 firstDataPacket = false;
             }
 
-            LatestData = new XR2Learn_ShimmerIMUData(
+            LatestData = new ShimmerSDK_IMUData(
                 GetSafe(oc, indexTimeStamp),
                 GetSafe(oc, indexLowNoiseAccX),
                 GetSafe(oc, indexLowNoiseAccY),
@@ -547,7 +551,7 @@ private volatile bool _reconfigInProgress = false;
                 }
 
                 // aggiorna LatestData (usa CAL)
-                LatestData = new XR2Learn_ShimmerIMUData(
+                LatestData = new ShimmerSDK_IMUData(
                     SafeGet(oc, indexTimeStamp),
                     SafeGet(oc, indexLowNoiseAccX), SafeGet(oc, indexLowNoiseAccY), SafeGet(oc, indexLowNoiseAccZ),
                     SafeGet(oc, indexWideAccX),    SafeGet(oc, indexWideAccY),    SafeGet(oc, indexWideAccZ),

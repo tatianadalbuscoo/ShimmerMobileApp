@@ -2,14 +2,14 @@
 using System.Threading.Tasks;
 
 
-namespace XR2Learn_ShimmerAPI.IMU
+namespace ShimmerSDK.IMU
 {
 
     /// <summary>
     /// Partial class that provides methods to manage the connection, streaming, and disconnection
     /// lifecycle of a Shimmer IMU device.
     /// </summary>
-    public partial class XR2Learn_ShimmerIMU
+    public partial class ShimmerSDK_IMU
     {
 
         /// <summary>

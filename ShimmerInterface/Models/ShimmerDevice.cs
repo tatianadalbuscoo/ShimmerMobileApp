@@ -1,7 +1,7 @@
 ﻿using System;
 using CommunityToolkit.Mvvm.ComponentModel;
 #if WINDOWS
-using XR2Learn_ShimmerAPI.GSR; // ExgMode enum (wrapper EXG)
+using ShimmerSDK.EXG; 
 #endif
 
 namespace ShimmerInterface.Models

@@ -1,12 +1,12 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using XR2Learn_ShimmerAPI.IMU;
+using ShimmerSDK.IMU;
 using ShimmerInterface.Models;
 using System.Diagnostics;
 
 
 #if WINDOWS || ANDROID
-using XR2Learn_ShimmerAPI.GSR; // ← wrapper EXG
+using ShimmerSDK.EXG; // ← wrapper EXG
 #endif
 
 
@@ -134,7 +134,7 @@ public partial class LoadingPageViewModel : ObservableObject
 #if WINDOWS
             if (device.IsExg && device.EnableExg)
             {
-                var exg = new XR2Learn_ShimmerEXG
+                var exg = new ShimmerSDK_EXG
                 {
                     // IMU flags (puoi tenerli accesi: il wrapper EXG li gestisce comunque)
                     EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
@@ -188,7 +188,7 @@ public partial class LoadingPageViewModel : ObservableObject
             device.IsExgModeEMG        ? ExgMode.EMG :
             ExgMode.ECG; // default
 
-        var exg = new XR2Learn_ShimmerEXG
+        var exg = new ShimmerSDK_EXG
         {
             EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
             EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
@@ -235,7 +235,7 @@ public partial class LoadingPageViewModel : ObservableObject
 
             // ===== Branch IMU (default o piattaforme non-Windows) =====
 
-            var imu = new XR2Learn_ShimmerIMU
+            var imu = new ShimmerSDK_IMU
             {
                 EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
                 EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,

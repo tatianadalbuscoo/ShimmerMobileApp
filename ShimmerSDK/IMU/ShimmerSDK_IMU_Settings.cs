@@ -1,12 +1,12 @@
 ﻿
-namespace XR2Learn_ShimmerAPI.IMU
+namespace ShimmerSDK.IMU
 {
 
     /// <summary>
     /// Partial class that manages configuration parameters and sensor enable flags
     /// for a Shimmer IMU device.
     /// </summary>
-    public partial class XR2Learn_ShimmerIMU
+    public partial class ShimmerSDK_IMU
     {
 
         private double _samplingRate;

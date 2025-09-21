@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Android.Bluetooth;
 using Java.Util;
 
+
 namespace ShimmerSDK.Android
 {
 

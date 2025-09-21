@@ -1,5 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
-using XR2Learn_ShimmerAPI.IMU;
+using ShimmerSDK.IMU;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using ShimmerInterface.Models;
@@ -16,7 +16,7 @@ using System.Globalization;
 using Microsoft.Maui.ApplicationModel;  // MainThread
 #endif
 
-using XR2Learn_ShimmerAPI.GSR;  // XR2Learn_ShimmerEXG, ExgMode
+using ShimmerSDK.EXG;  // XR2Learn_ShimmerEXG, ExgMode
 
 
 
@@ -41,7 +41,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
 {
 #if IOS || MACCATALYST
     // --- EXG mode (il “pallino” dal bridge) ---
-    private XR2Learn_ShimmerEXG? _exgBridge;
+    private ShimmerSDK_EXG? _exgBridge;
     private string _exgModeTitle = string.Empty;
 
     public string ExgModeTitle
@@ -72,9 +72,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private const double MIN_SAMPLING_RATE = 1;
 
     // ==== Device references and internal timer for periodic updates ====
-    private readonly XR2Learn_ShimmerIMU? shimmerImu;
+    private readonly ShimmerSDK_IMU? shimmerImu;
 
-private readonly XR2Learn_ShimmerEXG? shimmerExg;
+private readonly ShimmerSDK_EXG? shimmerExg;
 
     // flag di sessione EXG (copiati dal config)
     private bool enableExg;
@@ -369,7 +369,7 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
 
 
 
-    public DataPageViewModel(XR2Learn_ShimmerIMU shimmerDevice, ShimmerDevice config)
+    public DataPageViewModel(ShimmerSDK_IMU shimmerDevice, ShimmerDevice config)
     {
         shimmerImu = shimmerDevice;
         SubscribeSamples();
@@ -419,7 +419,7 @@ private readonly XR2Learn_ShimmerEXG? shimmerExg;
         UpdateTextProperties();
     }
 
-public DataPageViewModel(XR2Learn_ShimmerEXG shimmerDevice, ShimmerDevice config)
+public DataPageViewModel(ShimmerSDK_EXG shimmerDevice, ShimmerDevice config)
 {
     shimmerExg = shimmerDevice;
     SubscribeSamples();

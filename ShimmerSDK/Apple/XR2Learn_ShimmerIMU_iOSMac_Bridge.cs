@@ -9,9 +9,9 @@ using System.Globalization;
 using UIKit;       // per invocare sul main thread (senza MAUI)
 using Foundation;  // NSThread
 
-namespace XR2Learn_ShimmerAPI.IMU
+namespace ShimmerSDK.IMU
 {
-    public partial class XR2Learn_ShimmerIMU
+    public partial class ShimmerSDK_IMU
     {
         // ===== Helper: invoca sul main thread (iOS/macOS Catalyst) =====
         private static void RunOnMainThread(Action action)
@@ -122,7 +122,7 @@ namespace XR2Learn_ShimmerAPI.IMU
             };
         }
 
-        private static bool HasAnyValue(XR2Learn_ShimmerIMUData d) =>
+        private static bool HasAnyValue(ShimmerSDK_IMUData d) =>
             d != null &&
             (IsNumLike(d.LowNoiseAccelerometerX) || IsNumLike(d.LowNoiseAccelerometerY) || IsNumLike(d.LowNoiseAccelerometerZ) ||
              IsNumLike(d.WideRangeAccelerometerX) || IsNumLike(d.WideRangeAccelerometerY) || IsNumLike(d.WideRangeAccelerometerZ) ||
@@ -413,7 +413,7 @@ namespace XR2Learn_ShimmerAPI.IMU
                         double? a15 = N(ext, "a15");
 
 
-                        LatestData = new XR2Learn_ShimmerIMUData(
+                        LatestData = new ShimmerSDK_IMUData(
                             timeStamp: (uint)Math.Max(0, (int)(ts ?? 0)),
                             accelerometerX: lnaX.HasValue ? new NumericPayload(lnaX.Value) : null,
                             accelerometerY: lnaY.HasValue ? new NumericPayload(lnaY.Value) : null,
@@ -558,7 +558,7 @@ namespace XR2Learn_ShimmerAPI.IMU
                 var ay_g = new NumericPayload(ay / scale);
                 var az_g = new NumericPayload(az / scale);
 
-                LatestData = new XR2Learn_ShimmerIMUData(
+                LatestData = new ShimmerSDK_IMUData(
                     timeStamp: ts,
                     accelerometerX: ax_g, accelerometerY: ay_g, accelerometerZ: az_g,
                     wideAccelerometerX: null, wideAccelerometerY: null, wideAccelerometerZ: null,

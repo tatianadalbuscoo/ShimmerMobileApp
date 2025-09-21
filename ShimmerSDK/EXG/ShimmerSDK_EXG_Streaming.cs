@@ -6,12 +6,12 @@ using System.Threading.Tasks;
  using ShimmerSDK.Android;
 #endif
 
-namespace XR2Learn_ShimmerAPI.GSR
+namespace ShimmerSDK.EXG
 {
     /// <summary>
     /// Windows-focused streaming lifecycle (mirrors IMU style)
     /// </summary>
-    public partial class XR2Learn_ShimmerEXG
+    public partial class ShimmerSDK_EXG
     {
         public void Connect()
         {

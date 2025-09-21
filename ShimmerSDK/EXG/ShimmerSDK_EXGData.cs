@@ -2,9 +2,9 @@
 using ShimmerAPI;
 #endif
 
-namespace XR2Learn_ShimmerAPI.GSR
+namespace ShimmerSDK.EXG
 {
-    public class XR2Learn_ShimmerEXGData
+    public class ShimmerSDK_EXGData
     {
 #if WINDOWS || ANDROID
         // Timestamp
@@ -54,7 +54,7 @@ namespace XR2Learn_ShimmerAPI.GSR
         public readonly SensorData Exg2;    
 
         // === Costruttore NUOVO (4 canali EXG) ===
-        public XR2Learn_ShimmerEXGData(
+        public ShimmerSDK_EXGData(
             SensorData timeStamp,
             SensorData accelerometerX, SensorData accelerometerY, SensorData accelerometerZ,
             SensorData wideAccelerometerX, SensorData wideAccelerometerY, SensorData wideAccelerometerZ,
@@ -106,7 +106,7 @@ namespace XR2Learn_ShimmerAPI.GSR
         }
 
         // === Costruttore LEGACY (2 canali EXG → mappa su EXG1) ===
-        public XR2Learn_ShimmerEXGData(
+        public ShimmerSDK_EXGData(
             SensorData timeStamp,
             SensorData accelerometerX, SensorData accelerometerY, SensorData accelerometerZ,
             SensorData wideAccelerometerX, SensorData wideAccelerometerY, SensorData wideAccelerometerZ,
@@ -175,7 +175,7 @@ public readonly object ExtADC_A15;
         public object ExgRespiration { get; set; }   // opzionale; puoi lasciarlo ma il bridge non lo invia
 
 
-        public XR2Learn_ShimmerEXGData(
+        public ShimmerSDK_EXGData(
     object timeStamp = null,
     object accelerometerX = null, object accelerometerY = null, object accelerometerZ = null,
     object wideAccelerometerX = null, object wideAccelerometerY = null, object wideAccelerometerZ = null,

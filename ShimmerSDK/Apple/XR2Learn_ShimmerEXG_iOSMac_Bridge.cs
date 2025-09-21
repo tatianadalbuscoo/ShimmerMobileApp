@@ -9,10 +9,10 @@ using System.Globalization;
 using UIKit;       // per invocare sul main thread (senza MAUI)
 using Foundation;  // NSThread
 
-namespace XR2Learn_ShimmerAPI.GSR
+namespace ShimmerSDK.EXG
 {
     // Bridge iOS/MacCatalyst per EXG: instrada IMU/env (EXG1/EXG2 ignorati per ora)
-    public partial class XR2Learn_ShimmerEXG
+    public partial class ShimmerSDK_EXG
     {
         // ======== API pubblica stile IMU ========
 
@@ -23,7 +23,7 @@ namespace XR2Learn_ShimmerAPI.GSR
         public string BridgeTargetMac { get; set; } = "";
 
         // Ultimo pacchetto instradato
-        public XR2Learn_ShimmerEXGData? LatestData { get; private set; }
+        public ShimmerSDK_EXGData? LatestData { get; private set; }
 
 // --- modalità EXG letta dal bridge (normalizzata) ---
 private string _currentExgMode = "";
@@ -165,7 +165,7 @@ public string CurrentExgMode
             };
         }
 
-private static bool HasAnyValue(XR2Learn_ShimmerEXGData d) =>
+private static bool HasAnyValue(ShimmerSDK_EXGData d) =>
     d != null &&
     (IsNumLike(d.LowNoiseAccelerometerX) || IsNumLike(d.LowNoiseAccelerometerY) || IsNumLike(d.LowNoiseAccelerometerZ) ||
      IsNumLike(d.WideRangeAccelerometerX) || IsNumLike(d.WideRangeAccelerometerY) || IsNumLike(d.WideRangeAccelerometerZ) ||
@@ -485,7 +485,7 @@ if (!exg2.HasValue && root.TryGetProperty("Exg2", out var exg2Legacy) && exg2Leg
 
 
 
-                        LatestData = new XR2Learn_ShimmerEXGData(
+                        LatestData = new ShimmerSDK_EXGData(
                             // DOPO (no saturazione a 2147483647)
                             timeStamp: ts.HasValue && ts.Value >= 0
                                 ? (uint)Math.Min(ts.Value, uint.MaxValue)

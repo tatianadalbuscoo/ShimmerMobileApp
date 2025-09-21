@@ -7,6 +7,7 @@
 using System;
 using System.IO.Ports;
 
+
 namespace ShimmerSDK
 {
     public class SerialPortsManager

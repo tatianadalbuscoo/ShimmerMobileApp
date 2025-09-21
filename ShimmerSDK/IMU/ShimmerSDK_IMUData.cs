@@ -2,7 +2,7 @@
 using ShimmerAPI;
 #endif
 
-namespace XR2Learn_ShimmerAPI.IMU
+namespace ShimmerSDK.IMU
 {
 
     /// <summary>
@@ -11,7 +11,7 @@ namespace XR2Learn_ShimmerAPI.IMU
     /// wide-range accelerometer, BMP180 temperature and pressure sensors,
     /// battery voltage, and external ADCs.
     /// </summary>
-    public class XR2Learn_ShimmerIMUData
+    public class ShimmerSDK_IMUData
     {
 #if WINDOWS || ANDROID
     // Timestamp
@@ -52,7 +52,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// <summary>
         /// Constructs a full Shimmer IMU data frame with all sensor channels.
         /// </summary>
-        public XR2Learn_ShimmerIMUData(
+        public ShimmerSDK_IMUData(
             SensorData timeStamp,
             SensorData accelerometerX, SensorData accelerometerY, SensorData accelerometerZ,
             SensorData wideAccelerometerX, SensorData wideAccelerometerY, SensorData wideAccelerometerZ,
@@ -117,7 +117,7 @@ namespace XR2Learn_ShimmerAPI.IMU
         /// <summary>
         /// Costruttore per iOS/MacCatalyst: assegna i parametri ai campi.
         /// </summary>
-        public XR2Learn_ShimmerIMUData(
+        public ShimmerSDK_IMUData(
             object timeStamp = null,
             object accelerometerX = null, object accelerometerY = null, object accelerometerZ = null,
             object wideAccelerometerX = null, object wideAccelerometerY = null, object wideAccelerometerZ = null,

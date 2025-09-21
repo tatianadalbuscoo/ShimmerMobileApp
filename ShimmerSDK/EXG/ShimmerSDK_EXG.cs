@@ -9,7 +9,7 @@ using ShimmerAPI;
 using ShimmerSDK.Android;
 #endif
 
-namespace XR2Learn_ShimmerAPI.GSR
+namespace ShimmerSDK.EXG
 {
 
 
@@ -22,7 +22,7 @@ namespace XR2Learn_ShimmerAPI.GSR
     }
 
     // NOTE: Windows-only for now (same style as IMU, but restricted)
-    public partial class XR2Learn_ShimmerEXG
+    public partial class ShimmerSDK_EXG
     {
         public event EventHandler<dynamic>? SampleReceived;
 
@@ -123,7 +123,7 @@ private static (int idx, string? name, string? fmt) FindSignalA(ObjectCluster oc
 #endif
 
 
-        public XR2Learn_ShimmerEXG()
+        public ShimmerSDK_EXG()
         {
             _samplingRate = 51.2;
 
@@ -362,7 +362,7 @@ private static (int idx, string? name, string? fmt) FindSignalA(ObjectCluster oc
                     firstDataPacket = false;
                 }
 
-                var latest = new XR2Learn_ShimmerEXGData(
+                var latest = new ShimmerSDK_EXGData(
                     GetSafe(oc, indexTimeStamp),
                     GetSafe(oc, indexLowNoiseAccX),
                     GetSafe(oc, indexLowNoiseAccY),
@@ -482,7 +482,7 @@ private void HandleEventAndroid(object sender, EventArgs args)
             firstDataPacketAndroid = false;
         }
 
-        var latest = new XR2Learn_ShimmerEXGData(
+        var latest = new ShimmerSDK_EXGData(
             GetSafeA(oc, indexTimeStamp),
             GetSafeA(oc, indexLowNoiseAccX),
             GetSafeA(oc, indexLowNoiseAccY),
