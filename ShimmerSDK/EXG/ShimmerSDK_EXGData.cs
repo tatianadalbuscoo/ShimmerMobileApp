@@ -103,6 +103,9 @@ namespace ShimmerSDK.EXG
             Exg2Ch2 = exg2Ch2;
             ExgRespiration = exgRespiration;
 
+             Exg1 = Exg1Ch1;
+            Exg2 = Exg2Ch1 ?? Exg1Ch2;   // fallback sul CH2 di EXG1 se non c'è EXG2
+
         }
 
         // === Costruttore LEGACY (2 canali EXG → mappa su EXG1) ===
@@ -134,8 +137,8 @@ namespace ShimmerSDK.EXG
         )
         { }
 #else
-// Fallback neutro (iOS/MacCatalyst): evita dipendenze da SensorData
-public readonly object TimeStamp;
+        // Fallback neutro (iOS/MacCatalyst): evita dipendenze da SensorData
+        public readonly object TimeStamp;
 
 // Low-noise accelerometer
 public readonly object LowNoiseAccelerometerX;

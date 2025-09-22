@@ -1,4 +1,10 @@
-﻿
+﻿/* 
+ * ShimmerSDK_IMU — This partial holds configuration: sampling rate and per-sensor enable flags.
+ * Pure config (no I/O or streaming). Other partials use these values to build sensor bitmaps
+ * and decide which CAL signals are produced.
+ */
+
+
 namespace ShimmerSDK.IMU
 {
 
@@ -9,6 +15,7 @@ namespace ShimmerSDK.IMU
     public partial class ShimmerSDK_IMU
     {
 
+        // Sampling rate + sensor toggles (LNA, WRA, gyro, mag, BMP180, battery, Ext A6/A7/A15).
         private double _samplingRate;
         private bool _enableLowNoiseAccelerometer;
         private bool _enableWideRangeAccelerometer;
@@ -21,10 +28,12 @@ namespace ShimmerSDK.IMU
         private bool _enableExtA15;
 
 #if ANDROID
-private string? _endpointMac;
-private string? _deviceId;
-#endif
 
+        // Android: MAC + device ID.
+        private string? _endpointMac;
+        private string? _deviceId;
+
+#endif
 
         /// <summary>
         /// Gets or sets the sampling rate in Hz for the Shimmer device.
@@ -35,6 +44,7 @@ private string? _deviceId;
             set => _samplingRate = value;
         }
 
+
         /// <summary>
         /// Gets or sets whether the low-noise accelerometer is enabled.
         /// </summary>
@@ -43,6 +53,7 @@ private string? _deviceId;
             get => _enableLowNoiseAccelerometer;
             set => _enableLowNoiseAccelerometer = value;
         }
+
 
         /// <summary>
         /// Gets or sets whether the wide-range accelerometer is enabled.
@@ -53,6 +64,7 @@ private string? _deviceId;
             set => _enableWideRangeAccelerometer = value;
         }
 
+
         /// <summary>
         /// Gets or sets whether the gyroscope is enabled.
         /// </summary>
@@ -61,6 +73,7 @@ private string? _deviceId;
             get => _enableGyroscope;
             set => _enableGyroscope = value;
         }
+
 
         /// <summary>
         /// Gets or sets whether the magnetometer is enabled.
@@ -71,6 +84,7 @@ private string? _deviceId;
             set => _enableMagnetometer = value;
         }
 
+
         /// <summary>
         /// Gets or sets whether the BMP180 pressure and temperature sensors are enabled.
         /// </summary>
@@ -79,6 +93,7 @@ private string? _deviceId;
             get => _enablePressureTemperature;
             set => _enablePressureTemperature = value;
         }
+
 
         /// <summary>
         /// Gets or sets whether battery voltage monitoring is enabled.
@@ -89,6 +104,7 @@ private string? _deviceId;
             set => _enableBattery = value;
         }
 
+
         /// <summary>
         /// Gets or sets whether the external ADC channel A6 is enabled.
         /// </summary>
@@ -97,6 +113,7 @@ private string? _deviceId;
             get => _enableExtA6;
             set => _enableExtA6 = value;
         }
+
 
         /// <summary>
         /// Gets or sets whether the external ADC channel A7 is enabled.
@@ -107,6 +124,7 @@ private string? _deviceId;
             set => _enableExtA7 = value;
         }
 
+
         /// <summary>
         /// Gets or sets whether the external ADC channel A15 is enabled.
         /// </summary>
@@ -115,6 +133,5 @@ private string? _deviceId;
             get => _enableExtA15;
             set => _enableExtA15 = value;
         }
-
     }
 }

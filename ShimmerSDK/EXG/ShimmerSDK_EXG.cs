@@ -1,5 +1,5 @@
 ﻿/* 
- * ShimmerSDK_IMU — Cross-platform wrapper for Shimmer3 EXG devices.
+ * ShimmerSDK_EXG — Cross-platform wrapper for Shimmer3 EXG devices.
  * Handles sensor configuration, firmware-quantized sampling rate, connection/stream lifecycle,
  * CAL index mapping, and event-driven delivery of samples via LatestData/SampleReceived.
  * Backends: Windows (serial V2) and Android (Bluetooth RFCOMM V2).
