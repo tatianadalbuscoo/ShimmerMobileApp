@@ -1,4 +1,11 @@
-﻿using System;
+﻿/* 
+ * ShimmerSDK_IMU — This partial handles the connect/stream/disconnect lifecycle.
+ * Applies sampling rate & sensor bitmap, refreshes metadata, and exposes IsConnected().
+ * Pure lifecycle logic; configuration flags/properties live in other partials.
+ */
+
+
+using System;
 using System.Threading.Tasks;
 
 
@@ -17,86 +24,96 @@ namespace ShimmerSDK.IMU
         /// </summary>
         public void Connect()
         {
+
 #if ANDROID
+
             if (shimmerAndroid == null)
-                throw new InvalidOperationException("ConfigureAndroid non chiamata");
+                throw new InvalidOperationException("ConfigureAndroid was not called");
 
+            // Connect
             shimmerAndroid.Connect();
-            global::Android.Util.Log.Info("Shimmer", $"Android Connect() -> {shimmerAndroid.IsConnected()}");
             return;
+
 #elif WINDOWS
-    if (IsConnected()) return;
-    shimmer.Connect();
 
-    // Applica sampling rate e bitmap sensori calcolata in ConfigureWindows(...)
-    var sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
-    shimmer.WriteSamplingRate(sr);
-    System.Threading.Thread.Sleep(150);
+            if (IsConnected()) return;
+            shimmer.Connect();
 
-    shimmer.WriteSensors(_winEnabledSensors);
-    System.Threading.Thread.Sleep(200);
+            var sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
 
-    // Aggiorna la mappa dei campi (nomi/indici) lato API
-    shimmer.Inquiry();
-    System.Threading.Thread.Sleep(200);
+            // Apply sampling rate
+            shimmer.WriteSamplingRate(sr);
+            System.Threading.Thread.Sleep(150);
+
+            // Apply sensor bitmap
+            shimmer.WriteSensors(_winEnabledSensors);
+            System.Threading.Thread.Sleep(200);
+
+            // Refresh metadata
+            shimmer.Inquiry();
+            System.Threading.Thread.Sleep(200);
+
 #elif MACCATALYST || IOS
-return;
+
+            return;
+
 #endif
+
         }
 
-        /// <summary>
-        /// Disconnects from the Shimmer IMU device and clears the UI callback.
-        /// Includes a short delay to allow disconnection to complete.
-        /// </summary>
-        public async void Disconnect()
-        {
-#if ANDROID
-            shimmerAndroid?.StopStreaming();
-            shimmerAndroid?.Disconnect();
-            await DelayWork(1000);
-            return;
-#elif WINDOWS
-            shimmer.Disconnect();
-            await DelayWork(1000);
-            shimmer.UICallback = null;
-#elif MACCATALYST || IOS
-    await DisconnectMacAsync();
-#endif
-        }
 
         /// <summary>
         /// Starts data streaming from the Shimmer IMU device after a short delay.
         /// </summary>
         public async void StartStreaming()
         {
+
 #if ANDROID
+
+            // Not configured
             if (shimmerAndroid == null) return;
-            await StartStreamingAndroidSequenceAsync(); // sequenza speculare a Windows
+            await StartStreamingAndroidSequenceAsync();
             return;
+
 #elif WINDOWS
+
             await DelayWork(1000);
             shimmer.StartStreaming();
+
 #elif MACCATALYST || IOS
-    await StartStreamingMacAsync();
+
+            await StartStreamingMacAsync();
+
 #endif
+
         }
+
 
         /// <summary>
         /// Stops data streaming from the Shimmer IMU device and waits briefly.
         /// </summary>
         public async void StopStreaming()
         {
+
 #if ANDROID
+
             shimmerAndroid?.StopStreaming();
-            await DelayWork(1000); // come Windows
+            await DelayWork(1000);
             return;
+
 #elif WINDOWS
+            
             shimmer.StopStreaming();
             await DelayWork(1000);
+
 #elif MACCATALYST || IOS
-    await StopStreamingMacAsync();
+
+            await StopStreamingMacAsync();
+
 #endif
+
         }
+
 
         /// <summary>
         /// Returns whether the Shimmer IMU device is currently connected.
@@ -104,94 +121,26 @@ return;
         /// <returns>True if connected; otherwise, false.</returns>
         public bool IsConnected()
         {
+
 #if ANDROID
+
             return shimmerAndroid != null && shimmerAndroid.IsConnected();
+
 #elif WINDOWS
+
             return shimmer.IsConnected();
+
 #elif MACCATALYST || IOS
-    return IsConnectedMac();
+
+            return IsConnectedMac();
+
 #else
+
             return false;
+
 #endif
+
         }
-
-#if ANDROID
-private async System.Threading.Tasks.Task StartStreamingAndroidSequenceAsync()
-{
-    try
-    {
-        if (shimmerAndroid == null)
-            throw new InvalidOperationException("Shimmer Android non configurato.");
-
-        // A) Assicurati che la connessione sia COMPLETATA (stato CONNECTED dall’API)
-        _androidConnectedTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
-        if (shimmerAndroid.IsConnected())
-            _androidConnectedTcs.TrySetResult(true); // nel caso fossi già connected
-
-        var connectedReady = await System.Threading.Tasks.Task.WhenAny(_androidConnectedTcs.Task, System.Threading.Tasks.Task.Delay(5000));
-        if (connectedReady != _androidConnectedTcs.Task)
-            global::Android.Util.Log.Warn("Shimmer", "Timeout in attesa di CONNECTED (proseguo)");
-
-        // B) Stop idempotente e reset sensori (ma NIENTE FlushConnection!)
-        shimmerAndroid.StopStreaming();
-        await DelayWork(150);
-        shimmerAndroid.WriteSensors(0);
-        await DelayWork(150);
-
-        // C) Applica sampling + ranges + sensori (ordine importante)
-        int sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
-        shimmerAndroid.WriteSamplingRate(sr);
-        await DelayWork(180);
-
-        shimmerAndroid.WriteAccelRange(0);
-        shimmerAndroid.WriteGyroRange(0);
-        shimmerAndroid.SetLowPowerAccel(false);
-        shimmerAndroid.SetLowPowerGyro(false);
-        shimmerAndroid.WriteInternalExpPower(0);
-        await DelayWork(150);
-
-        int sensors = _androidEnabledSensors;
-        shimmerAndroid.WriteSensors(sensors);
-        await DelayWork(180);
-
-        // D) **QUI** fai l’Inquiry per aggiornare PacketSize/SignalNameArray in ShimmerAPI
-        shimmerAndroid.Inquiry();
-        await DelayWork(350);
-
-        // (Opzionale) calibrazioni generiche
-        shimmerAndroid.ReadCalibrationParameters("All");
-        await DelayWork(250);
-
-        // E) Prepara attese StartStreaming
-        _androidStreamingAckTcs = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
-        _androidFirstPacketTcs  = new System.Threading.Tasks.TaskCompletionSource<bool>(System.Threading.Tasks.TaskCreationOptions.RunContinuationsAsynchronously);
-
-        // F) Start
-        shimmerAndroid.StartStreaming();
-
-        // G) Attendi stato STREAMING (ACK di start gestito dall’API → event STATE_CHANGE)
-        var ackReady = await System.Threading.Tasks.Task.WhenAny(_androidStreamingAckTcs.Task, System.Threading.Tasks.Task.Delay(2000));
-        if (ackReady != _androidStreamingAckTcs.Task)
-            global::Android.Util.Log.Warn("Shimmer", "Timeout in attesa di ACK/STREAMING (proseguo)");
-
-        // H) Attendi il primo pacchetto dati valido (allinea indici)
-        var firstReady = await System.Threading.Tasks.Task.WhenAny(_androidFirstPacketTcs.Task, System.Threading.Tasks.Task.Delay(2000));
-        if (firstReady != _androidFirstPacketTcs.Task)
-            global::Android.Util.Log.Warn("Shimmer", "Timeout in attesa del primo DATA_PACKET (proseguo)");
-
-        global::Android.Util.Log.Info("Shimmer", $"StartStreaming OK (sensors=0x{sensors:X}, SR={sr})");
-    }
-    catch (Exception ex)
-    {
-        global::Android.Util.Log.Error("Shimmer", "StartStreamingAndroidSequenceAsync exception:");
-        global::Android.Util.Log.Error("Shimmer", ex.ToString());
-        System.Diagnostics.Debug.WriteLine(ex);
-        throw;
-    }
-}
-#endif
-
-
 
 
         /// <summary>
@@ -203,6 +152,89 @@ private async System.Threading.Tasks.Task StartStreamingAndroidSequenceAsync()
         {
             await Task.Delay(t);
         }
+
+
+#if ANDROID
+
+        /// <summary>
+        /// Android start sequence: ensures CONNECTED state, reapplies config, and starts streaming.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown if Android configuration is missing.</exception>
+        /// <returns>A task that completes when the start sequence has finished.</returns>
+        private async Task StartStreamingAndroidSequenceAsync()
+        {
+            try
+            {
+                if (shimmerAndroid == null)
+                    throw new InvalidOperationException("Shimmer Android is not configured");
+
+                // Ensure connection is fully established (wait for CONNECTED state)
+                _androidConnectedTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                if (shimmerAndroid.IsConnected())
+                    _androidConnectedTcs.TrySetResult(true);
+
+                var connectedReady = await Task.WhenAny(_androidConnectedTcs.Task, Task.Delay(5000));
+                if (connectedReady != _androidConnectedTcs.Task)
+                    global::Android.Util.Log.Warn("Shimmer", "Timeout waiting for CONNECTED (continuing)");
+
+                // Ensure not streaming; clear sensors (no flush)
+                shimmerAndroid.StopStreaming();
+                await DelayWork(150);
+                shimmerAndroid.WriteSensors(0);
+                await DelayWork(150);
+
+                // Apply config in order: SR → ranges/power → sensors
+                int sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
+                shimmerAndroid.WriteSamplingRate(sr);
+                await DelayWork(180);
+
+                shimmerAndroid.WriteAccelRange(0);
+                shimmerAndroid.WriteGyroRange(0);
+                shimmerAndroid.SetLowPowerAccel(false);
+                shimmerAndroid.SetLowPowerGyro(false);
+                shimmerAndroid.WriteInternalExpPower(0);
+                await DelayWork(150);
+
+                int sensors = _androidEnabledSensors;
+                shimmerAndroid.WriteSensors(sensors);
+                await DelayWork(180);
+
+                // Refresh metadata (packet size, signal names/indices)
+                shimmerAndroid.Inquiry();
+                await DelayWork(350);
+
+                // Reload generic calibrations
+                shimmerAndroid.ReadCalibrationParameters("All");
+                await DelayWork(250);
+
+                // Prepare waiters for streaming ACK and first data packet
+                _androidStreamingAckTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                _androidFirstPacketTcs  = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+                // Start streaming
+                shimmerAndroid.StartStreaming();
+
+                // Wait for STREAMING state (ACK) then first packet
+                var ackReady = await Task.WhenAny(_androidStreamingAckTcs.Task, Task.Delay(2000));
+                if (ackReady != _androidStreamingAckTcs.Task)
+                    global::Android.Util.Log.Warn("Shimmer", "Timeout waiting for ACK/STREAMING (continuing)");
+
+                var firstReady = await Task.WhenAny(_androidFirstPacketTcs.Task, Task.Delay(2000));
+                if (firstReady != _androidFirstPacketTcs.Task)
+                    global::Android.Util.Log.Warn("Shimmer", "Timeout waiting for first DATA_PACKET (continuing)");
+
+                global::Android.Util.Log.Info("Shimmer", $"StartStreaming OK (sensors=0x{sensors:X}, SR={sr})");
+            }
+            catch (Exception ex)
+            {
+                global::Android.Util.Log.Error("Shimmer", "StartStreamingAndroidSequenceAsync exception:");
+                global::Android.Util.Log.Error("Shimmer", ex.ToString());
+                System.Diagnostics.Debug.WriteLine(ex);
+                throw;
+            }
+        }
+
+#endif
+
     }
 }
-

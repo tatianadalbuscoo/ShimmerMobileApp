@@ -1,87 +1,98 @@
+﻿/* 
+ * ShimmerSDK_EXG — This partial handles the connect/stream/disconnect lifecycle.
+ * Applies sampling rate & sensor bitmap, refreshes metadata, and exposes IsConnected().
+ * Pure lifecycle logic; configuration flags/properties live in other partials.
+ */
+
+
 using System;
 using System.Threading.Tasks;
 
-
 #if ANDROID
- using ShimmerSDK.Android;
+using ShimmerSDK.Android;
 #endif
+
 
 namespace ShimmerSDK.EXG
 {
+
     /// <summary>
-    /// Windows-focused streaming lifecycle (mirrors IMU style)
+    /// Partial class that provides methods to manage the connection, streaming, and disconnection
+    /// lifecycle of a Shimmer EXG device.
     /// </summary>
     public partial class ShimmerSDK_EXG
     {
+
+        /// <summary>
+        /// Connects to the Shimmer EXG device if not already connected.
+        /// </summary>
         public void Connect()
         {
-#if WINDOWS
+
+#if ANDROID
+
+            if (shimmerAndroid == null)
+                throw new InvalidOperationException("ConfigureAndroid was not called");
+
+            shimmerAndroid.Connect();
+            return;
+            
+#elif WINDOWS
+
             if (IsConnected()) return;
             shimmer.Connect();
 
             var sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
+
+            // Apply sampling rate
             shimmer.WriteSamplingRate(sr);
             System.Threading.Thread.Sleep(150);
 
+            // Apply sensor bitmap
             shimmer.WriteSensors(_winEnabledSensors);
             System.Threading.Thread.Sleep(200);
 
+            // Refresh metadata
             shimmer.Inquiry();
             System.Threading.Thread.Sleep(200);
-#elif ANDROID
-            if (shimmerAndroid == null)
-                throw new InvalidOperationException("ConfigureAndroid non chiamata");
 
-            shimmerAndroid.Connect();
-            global::Android.Util.Log.Info("Shimmer-EXG", $"Android Connect() -> {shimmerAndroid.IsConnected()}");
-            return;
 #elif MACCATALYST || IOS
-    return;
-#else
-            throw new PlatformNotSupportedException("Windows-only in this wrapper.");
+
+            return;
+
 #endif
         }
 
-        public async void Disconnect()
-        {
-#if WINDOWS
-            shimmer.Disconnect();
-            await Task.Delay(1000);
-            shimmer.UICallback = null;
-#elif ANDROID
-            shimmerAndroid?.StopStreaming();
-            shimmerAndroid?.Disconnect();
-            await DelayWork(1000);
-            return;
-#elif MACCATALYST || IOS
-    await DisconnectMacAsync();
-#else
-            await Task.CompletedTask;
-            throw new PlatformNotSupportedException("Windows-only in this wrapper.");
-#endif
-        }
 
+
+        /// <summary>
+        /// Starts data streaming. On Android, safely reapplies config first
+        /// (stop → clear sensors → set sampling/ranges/power → restore sensors → inquiry + calibrations),
+        /// then starts the stream; on other platforms, issues a simple start.
+        /// </summary>
         public async void StartStreaming()
         {
-#if WINDOWS
-            await Task.Delay(1000);
-            shimmer.StartStreaming();
-#elif ANDROID
-            if (shimmerAndroid == null)
-                throw new InvalidOperationException("ConfigureAndroid non chiamata");
 
-            // Sequenza speculare alla IMU (senza TCS/ACK, semplice e robusta)
+
+#if ANDROID
+            
+            // Not configured
+            if (shimmerAndroid == null) return;
+
+            // Ensure not streaming before reconfig
             shimmerAndroid.StopStreaming();
             await DelayWork(150);
 
+            // Clear sensor bitmap to avoid partial packets
             shimmerAndroid.WriteSensors(0);
             await DelayWork(150);
 
+            // Apply sampling rate
             int sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
             shimmerAndroid.WriteSamplingRate(sr);
             await DelayWork(180);
 
-            // Allinea ranges/power (come su IMU)
+            // Apply default ranges and power settings
             shimmerAndroid.WriteAccelRange(0);
             shimmerAndroid.WriteGyroRange(0);
             shimmerAndroid.SetLowPowerAccel(false);
@@ -89,61 +100,95 @@ namespace ShimmerSDK.EXG
             shimmerAndroid.WriteInternalExpPower(0);
             await DelayWork(150);
 
-            // Riattiva sensori selezionati (inclusi EXG1/EXG2 se abilitati in ConfigureAndroid)
+            // Restore selected sensors (EXG1/EXG2 included if enabled)
             shimmerAndroid.WriteSensors(_androidEnabledSensors);
             await DelayWork(180);
 
-            // Aggiorna mappa nomi/indici e calibrazioni
+            // Refresh packet metadata (size, signal names/indices)
             shimmerAndroid.Inquiry();
             await DelayWork(350);
 
+            // Reload calibration parameters
             shimmerAndroid.ReadCalibrationParameters("All");
             await DelayWork(250);
 
+            // Start streaming
             shimmerAndroid.StartStreaming();
-            global::Android.Util.Log.Info("Shimmer-EXG", $"StartStreaming OK (sensors=0x{_androidEnabledSensors:X}, SR={sr})");
             return;
+
+#elif WINDOWS
+
+            await Task.Delay(1000);
+            shimmer.StartStreaming();
+
 #elif MACCATALYST || IOS
+
     await StartStreamingMacAsync();
-#else
-            await Task.CompletedTask;
-            throw new PlatformNotSupportedException("Windows-only in this wrapper.");
+
 #endif
         }
 
+
+        /// <summary>
+        /// Stops data streaming from the Shimmer EXG device and waits briefly.
+        /// </summary>
         public async void StopStreaming()
         {
-#if WINDOWS
-            shimmer.StopStreaming();
-            await Task.Delay(1000);
-#elif ANDROID
+
+#if ANDROID
+
             shimmerAndroid?.StopStreaming();
             await DelayWork(1000);
             return;
+
+#elif WINDOWS
+
+            shimmer.StopStreaming();
+            await Task.Delay(1000);
+
 #elif MACCATALYST || IOS
-    await StopStreamingMacAsync();
-#else
-            await Task.CompletedTask;
-            throw new PlatformNotSupportedException("Windows-only in this wrapper.");
+
+            await StopStreamingMacAsync();
 #endif
+
         }
 
+
+        /// <summary>
+        /// Returns whether the Shimmer EXG device is currently connected.
+        /// </summary>
+        /// <returns>True if connected; otherwise, false.</returns>
         public bool IsConnected()
         {
-#if WINDOWS
-            return shimmer != null && shimmer.IsConnected();
-#elif ANDROID
+
+#if ANDROID
+
             return shimmerAndroid != null && shimmerAndroid.IsConnected();
+
+#elif WINDOWS
+
+            return shimmer != null && shimmer.IsConnected();
+
 #elif MACCATALYST || IOS
-    return IsConnectedMac();
+
+            return IsConnectedMac();
+
 #else
+
             return false;
+
 #endif
         }
 
-#if ANDROID
-        // piccolo helper per uniformare i Delay come nella IMU
-        private Task DelayWork(int ms) => Task.Delay(ms);
-#endif
+
+        /// <summary>
+        /// Asynchronously waits for the specified number of milliseconds.
+        /// Used to provide delay between operations.
+        /// </summary>
+        /// <param name="t">Time in milliseconds to wait.</param>
+        private async Task DelayWork(int t)
+        {
+            await Task.Delay(t);
+        }
     }
 }

@@ -416,7 +416,6 @@ namespace ShimmerSDK.EXG
                         "EXG_CH1",
                         Shimmer3Configuration.SignalNames.EXG1_CH1,
                         "EXG1_CH1","EXG1 CH1","EXG CH1",
-                        // alias quando la board è in ECG/EMG
                         "ECG_CH1","ECG CH1","EMG_CH1","EMG CH1",
                         "ECG RA-LL","ECG LL-RA","ECG_RA-LL","ECG_LL-RA"
                     });
@@ -809,6 +808,7 @@ namespace ShimmerSDK.EXG
         }
 
 #endif
+
 
     }
 }

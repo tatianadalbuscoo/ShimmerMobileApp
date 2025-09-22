@@ -1,6 +1,7 @@
 /* 
- * ShimmerSDK_EXG — Config: sampling rate, sensor toggles, and EXG (EnableExg/ExgMode).
- * Pure config (no I/O/streaming); used by other partials to build sensor bitmaps and CAL outputs.
+ * ShimmerSDK_EXG — This partial holds configuration: sampling rate and per-sensor enable flags (including EXG).
+ * Pure config (no I/O or streaming). Other partials use these values to build sensor bitmaps
+ * and decide which CAL signals are produced.
  */
 
 
