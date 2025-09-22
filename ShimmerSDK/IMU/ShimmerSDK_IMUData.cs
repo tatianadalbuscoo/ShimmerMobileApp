@@ -1,20 +1,31 @@
-﻿#if WINDOWS || ANDROID
+﻿/* 
+ * ShimmerSDK_IMUData — immutable snapshot of one IMU frame.
+ * Includes timestamp, LNA/WRA accel, gyro, mag, BMP180 (temp/pressure), battery, Ext A6/A7/A15.
+ * Types: SensorData on Windows/Android; object-only on iOS/macOS.
+ */
+
+
+#if WINDOWS || ANDROID
 using ShimmerAPI;
 #endif
+
 
 namespace ShimmerSDK.IMU
 {
 
     /// <summary>
     /// Represents a full sensor data frame acquired from a Shimmer IMU device.
-    /// Contains readings from low-noise accelerometer, gyroscope, magnetometer,
-    /// wide-range accelerometer, BMP180 temperature and pressure sensors,
+    /// Contains readings from low-noise accelerometer, wide-range accelerometer, 
+    /// gyroscope, magnetometer,
+    /// BMP180 temperature and pressure sensors,
     /// battery voltage, and external ADCs.
     /// </summary>
     public class ShimmerSDK_IMUData
     {
+
 #if WINDOWS || ANDROID
-    // Timestamp
+
+        // Timestamp
         public readonly SensorData TimeStamp;
 
         // Low-noise accelerometer
@@ -41,13 +52,14 @@ namespace ShimmerSDK.IMU
         public readonly SensorData Pressure_BMP180;
         public readonly SensorData Temperature_BMP180;
 
-        // Shimmer Battery
+        // Battery
         public readonly SensorData BatteryVoltage;
 
         // External ADCs
         public readonly SensorData ExtADC_A6;
         public readonly SensorData ExtADC_A7;
         public readonly SensorData ExtADC_A15;
+
 
         /// <summary>
         /// Constructs a full Shimmer IMU data frame with all sensor channels.
@@ -91,31 +103,47 @@ namespace ShimmerSDK.IMU
             ExtADC_A7 = extADC_A7;
             ExtADC_A15 = extADC_A15;
         }
-#else
-        // Versione per piattaforme non-Windows/Android (iOS/MacCatalyst):
-        // usa 'object' per non dipendere da SensorData.
+
+#elif IOS || MACCATALYST
+
+        // Timestamp
         public readonly object TimeStamp;
+
+        // Low-noise accelerometer
         public readonly object LowNoiseAccelerometerX;
         public readonly object LowNoiseAccelerometerY;
         public readonly object LowNoiseAccelerometerZ;
+
+        // Wide-range accelerometer
         public readonly object WideRangeAccelerometerX;
         public readonly object WideRangeAccelerometerY;
         public readonly object WideRangeAccelerometerZ;
+
+        // Gyroscope
         public readonly object GyroscopeX;
         public readonly object GyroscopeY;
         public readonly object GyroscopeZ;
+
+        // Magnetometer
         public readonly object MagnetometerX;
         public readonly object MagnetometerY;
         public readonly object MagnetometerZ;
+
+        // Pressure and Temperature
         public readonly object Pressure_BMP180;
         public readonly object Temperature_BMP180;
+
+        // Battery
         public readonly object BatteryVoltage;
+
+        // External ADCs
         public readonly object ExtADC_A6;
         public readonly object ExtADC_A7;
         public readonly object ExtADC_A15;
 
+
         /// <summary>
-        /// Costruttore per iOS/MacCatalyst: assegna i parametri ai campi.
+        /// Constructs a full Shimmer IMU data frame with all sensor channels.
         /// </summary>
         public ShimmerSDK_IMUData(
             object timeStamp = null,
@@ -155,6 +183,7 @@ namespace ShimmerSDK.IMU
             ExtADC_A7 = extADC_A7;
             ExtADC_A15 = extADC_A15;
         }
+
 #endif
 
     }
