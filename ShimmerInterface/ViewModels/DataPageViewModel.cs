@@ -1564,10 +1564,11 @@ private void ApplyModeTitleToFlags(string? title)
     public static string MapToInternalKey(string displayName)
     {
         var name = CleanParameterName(displayName);
-        // Per EXG usiamo chiavi distinte per canale; i gruppi (ECG/EMG/EXG Test/Respiration)
-        // non vengono mappati a un buffer singolo perché in Multi-chart usiamo i sotto-parametri.
+        if (name.Equals("EXG1", StringComparison.OrdinalIgnoreCase)) return "Exg1";
+        if (name.Equals("EXG2", StringComparison.OrdinalIgnoreCase)) return "Exg2";
         return name;
     }
+
 
 
 

@@ -120,7 +120,7 @@ namespace ShimmerSDK.IMU
 
 
         /// <summary>
-        /// Initializes the IMU wrapper with sensible defaults:
+        /// Constructor: Initializes the IMU wrapper with sensible defaults:
         /// sampling at ~51.2 Hz and all key sensors enabled (LNA, WRA, gyro, mag,
         /// pressure/temperature, battery, and external ADCs A6/A7/A15).
         /// </summary>
@@ -154,9 +154,9 @@ namespace ShimmerSDK.IMU
 
 #if IOS || MACCATALYST
 
-    // Avoid blocking
-    if (!string.IsNullOrWhiteSpace(BridgeTargetMac))
-        return SetFirmwareSamplingRateNearestAsync(requestedHz).GetAwaiter().GetResult();
+            // Avoid blocking
+            if (!string.IsNullOrWhiteSpace(BridgeTargetMac))
+                return SetFirmwareSamplingRateNearestAsync(requestedHz).GetAwaiter().GetResult();
 
 #endif
 
@@ -185,7 +185,6 @@ namespace ShimmerSDK.IMU
 
 
 #if WINDOWS
-
 
         /// <summary>
         /// Configure the Windows serial backend: apply sensor flags, rebuild the bitmap,
@@ -365,7 +364,6 @@ namespace ShimmerSDK.IMU
 
 
 #if ANDROID
-
 
         /// <summary>
         /// Configure the Android Bluetooth backend: apply sensor flags, validate MAC,
@@ -636,7 +634,6 @@ namespace ShimmerSDK.IMU
             }
             catch {}
         }
-
 
 #endif
 
