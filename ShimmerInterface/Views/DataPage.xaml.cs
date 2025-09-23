@@ -290,7 +290,6 @@ private void OnFirstExgSampleSelectGroupOnce(object? sender, dynamic e)
             // EXG singoli canali (abilitati dal ViewModel/Config)
             "Exg1" => config.WantsExg && config.WantExg1,
             "Exg2" => config.WantsExg && config.WantExg2,
-            "ExgRespiration" => config.WantsExg && config.WantRespiration,
 
                         // Gruppi EXG a 2 canali (mostriamo EXG1/EXG2 dentro ECG/EMG/EXG Test/Respiration)
             "EXG" or "ECG" or "EMG" or "EXG Test"
