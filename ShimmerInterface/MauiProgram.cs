@@ -1,13 +1,11 @@
-﻿using Microsoft.Extensions.Logging;
-using SkiaSharp.Views.Maui.Controls.Hosting;
-
-
-/*
-* MauiProgram.cs
-* ---------------
+﻿/*
 * Application entry point for configuring and creating the .NET MAUI app.
 * This file sets up fonts, logging, and platform-specific services such as SkiaSharp.
 */
+
+
+using Microsoft.Extensions.Logging;
+using SkiaSharp.Views.Maui.Controls.Hosting;
 
 
 namespace ShimmerInterface
@@ -49,4 +47,3 @@ namespace ShimmerInterface
         }
     }
 }
-

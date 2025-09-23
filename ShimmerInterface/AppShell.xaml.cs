@@ -1,5 +1,8 @@
-﻿// Classe che definisce la struttura di navigazione dell'app usando Shell.
-// Inizializza i percorsi e le pagine dichiarate in AppShell.xaml.
+﻿/*
+ * App navigation shell for MAUI.
+ * Wires up routes/pages declared in AppShell.xaml and initializes Shell.
+ */
+
 
 namespace ShimmerInterface
 {
@@ -11,4 +14,3 @@ namespace ShimmerInterface
         }
     }
 }
-
