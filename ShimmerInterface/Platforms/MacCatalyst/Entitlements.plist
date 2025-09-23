@@ -1,21 +1,15 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-  <!-- Vedi https://aka.ms/maui-publish-app-store#add-entitlements -->
   <dict>
-    <!-- Obbligatorio per app Mac Catalyst -->
     <key>com.apple.security.app-sandbox</key>
     <true/>
 
-    <!-- Necessario per aprire connessioni in uscita (se la tua app fa anche rete) -->
     <key>com.apple.security.network.client</key>
     <true/>
 
-    <!-- ✨ Bluetooth Low Energy su Mac Catalyst -->
     <key>com.apple.security.device.bluetooth</key>
     <true/>
 
-    <!-- (Opzionale) Se accetti connessioni in ingresso -->
-    <!-- <key>com.apple.security.network.server</key><true/> -->
   </dict>
 </plist>

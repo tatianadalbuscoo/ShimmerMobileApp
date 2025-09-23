@@ -3,23 +3,16 @@
 <plist version="1.0">
 <dict>
 
-  <!-- (Facoltativo per App Store) Cifratura: imposta <false/> se non usi crittografia non esente -->
-  <!-- <key>ITSAppUsesNonExemptEncryption</key>
-  <false/> -->
-
-  <!-- Famiglia device (2 = iPad). Rimane valido anche per Catalyst -->
   <key>UIDeviceFamily</key>
   <array>
     <integer>2</integer>
   </array>
 
-  <!-- Capacità richieste lato iOS (ignorate su Catalyst ma innocue) -->
   <key>UIRequiredDeviceCapabilities</key>
   <array>
     <string>arm64</string>
   </array>
 
-  <!-- Orientamenti supportati -->
   <key>UISupportedInterfaceOrientations</key>
   <array>
     <string>UIInterfaceOrientationPortrait</string>
@@ -35,19 +28,15 @@
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
 
-  <!-- Icone -->
   <key>XSAppIconAssets</key>
   <string>Assets.xcassets/appicon.appiconset</string>
 
-  <!-- 📡 Permessi Bluetooth (obbligatorio su Mac Catalyst/iOS) -->
   <key>NSBluetoothAlwaysUsageDescription</key>
   <string>L'app usa il Bluetooth Low Energy per trovare e collegarsi ai sensori Shimmer.</string>
 
-  <!-- (Facoltativo / legacy) Alcune versioni vecchie leggono ancora questa chiave -->
   <key>NSBluetoothPeripheralUsageDescription</key>
   <string>Necessario per comunicare con i dispositivi BLE.</string>
 
-  <!-- Modalità background (rilevante su iOS; su Catalyst viene ignorata senza problemi) -->
   <key>UIBackgroundModes</key>
   <array>
     <string>bluetooth-central</string>

@@ -1,4 +1,10 @@
-﻿using Foundation;
+﻿/* 
+ * macOS AppDelegate for MAUI: bootstraps and returns the MauiApp.
+ */
+
+
+using Foundation;
+
 
 namespace ShimmerInterface
 {

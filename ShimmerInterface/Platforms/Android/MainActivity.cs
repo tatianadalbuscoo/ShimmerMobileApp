@@ -1,13 +1,23 @@
-﻿using Android;
+﻿/* 
+ * MainActivity for MAUI (Android): hosts the app and requests runtime Bluetooth permissions.
+ */
+
+
+using Android;
 using Android.App;
 using Android.Content.PM;
 using Android.OS;
 using Android.Runtime;
-using Microsoft.Maui;     // per Platform.OnRequestPermissionsResult
+using Microsoft.Maui;
 using Microsoft.Maui.ApplicationModel;
+
 
 namespace ShimmerInterface
 {
+
+    /// <summary>
+    /// Main Android activity hosting the MAUI app and handling runtime Bluetooth permission requests.
+    /// </summary>
     [Activity(
         Theme = "@style/Maui.SplashTheme",
         MainLauncher = true,
@@ -19,19 +29,28 @@ namespace ShimmerInterface
                                | ConfigChanges.Density)]
     public class MainActivity : MauiAppCompatActivity
     {
+
+        // Request code for Bluetooth permission prompts
         const int RequestCodeBt = 42;
 
+
+        /// <summary>
+        /// Android lifecycle entry point; ensures required Bluetooth permissions are requested at startup.
+        /// </summary>
+        /// <param name="savedInstanceState">Previously saved instance state, or <c>null</c> on first launch.</param>
         protected override void OnCreate(Bundle? savedInstanceState)
         {
             base.OnCreate(savedInstanceState);
-
-            // Chiedi i permessi PRIMA di fare scan/connessioni/leggere MAC
             RequestBtPermissionsIfNeeded();
         }
 
+
+        /// <summary>
+        /// Requests the appropriate set of Bluetooth permissions based on the current Android version.
+        /// </summary>
         void RequestBtPermissionsIfNeeded()
         {
-            if (OperatingSystem.IsAndroidVersionAtLeast(31)) // Android 12+
+            if (OperatingSystem.IsAndroidVersionAtLeast(31))
             {
                 var perms31 = new[]
                 {
@@ -42,7 +61,6 @@ namespace ShimmerInterface
             }
             else
             {
-                // Android 6–11: Location necessaria per lo scan BLE
                 var permsLegacy = new[]
                 {
                     Manifest.Permission.AccessFineLocation
@@ -51,6 +69,10 @@ namespace ShimmerInterface
             }
         }
 
+
+        /// <summary>
+        /// Checks the provided permissions and triggers a system prompt for those not yet granted.
+        /// </summary>
         void RequestMissing(string[] permissions)
         {
             var missing = new List<string>();
@@ -59,24 +81,7 @@ namespace ShimmerInterface
                     missing.Add(p);
 
             if (missing.Count > 0)
-                RequestPermissions(missing.ToArray(), RequestCodeBt); // oppure ActivityCompat.RequestPermissions(this, ...)
-        }
-
-        // (Consigliato) gestisci il callback dei permessi
-        public override void OnRequestPermissionsResult(
-            int requestCode, string[] permissions, [GeneratedEnum] Permission[] grantResults)
-        {
-            // Notifica a MAUI Essentials (se la usi per altri permessi)
-            Platform.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-
-            base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
-
-            if (requestCode == RequestCodeBt)
-            {
-                // Qui puoi verificare se sono stati concessi e, se sì, proseguire con scan/connessione
-                bool granted = grantResults.All(r => r == Permission.Granted);
-                // TODO: se !granted mostra un toast/dialog e disabilita l’azione che richiede BT
-            }
+                RequestPermissions(missing.ToArray(), RequestCodeBt);
         }
     }
 }
