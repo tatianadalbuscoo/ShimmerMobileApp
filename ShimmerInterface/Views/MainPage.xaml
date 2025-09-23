@@ -1,8 +1,12 @@
 ﻿<!-- 
-MainPage.xaml
-Main user interface page for displaying and configuring available Shimmer devices.
-Includes device selection, sensor options toggles, and a button to initiate connection and refresh.
+    
+    MainPage.xaml
+    Main user interface page for displaying and configuring available Shimmer devices.
+    Includes device selection, sensor options toggles, and a button to initiate connection and refresh.
+    Adds a Scan status badge next to the "Refresh Devices" button: shows "Scanning..." while refreshing and "Scan OK" / "Scan Failed" after the scan.
+
 -->
+
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
@@ -12,27 +16,24 @@ Includes device selection, sensor options toggles, and a button to initiate conn
              x:Class="ShimmerInterface.Views.MainPage"
              x:Name="MainPageRoot"
              BackgroundColor="{StaticResource PageBackground}">
+
+    <!-- Reusable template to render radio buttons as a stroked circle with a filled dot when checked -->
     <ContentPage.Resources>
         <ControlTemplate x:Key="RadioWithDotTemplate">
             <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
-                <!-- Cerchio + puntino sovrapposti -->
                 <Grid WidthRequest="18" HeightRequest="18" VerticalOptions="Center">
-                    <!-- Anello -->
                     <shapes:Ellipse WidthRequest="18" HeightRequest="18"
                     Fill="Transparent" Stroke="Black" StrokeThickness="2" />
-                    <!-- Puntino -->
                     <shapes:Ellipse WidthRequest="10" HeightRequest="10"
                     Fill="Black"
                     HorizontalOptions="Center" VerticalOptions="Center"
                     IsVisible="{TemplateBinding IsChecked}" />
                 </Grid>
 
-
-                <!-- Testo del RadioButton -->
+                <!-- Presents the radio content (label) to the right of the dot -->
                 <ContentPresenter Grid.Column="1" VerticalOptions="Center" />
             </Grid>
         </ControlTemplate>
-
     </ContentPage.Resources>
 
 
@@ -41,12 +42,17 @@ Includes device selection, sensor options toggles, and a button to initiate conn
     </ContentPage.BindingContext>
 
     <Grid>
+
+        <!-- ScrollView ensures the whole content is scrollable on smaller screens -->
         <ScrollView>
 
+            <!-- Fixed content width for a centered, compact layout -->
             <VerticalStackLayout Padding="20" Spacing="18" HorizontalOptions="Center" WidthRequest="380">
 
             <Label Text="Select Shimmer Device" Style="{StaticResource TitleLabel}" />
 
+                <!-- Refresh button triggers device discovery.
+                     DataTrigger disables the button while a refresh is in progress. -->
                 <Button Text="Refresh Devices"
                     Style="{StaticResource SecondaryButton}"
                     Command="{Binding RefreshDevicesCommand}">
@@ -57,22 +63,25 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                                 </Button.Triggers>
                  </Button>
 
-
+                <!-- Device list. Each item is a device entry with selection and sensor toggles. -->
                 <CollectionView ItemsSource="{Binding AvailableDevices}">
                 <CollectionView.ItemTemplate>
                     <DataTemplate>
-                        <Frame Padding="15" Margin="5" BorderColor="Gray" BackgroundColor="White" CornerRadius="8">
-                            <VerticalStackLayout Spacing="10">
+                        
+                         <!-- Card-like container for each device -->
+                            <Frame Padding="15" Margin="5" BorderColor="Gray" BackgroundColor="White" CornerRadius="8">
+                                <VerticalStackLayout Spacing="10">
 
-                                <!-- Header: name + side badge IMU/EXG -->
-                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
-                                    <Label Grid.Row="0" Grid.Column="0"
+                                    <!-- Header row: device name + right-aligned badge (IMU/EXG or device off) + port info -->
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
+                                        <Label Grid.Row="0" Grid.Column="0"
                                            Text="{Binding DisplayName}"
                                            FontAttributes="Bold"
                                            FontSize="16"
                                            TextColor="Black" />
 
-                                    <Frame Grid.Row="0" Grid.Column="1"
+                                        <!-- Badge shows EXG/IMU or "device off". -->
+                                        <Frame Grid.Row="0" Grid.Column="1"
                                        Padding="8,2"
                                        CornerRadius="10"
                                        HasShadow="False"
@@ -80,105 +89,107 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                                        BorderColor="Gray"
                                        VerticalOptions="Center">
 
-                                        <!-- Mostra EXG/IMU o "device off" -->
-                                        <Label Text="{Binding RightBadge}"
+                                            <!-- Mostra EXG/IMU o "device off" -->
+                                            <Label Text="{Binding RightBadge}"
                                            FontAttributes="Bold"
                                            FontSize="12"
                                            TextColor="Black">
-                                            <!-- Se "device off", colora il testo di rosso -->
-                                            <Label.Triggers>
-                                                <DataTrigger TargetType="Label" Binding="{Binding RightBadge}" Value="device off">
-                                                    <Setter Property="TextColor" Value="IndianRed" />
+
+                                                <!-- If "device off", tint text red -->
+                                                <Label.Triggers>
+                                                    <DataTrigger TargetType="Label" Binding="{Binding RightBadge}" Value="device off">
+                                                        <Setter Property="TextColor" Value="IndianRed" />
+                                                    </DataTrigger>
+                                                </Label.Triggers>
+                                            </Label>
+
+                                            <!-- If "device off", also tint badge frame -->
+                                            <Frame.Triggers>
+                                                <DataTrigger TargetType="Frame" Binding="{Binding RightBadge}" Value="device off">
+                                                    <Setter Property="BorderColor" Value="IndianRed" />
+                                                    <Setter Property="BackgroundColor" Value="#FFF5F5" />
                                                 </DataTrigger>
-                                            </Label.Triggers>
-                                        </Label>
+                                            </Frame.Triggers>
+                                        </Frame>
 
-                                        <!-- Se "device off", colora anche il bordo/background -->
-                                        <Frame.Triggers>
-                                            <DataTrigger TargetType="Frame" Binding="{Binding RightBadge}" Value="device off">
-                                                <Setter Property="BorderColor" Value="IndianRed" />
-                                                <Setter Property="BackgroundColor" Value="#FFF5F5" />
-                                            </DataTrigger>
-                                        </Frame.Triggers>
-                                    </Frame>
-
-
-                                    <Label Grid.Row="1" Grid.Column="0"
+                                        <!-- Secondary line with port info (e.g., COMx / MAC) -->
+                                        <Label Grid.Row="1" Grid.Column="0"
                                            Text="{Binding PortDisplay}"
                                            FontSize="12"
                                            TextColor="Gray" />
-                                </Grid>
+                                    </Grid>
 
-                                <!-- Select device -->
-                                <HorizontalStackLayout Spacing="10"
+                                    <!-- Device selection toggle for connecting -->
+                                    <HorizontalStackLayout Spacing="10"
                                                        Padding="0,6,0,10"
                                                        HeightRequest="44"
                                                        MinimumHeightRequest="44"
                                                        VerticalOptions="Center">
-                                    <Switch IsToggled="{Binding IsSelected, Mode=TwoWay}"
+                                        <Switch IsToggled="{Binding IsSelected, Mode=TwoWay}"
                                             WidthRequest="52"
                                             HeightRequest="32"
                                             MinimumHeightRequest="32"
                                             HorizontalOptions="Start"
                                             VerticalOptions="Center" />
-                                    <Label Text="Select for connection"
+                                        <Label Text="Select for connection"
                                            VerticalOptions="Center"
                                            FontSize="14"
                                            TextColor="Black" />
-                                </HorizontalStackLayout>
+                                    </HorizontalStackLayout>
 
-                                <!-- Separator -->
-                                <BoxView HeightRequest="1"
+                                    <!-- Visual separator before sensor configuration -->
+                                    <BoxView HeightRequest="1"
                                          BackgroundColor="LightGray"
                                          Margin="0,20,0,0" />
 
-                                <!-- Sensor configuration -->
-                                <Label Text="Sensor Configuration"
+                                    <!-- Sensor configuration section title -->
+                                    <Label Text="Sensor Configuration"
                                        FontAttributes="Bold"
                                        FontSize="14"
                                        TextColor="Black" />
 
-                                <!-- Toggles grid + EXG mode at the end -->
-                                <Grid ColumnDefinitions="*,Auto"
+                                    <!-- Grid of sensor toggles. Left column: label; right column: switch bound to VM flags. -->
+                                    <Grid ColumnDefinitions="*,Auto"
                                       RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
                                       RowSpacing="8">
 
-                                    <Label Grid.Row="0" Grid.Column="0" Text="Low-Noise Accelerometer" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="0" Grid.Column="1" IsToggled="{Binding EnableLowNoiseAccelerometer, Mode=TwoWay}" />
+                                        <Label Grid.Row="0" Grid.Column="0" Text="Low-Noise Accelerometer" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="0" Grid.Column="1" IsToggled="{Binding EnableLowNoiseAccelerometer, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="1" Grid.Column="0" Text="Wide-Range Accelerometer" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="1" Grid.Column="1" IsToggled="{Binding EnableWideRangeAccelerometer, Mode=TwoWay}" />
+                                        <Label Grid.Row="1" Grid.Column="0" Text="Wide-Range Accelerometer" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="1" Grid.Column="1" IsToggled="{Binding EnableWideRangeAccelerometer, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="2" Grid.Column="0" Text="Gyroscope" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="2" Grid.Column="1" IsToggled="{Binding EnableGyroscope, Mode=TwoWay}" />
+                                        <Label Grid.Row="2" Grid.Column="0" Text="Gyroscope" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="2" Grid.Column="1" IsToggled="{Binding EnableGyroscope, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="3" Grid.Column="0" Text="Magnetometer" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="3" Grid.Column="1" IsToggled="{Binding EnableMagnetometer, Mode=TwoWay}" />
+                                        <Label Grid.Row="3" Grid.Column="0" Text="Magnetometer" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="3" Grid.Column="1" IsToggled="{Binding EnableMagnetometer, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="4" Grid.Column="0" Text="Pressure &amp; Temperature" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="4" Grid.Column="1" IsToggled="{Binding EnablePressureTemperature, Mode=TwoWay}" />
+                                        <Label Grid.Row="4" Grid.Column="0" Text="Pressure &amp; Temperature" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="4" Grid.Column="1" IsToggled="{Binding EnablePressureTemperature, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="5" Grid.Column="0" Text="Battery Voltage" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="5" Grid.Column="1" IsToggled="{Binding EnableBattery, Mode=TwoWay}" />
+                                        <Label Grid.Row="5" Grid.Column="0" Text="Battery Voltage" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="5" Grid.Column="1" IsToggled="{Binding EnableBattery, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="6" Grid.Column="0" Text="External ADC A6" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="6" Grid.Column="1" IsToggled="{Binding EnableExtA6, Mode=TwoWay}" />
+                                        <Label Grid.Row="6" Grid.Column="0" Text="External ADC A6" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="6" Grid.Column="1" IsToggled="{Binding EnableExtA6, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="7" Grid.Column="0" Text="External ADC A7" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="7" Grid.Column="1" IsToggled="{Binding EnableExtA7, Mode=TwoWay}" />
+                                        <Label Grid.Row="7" Grid.Column="0" Text="External ADC A7" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="7" Grid.Column="1" IsToggled="{Binding EnableExtA7, Mode=TwoWay}" />
 
-                                    <Label Grid.Row="8" Grid.Column="0" Text="External ADC A15" VerticalOptions="Center" TextColor="Black" />
-                                    <Switch Grid.Row="8" Grid.Column="1" IsToggled="{Binding EnableExtA15, Mode=TwoWay}" />
+                                        <Label Grid.Row="8" Grid.Column="0" Text="External ADC A15" VerticalOptions="Center" TextColor="Black" />
+                                        <Switch Grid.Row="8" Grid.Column="1" IsToggled="{Binding EnableExtA15, Mode=TwoWay}" />
 
-                                    <!-- NEW: ECG/EMG (solo per EXG) -->
-                                    <Label Grid.Row="9" Grid.Column="0"
+                                        <!-- EXG-specific radio group (visible only when IsExg is true in the item VM) -->
+                                        <Label Grid.Row="9" Grid.Column="0"
                                            Text="ECG/EMG"
                                            VerticalOptions="Start"
                                            TextColor="Black"
                                            IsVisible="{Binding IsExg}"
                                            Margin="0,12,0,0" />
 
-                                    <VerticalStackLayout Grid.Row="9" Grid.Column="1"
+                                        <!-- Mutually exclusive EXG modes via radio buttons; styled with the custom control template -->
+                                        <VerticalStackLayout Grid.Row="9" Grid.Column="1"
                                                          Spacing="6"
                                                          IsVisible="{Binding IsExg}"
                                                          Margin="0,12,0,0">
@@ -188,38 +199,40 @@ Includes device selection, sensor options toggles, and a button to initiate conn
                                                  GroupName="{Binding ExgModeGroupName}"
                                                  IsChecked="{Binding IsExgModeECG, Mode=TwoWay}" />
 
-                                                                                <RadioButton Content="EMG"
+                                            <RadioButton Content="EMG"
                                                  TextColor="Black"
                                                  ControlTemplate="{StaticResource RadioWithDotTemplate}"
                                                  GroupName="{Binding ExgModeGroupName}"
                                                  IsChecked="{Binding IsExgModeEMG, Mode=TwoWay}" />
 
-                                                                                <RadioButton Content="EXG Test"
+                                            <RadioButton Content="EXG Test"
                                                  TextColor="Black"
                                                  ControlTemplate="{StaticResource RadioWithDotTemplate}"
                                                  GroupName="{Binding ExgModeGroupName}"
                                                  IsChecked="{Binding IsExgModeTest, Mode=TwoWay}" />
 
-                                                                                <RadioButton Content="Respiration"
+                                            <RadioButton Content="Respiration"
                                                  TextColor="Black"
                                                  ControlTemplate="{StaticResource RadioWithDotTemplate}"
                                                  GroupName="{Binding ExgModeGroupName}"
                                                  IsChecked="{Binding IsExgModeRespiration, Mode=TwoWay}" />
 
                                         </VerticalStackLayout>
-                                </Grid>
-                            </VerticalStackLayout>
-                        </Frame>
-
-                    </DataTemplate>
+                                    </Grid>
+                                </VerticalStackLayout>
+                            </Frame>
+                        </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-                <Button Text="Connect to Selected Devices"
+     <!-- Main action to connect to all devices the user toggled on (IsSelected = true). -->
+    <Button Text="Connect to Selected Devices"
         Style="{StaticResource PrimaryButton}"
         Command="{Binding ConnectCommand}"
         CommandParameter="{Binding Navigation, Source={x:Reference MainPageRoot}}">
                     <Button.Triggers>
+
+                        <!-- Disable connect while refreshing to avoid conflicting operations -->
                         <DataTrigger TargetType="Button" Binding="{Binding IsRefreshing}" Value="True">
                             <Setter Property="IsEnabled" Value="False" />
                         </DataTrigger>
@@ -229,28 +242,27 @@ Includes device selection, sensor options toggles, and a button to initiate conn
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- OVERLAY “avviso con rotellina” mentre IsRefreshing è true -->
+    <!-- Fullscreen overlay shown during refresh operations.
+            Blocks input and provides progress feedback (spinner + message). -->
         <Grid IsVisible="{Binding IsRefreshing}"
       BackgroundColor="#88000000"
       InputTransparent="False">
             <Frame Padding="20"
-         CornerRadius="14"
-         BackgroundColor="White"
-         HasShadow="True"
-         HorizontalOptions="Center"
-         VerticalOptions="Center">
+                     CornerRadius="14"
+                     BackgroundColor="White"
+                     HasShadow="True"
+                     HorizontalOptions="Center"
+                     VerticalOptions="Center">
                 <VerticalStackLayout Spacing="12" HorizontalOptions="Center">
                     <ActivityIndicator IsRunning="{Binding IsRefreshing}" WidthRequest="36" HeightRequest="36" />
                     <Label Text="{Binding OverlayMessage}"
-       FontAttributes="Bold"
-       FontSize="16"
-       TextColor="Black"
-       HorizontalTextAlignment="Center" />
-
+                       FontAttributes="Bold"
+                       FontSize="16"
+                       TextColor="Black"
+                       HorizontalTextAlignment="Center" />
                 </VerticalStackLayout>
             </Frame>
         </Grid>
-
     </Grid>
 </ContentPage>
 

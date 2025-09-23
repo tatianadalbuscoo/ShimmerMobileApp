@@ -7,7 +7,7 @@ using ShimmerSDK;
 using ShimmerSDK.IMU;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
-using Microsoft.Maui.ApplicationModel; // per MainThread.InvokeOnMainThreadAsync
+using Microsoft.Maui.ApplicationModel;
 using System.Linq;
 using System.Threading.Tasks;
 

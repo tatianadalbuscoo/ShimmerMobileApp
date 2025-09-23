@@ -1,4 +1,9 @@
-﻿
+﻿/* 
+ * MainPage code-behind: 
+ * initializes UI; ViewModel binding is done in XAML.
+ */
+
+
 namespace ShimmerInterface.Views;
 
 /// <summary>
@@ -17,4 +22,5 @@ public partial class MainPage : ContentPage
     {
         InitializeComponent();
     }
+
 }
