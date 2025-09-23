@@ -1,6 +1,7 @@
 ﻿<?xml version="1.0" encoding="utf-8" ?>
     
 <!--
+    
     ResourceDictionary for application-wide colors and styles (MAUI).
     This dictionary defines the main color palette and reusable styles
     for pages, labels, frames, and buttons. To use these resources,
