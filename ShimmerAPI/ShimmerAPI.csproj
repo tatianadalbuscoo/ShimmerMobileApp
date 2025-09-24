@@ -2,7 +2,7 @@
 
 	<!-- Targets -->
 	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
+		<TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
 		<Platforms>AnyCPU;x86</Platforms>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
@@ -39,11 +39,6 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="System.IO.Ports" Version="5.0.1" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Compile Remove="obj\**\*.cs" />
-		<Compile Remove="bin\**\*.cs" />
 	</ItemGroup>
 
 	<!-- Folders -->
