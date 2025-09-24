@@ -496,9 +496,7 @@ public partial class MainPageViewModel : ObservableObject
             }
         }
         catch (Exception ex)
-        {
-            Debug.WriteLine($"WMI Error: {ex.Message}");
-        }
+        {}
 
 #endif
 

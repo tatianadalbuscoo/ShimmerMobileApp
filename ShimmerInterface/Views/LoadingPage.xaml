@@ -1,7 +1,9 @@
 ﻿<!-- 
-LoadingPage.xaml
-Loading screen displayed while establishing a connection with a Shimmer device.
-Shows an activity spinner and a dynamic connection message with the COM port name.
+    
+    LoadingPage.xaml
+    Loading screen displayed while establishing a connection with a Shimmer device.
+    Shows an activity spinner and a dynamic connection message with the COM port name.
+    
 -->
     
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"

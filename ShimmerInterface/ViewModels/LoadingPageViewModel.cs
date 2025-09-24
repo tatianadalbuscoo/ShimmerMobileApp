@@ -1,4 +1,15 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿/*
+ * LoadingPageViewModel — MAUI MVVM
+ * Orchestrates the async connection flow to a Shimmer device (EXG or IMU) on Windows/Android.
+ * Exposes observable UI state (spinner text, is-connecting, alert title/message/visibility)
+ * and commands to start the connection and dismiss alerts.
+ * Uses a 30s timeout inside ConnectAsync, starts streaming on success,
+ * and returns the connected instance to the caller via a TaskCompletionSource<object?>.
+ * Note: iOS/macOS follow the WebSocket bridge path; this ViewModel is not used there.
+ */
+
+
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ShimmerSDK.IMU;
 using ShimmerInterface.Models;
@@ -6,11 +17,12 @@ using System.Diagnostics;
 
 
 #if WINDOWS || ANDROID
-using ShimmerSDK.EXG; // ← wrapper EXG
+using ShimmerSDK.EXG;
 #endif
 
 
 namespace ShimmerInterface.ViewModels;
+
 
 /// <summary>
 /// ViewModel for the LoadingPage.
@@ -19,10 +31,15 @@ namespace ShimmerInterface.ViewModels;
 /// </summary>
 public partial class LoadingPageViewModel : ObservableObject
 {
+
+    // Selected Shimmer device, immutable reference used to configure and open the connection.
     private readonly ShimmerDevice device;
 
-    // Generalizzato: può restituire XR2Learn_ShimmerIMU o XR2Learn_ShimmerEXG
+    // Completion source that returns the connected device instance (either ShimmerSDK_IMU or ShimmerSDK_EXG) to the caller.
     private readonly TaskCompletionSource<object?> completion;
+
+    // TaskCompletionSource used internally to wait for the alert dialog to be dismissed by the user.
+    private TaskCompletionSource<bool> alertCompletionSource = new TaskCompletionSource<bool>();
 
     // Message displayed on the UI during the connection process
     [ObservableProperty]
@@ -55,15 +72,16 @@ public partial class LoadingPageViewModel : ObservableObject
         this.completion = completion;
 
 #if WINDOWS
+
         this.connectingMessage = $"Connecting to {device.ShimmerName} on {device.Port1}...";
-#elif MACCATALYST
-        this.connectingMessage = $"Connecting to {device.ShimmerName} via BLE...";
+
 #elif ANDROID
+
         this.connectingMessage = $"Connecting to {device.ShimmerName} [{device.Port1}] via Bluetooth...";
-#else
-        this.connectingMessage = $"Connecting to {device.ShimmerName}...";
+
 #endif
     }
+
 
     /// <summary>
     /// Command that initiates the asynchronous connection to the Shimmer device.
@@ -106,10 +124,6 @@ public partial class LoadingPageViewModel : ObservableObject
         IsConnecting = false;
     }
 
-    /// <summary>
-    /// TaskCompletionSource used internally to wait for the alert dialog to be dismissed by the user.
-    /// </summary>
-    private TaskCompletionSource<bool> alertCompletionSource = new TaskCompletionSource<bool>();
 
     /// <summary>
     /// Command invoked when the alert is dismissed by the user.
@@ -122,21 +136,32 @@ public partial class LoadingPageViewModel : ObservableObject
         alertCompletionSource?.SetResult(true);
     }
 
+
     /// <summary>
-    /// Attempts to connect to the Shimmer device asynchronously.
-    /// On Windows: se la board è EXG e l’utente ha abilitato EXG, usa XR2Learn_ShimmerEXG; altrimenti IMU.
+    /// Opens a Shimmer connection: uses EXG when enabled, otherwise IMU.
+    /// Configures platform-specific settings, attempts a 30s connection, starts streaming,
+    /// and returns the connected instance.
     /// </summary>
+    /// <returns>
+    /// The connected device instance (<see cref="ShimmerSDK.EXG.ShimmerSDK_EXG"/> or
+    /// <see cref="ShimmerSDK.IMU.ShimmerSDK_IMU"/>) boxed as <see cref="object"/>; 
+    /// <c>null</c> on timeout or failure.
+    /// </returns>
     private async Task<object?> ConnectAsync()
     {
         try
         {
-            // ===== Branch EXG (solo Windows) =====
+
+            // ----- EXG path -----
+
 #if WINDOWS
+
             if (device.IsExg && device.EnableExg)
             {
+
+                // Configure EXG
                 var exg = new ShimmerSDK_EXG
                 {
-                    // IMU flags (puoi tenerli accesi: il wrapper EXG li gestisce comunque)
                     EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
                     EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
                     EnableGyroscope = device.EnableGyroscope,
@@ -147,12 +172,12 @@ public partial class LoadingPageViewModel : ObservableObject
                     EnableExtA7 = device.EnableExtA7,
                     EnableExtA15 = device.EnableExtA15,
 
-                    // EXG flags specifici
+                    // Always true
                     EnableExg = true,
-                    ExgMode = device.ExgModeEnum // mapping dal model
+                    ExgMode = device.ExgModeEnum
                 };
 
-                // Config Windows (stessa firma dell’IMU + EXG attivo nel device)
+                // Windows configuration 
                 exg.ConfigureWindows(
                     "Shimmer3",
                     device.Port1,
@@ -161,7 +186,7 @@ public partial class LoadingPageViewModel : ObservableObject
                     device.EnableGyroscope,
                     device.EnableMagnetometer,
                     device.EnablePressureTemperature,
-                    device.EnableBattery,   // bool per battery voltage nella firma EXG
+                    device.EnableBattery,
                     device.EnableExtA6,
                     device.EnableExtA7,
                     device.EnableExtA15,
@@ -169,71 +194,85 @@ public partial class LoadingPageViewModel : ObservableObject
                     exgMode: device.ExgModeEnum
                 );
 
-
+                // Connect with 30s timeout
                 var connectTaskExg = Task.Run(() => exg.Connect());
                 var completedExg = await Task.WhenAny(connectTaskExg, Task.Delay(30000));
-                if (completedExg != connectTaskExg) return null; // timeout
-                if (connectTaskExg.IsFaulted) return null;
-                if (!exg.IsConnected()) return null;
+                if (completedExg != connectTaskExg) return null;    // timeout
+                if (connectTaskExg.IsFaulted) return null;          // exception during connect
+                if (!exg.IsConnected()) return null;                // not connected
 
+                // start data stream
                 exg.StartStreaming();
-                return exg; // ← può essere usato come dynamic nella DataPage
+
+                // return connected EXG
+                return exg; 
+
             }
+
 #elif ANDROID
-    if (device.IsExg && device.EnableExg)
-    {
-        var exgModeSel =
-            device.IsExgModeRespiration ? ExgMode.Respiration :
-            device.IsExgModeECG        ? ExgMode.ECG :
-            device.IsExgModeEMG        ? ExgMode.EMG :
-            ExgMode.ECG; // default
 
-        var exg = new ShimmerSDK_EXG
-        {
-            EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
-            EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
-            EnableGyroscope = device.EnableGyroscope,
-            EnableMagnetometer = device.EnableMagnetometer,
-            EnablePressureTemperature = device.EnablePressureTemperature,
-            EnableBatteryVoltage = device.EnableBattery,
-            EnableExtA6 = device.EnableExtA6,
-            EnableExtA7 = device.EnableExtA7,
-            EnableExtA15 = device.EnableExtA15,
+            if (device.IsExg && device.EnableExg)
+            {
 
-            EnableExg = true,
-            ExgMode   = exgModeSel
-        };
+                // Pick EXG mode from model flags
+                var exgModeSel =
+                    device.IsExgModeRespiration ? ExgMode.Respiration :
+                    device.IsExgModeECG        ? ExgMode.ECG :
+                    device.IsExgModeEMG        ? ExgMode.EMG :
+                    ExgMode.ECG; // default
 
-        // ⬇️ NIENTE named args: tutti posizionali
-        exg.ConfigureAndroid(
-            "Shimmer3",                    // deviceId / name (come per IMU)
-            device.Port1,                  // MAC
-            device.EnableLowNoiseAccelerometer,
-            device.EnableWideRangeAccelerometer,
-            device.EnableGyroscope,
-            device.EnableMagnetometer,
-            device.EnablePressureTemperature,
-            device.EnableBattery,
-            device.EnableExtA6,
-            device.EnableExtA7,
-            device.EnableExtA15,
-            true,                          // enableExg
-            exgModeSel                     // ExgMode
-        );
+                // Configure EXG
+                var exg = new ShimmerSDK_EXG
+                {
+                    EnableLowNoiseAccelerometer = device.EnableLowNoiseAccelerometer,
+                    EnableWideRangeAccelerometer = device.EnableWideRangeAccelerometer,
+                    EnableGyroscope = device.EnableGyroscope,
+                    EnableMagnetometer = device.EnableMagnetometer,
+                    EnablePressureTemperature = device.EnablePressureTemperature,
+                    EnableBatteryVoltage = device.EnableBattery,
+                    EnableExtA6 = device.EnableExtA6,
+                    EnableExtA7 = device.EnableExtA7,
+                    EnableExtA15 = device.EnableExtA15,
 
-        var connectTaskExg = Task.Run(() => exg.Connect());
-        var completedExg = await Task.WhenAny(connectTaskExg, Task.Delay(30000));
-        if (completedExg != connectTaskExg) return null;
-        if (connectTaskExg.IsFaulted) return null;
-        if (!exg.IsConnected()) return null;
+                    EnableExg = true,
+                    ExgMode   = exgModeSel
+                };
 
-        exg.StartStreaming();
-        return exg;
-    }
+                // Android configuration 
+                exg.ConfigureAndroid(
+                    "Shimmer3",
+                    device.Port1,                  // MAC
+                    device.EnableLowNoiseAccelerometer,
+                    device.EnableWideRangeAccelerometer,
+                    device.EnableGyroscope,
+                    device.EnableMagnetometer,
+                    device.EnablePressureTemperature,
+                    device.EnableBattery,
+                    device.EnableExtA6,
+                    device.EnableExtA7,
+                    device.EnableExtA15,
+                    true,                          // enableExg
+                    exgModeSel                     // ExgMode
+                );
+
+                // Connect with 30s timeout
+                var connectTaskExg = Task.Run(() => exg.Connect());
+                var completedExg = await Task.WhenAny(connectTaskExg, Task.Delay(30000));
+                if (completedExg != connectTaskExg) return null;    // timeout
+                if (connectTaskExg.IsFaulted) return null;          // exception during connect
+                if (!exg.IsConnected()) return null;                // not connected
+
+                // start data stream
+                exg.StartStreaming();
+
+                // return connected EXG
+                return exg;
+
+            }
 
 #endif
+            // ----- IMU path -----
 
-            // ===== Branch IMU (default o piattaforme non-Windows) =====
 
             var imu = new ShimmerSDK_IMU
             {
@@ -249,6 +288,8 @@ public partial class LoadingPageViewModel : ObservableObject
             };
 
 #if WINDOWS
+
+            // Windows IMU configuration
             imu.ConfigureWindows(
                 "Shimmer3", device.Port1,
                 device.EnableLowNoiseAccelerometer,
@@ -261,7 +302,10 @@ public partial class LoadingPageViewModel : ObservableObject
                 device.EnableExtA7,
                 device.EnableExtA15
             );
+
 #elif ANDROID
+
+            // Android IMU configuration
             imu.ConfigureAndroid(
                 "Shimmer3", device.Port1,
                 device.EnableLowNoiseAccelerometer,
@@ -274,16 +318,21 @@ public partial class LoadingPageViewModel : ObservableObject
                 device.EnableExtA7,
                 device.EnableExtA15
             );
+
 #endif
 
+            // Connect with 30s timeout
             var connectTask = Task.Run(() => imu.Connect());
             var completedTask = await Task.WhenAny(connectTask, Task.Delay(30000));
 
-            if (completedTask != connectTask) return null; // timeout
-            if (connectTask.IsFaulted) return null;
-            if (!imu.IsConnected()) return null;
+            if (completedTask != connectTask) return null;      // timeout
+            if (connectTask.IsFaulted) return null;             // exception during connect
+            if (!imu.IsConnected()) return null;                // not connected
 
+            // start data stream
             imu.StartStreaming();
+
+            // return connected IMU
             return imu;
         }
         catch (Exception ex)

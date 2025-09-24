@@ -1,7 +1,16 @@
-﻿using ShimmerInterface.Models;
+﻿/* 
+ * LoadingPage code-behind:
+ * initializes the UI; binds to the ViewModel in the constructor;
+ * starts the connection in OnAppearing and handles alerts via PropertyChanged.
+ */
+
+
+using ShimmerInterface.Models;
 using ShimmerInterface.ViewModels;
 
+
 namespace ShimmerInterface.Views;
+
 
 /// <summary>
 /// Code-behind for the LoadingPage XAML view.
