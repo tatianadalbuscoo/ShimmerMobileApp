@@ -10,7 +10,6 @@ using ShimmerInterface.Views;
 
 
 #if IOS || MACCATALYST
-
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
@@ -18,7 +17,6 @@ using Microsoft.Maui.ApplicationModel;
 using ShimmerSDK.IMU;
 using ShimmerInterface.Models;
 using ShimmerSDK.EXG; 
-
 #endif
 
 

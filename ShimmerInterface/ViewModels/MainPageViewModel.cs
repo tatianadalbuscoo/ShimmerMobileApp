@@ -1,32 +1,38 @@
-﻿using System.Collections.ObjectModel;
+﻿/*
+ * MainPageViewModel — MAUI MVVM
+ * Discovers Shimmer devices (Windows: serial/WMI; Android: bonded Bluetooth),
+ * exposes refresh/connect commands with overlay feedback,
+ * and builds tabbed DataPages for connected devices.
+ * LoadingPage is invoked here by ConnectCommand (per selected device) on Windows/Android.
+ * Note: iOS/macOS use the WebSocket bridge path; this VM (and LoadingPage here) are not used there.
+ */
+
+
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ShimmerInterface.Models;
 using ShimmerInterface.Views;
 using ShimmerSDK;
-using ShimmerSDK.IMU;
-using System.Diagnostics;
 using System.Text.RegularExpressions;
-using Microsoft.Maui.ApplicationModel;
-using System.Linq;
-using System.Threading.Tasks;
-
-#if ANDROID
-using ShimmerSDK;
-#endif
-
 
 
 #if WINDOWS
 using System.Management;
-using ShimmerSDK;
 #endif
+
 
 namespace ShimmerInterface.ViewModels;
 
 
 /// <summary>
-/// ViewModel for the main page. Handles Shimmer device selection and connection.
+/// ViewModel for the main devices screen.
+/// Discovers Shimmer devices (Windows: serial/WMI; Android: bonded Bluetooth),
+/// exposes the list via <see cref="AvailableDevices"/>, and provides commands to
+/// refresh (<see cref="RefreshDevicesCommand"/>) and connect (<see cref="ConnectCommand"/>).
+/// Manages the refresh overlay state (<see cref="isRefreshing"/>, <see cref="overlayMessage"/>),
+/// orchestrates per-device connection via a modal loading page, and builds a tabbed UI for
+/// each connected device.
 /// </summary>
 public partial class MainPageViewModel : ObservableObject
 {
@@ -37,48 +43,51 @@ public partial class MainPageViewModel : ObservableObject
     // Internal list to keep track of connected Shimmer instances
     private readonly List<(object shimmer, ShimmerDevice device)> connectedShimmers = new();
 
-    // NEW: stato per overlay/avviso durante il refresh
-    [ObservableProperty] private bool isRefreshing;
-
-    // Testo mostrato nell'overlay (refresh/scan iniziale)
-    [ObservableProperty] private string overlayMessage = "Refreshing devices…";
-
-
     // Command to connect to selected Shimmer devices
     public IRelayCommand<INavigation> ConnectCommand { get; }
 
     // Command to refresh the list of available devices.
     public IRelayCommand RefreshDevicesCommand { get; }
 
+    // overlay/notice state while refreshing
+    [ObservableProperty] private bool isRefreshing;
+
+    // Text displayed in the overlay (initial scan or refresh)
+    [ObservableProperty] private string overlayMessage = "Refreshing devices…";
+
 
     /// <summary>
-    /// Constructor: initializes commands and loads devices on startup.
+    /// Constructor: initializes a new instance of the <see cref="MainPageViewModel"/> class,
+    /// wires commands, and starts the initial device scan with overlay.
     /// </summary>
-   /* public MainPageViewModel()
-    {
-        ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
-        RefreshDevicesCommand = new AsyncRelayCommand(LoadDevicesAsync); // ← era RelayCommand
-        _ = LoadDevicesAsync(); // ← carica subito
-    }*/
-
     public MainPageViewModel()
     {
         ConnectCommand = new AsyncRelayCommand<INavigation>(Connect);
-        RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAsync); // <-- usa il wrapper
-        _ = InitialScanAsync(); // start CON overlay "Scanning devices…"
+        RefreshDevicesCommand = new AsyncRelayCommand(RefreshDevicesAsync);
+        _ = InitialScanAsync();
     }
 
+
+    /// <summary>
+    /// Performs the initial device scan:
+    /// sets the overlay state/message, yields to the UI to show it,
+    /// runs the discovery, and restores state even on error.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous scan operation.</returns>
     private async Task InitialScanAsync()
     {
         try
         {
-            OverlayMessage = "Scanning devices…"; // <<< testo diverso all'avvio
+
+            // Set the overlay text for the very first scan and show the busy state.
+            OverlayMessage = "Scanning devices…";
             IsRefreshing = true;
 
-            // Mostra subito l'overlay prima di iniziare lo scan
+            // Give the UI thread a chance to render the overlay before the scan starts.
             await Task.Yield();
             await Task.Delay(50);
 
+            // Discover and populate the device list.
             await LoadDevicesAsync();
         }
         catch (Exception ex)
@@ -92,8 +101,16 @@ public partial class MainPageViewModel : ObservableObject
     }
 
 
+    /// <summary>
+    /// Refreshes the list of available devices:
+    /// guards against re-entrancy, shows the overlay, yields to the UI,
+    /// performs discovery, and clears the busy state on exit.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous refresh operation.</returns>
     private async Task RefreshDevicesAsync()
     {
+
+        // Prevent concurrent refreshes to avoid UI glitches and race conditions.
         if (IsRefreshing)
         {
             await App.Current!.MainPage!.DisplayAlert("Please wait", "A device refresh is already in progress.", "OK");
@@ -102,15 +119,17 @@ public partial class MainPageViewModel : ObservableObject
 
         try
         {
-            OverlayMessage = "Refreshing devices…"; // <<< NEW
+
+            // Set overlay message and switch on the busy state.
+            OverlayMessage = "Refreshing devices…";
             IsRefreshing = true;
 
+            // Give the UI a chance to render the overlay before scanning.
             await Task.Yield();
             await Task.Delay(50);
 
+            // Perform the actual discovery/population.
             await LoadDevicesAsync();
-            // opzionale: OK finale
-            // await App.Current!.MainPage!.DisplayAlert("Refresh complete", "Device list is up to date.", "OK");
         }
         catch (Exception ex)
         {
@@ -123,118 +142,119 @@ public partial class MainPageViewModel : ObservableObject
     }
 
 
-
-
-
+    /// <summary>
+    /// Discovers available Shimmer devices on Windows and Android, then updates
+    /// <see cref="AvailableDevices"/> on the UI thread.
+    /// </summary>
+    /// <returns>A task representing the asynchronous discovery and UI update.</returns>
     private async Task LoadDevicesAsync()
     {
+
 #if WINDOWS
-    // Esegui scoperta e detection su thread in background
-    var devices = await Task.Run(async () =>
-    {
-        var list = new List<ShimmerDevice>();
 
-        var ports = SerialPortsManager
-            .GetAvailableSerialPortsNames()
-            .OrderBy(p => p)
-            .ToList();
-
-        var shimmerNames = GetShimmerNamesFromWMI();
-
-        foreach (var port in ports)
+        // Run the whole scan off the UI thread.
+        var devices = await Task.Run(async () =>
         {
-            if (!shimmerNames.TryGetValue(port, out string? shimmerName)) continue;
-            if (shimmerName == "Unknown") continue;
+            var list = new List<ShimmerDevice>();
 
-            var device = new ShimmerDevice
+            // Enumerate COM ports in a stable order for deterministic UI.
+            var ports = SerialPortsManager
+                .GetAvailableSerialPortsNames()
+                .OrderBy(p => p)
+                .ToList();
+
+            // Resolve COM → ShimmerName ("DDCE", "E0D9", ...) using WMI.
+            var shimmerNames = GetShimmerNamesFromWMI();
+
+            // Build device rows and probe board kind (EXG vs IMU).
+            foreach (var port in ports)
             {
-                DisplayName = $"Shimmer {shimmerName}",
-                Port1 = port,
-                ShimmerName = shimmerName,
+                if (!shimmerNames.TryGetValue(port, out string? shimmerName)) continue;
+                if (shimmerName == "Unknown") continue;
 
-                IsSelected = false,
-                EnableLowNoiseAccelerometer = true,
-                EnableWideRangeAccelerometer = true,
-                EnableGyroscope = true,
-                EnableMagnetometer = true,
-                EnablePressureTemperature = true,
-                EnableBattery = true,
-                EnableExtA6 = true,
-                EnableExtA7 = true,
-                EnableExtA15 = true
-            };
+                var device = new ShimmerDevice
+                {
+                    DisplayName = $"Shimmer {shimmerName}",
+                    Port1 = port,
+                    ShimmerName = shimmerName,
 
-            // Rileva board kind (EXG vs IMU) – anche questo off-UI-thread
-            try
-            {
-                var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindWindowsAsync(device.DisplayName, port);
+                    IsSelected = false,
+                    EnableLowNoiseAccelerometer = true,
+                    EnableWideRangeAccelerometer = true,
+                    EnableGyroscope = true,
+                    EnableMagnetometer = true,
+                    EnablePressureTemperature = true,
+                    EnableBattery = true,
+                    EnableExtA6 = true,
+                    EnableExtA7 = true,
+                    EnableExtA15 = true
+                };
 
-                device.IsExg      = ok && kind == ShimmerSensorScanner.BoardKind.EXG;
-                device.BoardRawId = raw;
-                device.RightBadge = ok ? (device.IsExg ? "EXG" : "IMU") : "device off";
+                // Sensor expansion board kind (off UI thread).
+                try
+                {
+                    var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindWindowsAsync(device.DisplayName, port);
+
+                    device.IsExg      = ok && kind == ShimmerSensorScanner.BoardKind.EXG;
+                    device.BoardRawId = raw;
+                    device.RightBadge = ok ? (device.IsExg ? "EXG" : "IMU") : "device off";
+                }
+                catch
+                {
+
+                    // Mark as off.
+                    device.IsExg = false;
+                    device.RightBadge = "device off";
+                }
+
+                list.Add(device);
             }
-            catch
-            {
-                device.IsExg = false;
-                device.RightBadge = "device off";
-            }
 
-            list.Add(device);
-        }
-
-        return list;
-    });
-
-    // Aggiorna la ObservableCollection SOLO sul MainThread
-    await MainThread.InvokeOnMainThreadAsync(() =>
-    {
-        AvailableDevices.Clear();
-        foreach (var d in devices)
-            AvailableDevices.Add(d);
-    });
-
-#elif MACCATALYST || IOS
-        // Bridge mode (come prima)
-        AvailableDevices.Clear();
-        AvailableDevices.Add(new ShimmerDevice
-        {
-            DisplayName = "Bridge mode (iOS/Mac) — apri DataPage",
-            Port1 = "(gestito da App → DataPage)",
-            ShimmerName = "Bridge",
-            IsSelected = false,
-            ChannelsDisplay = "(n/a)",
-            IsExg = false,
-
-            EnableLowNoiseAccelerometer = true,
-            EnableWideRangeAccelerometer = true,
-            EnableGyroscope = true,
-            EnableMagnetometer = true,
-            EnablePressureTemperature = true,
-            EnableBattery = true,
-            EnableExtA6 = true,
-            EnableExtA7 = true,
-            EnableExtA15 = true
+            return list;
         });
 
+        // Publish results to the ObservableCollection on the main thread.
+        await MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            AvailableDevices.Clear();
+            foreach (var d in devices)
+                AvailableDevices.Add(d);
+        });
+
+
 #elif ANDROID
-    AvailableDevices.Clear();
+
+        // Start from a clean slate on each refresh.
+        AvailableDevices.Clear();
     try
     {
         var adapter = Android.Bluetooth.BluetoothAdapter.DefaultAdapter;
+
+        // Basic adapter checks → inform the user in the list itself.
         if (adapter == null)
         {
-            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth not available", Port1 = "(no adapter)", ShimmerName = "----" });
+            AvailableDevices.Add(new ShimmerDevice 
+            { 
+                DisplayName = "Bluetooth not available", 
+                Port1 = "(no adapter)", 
+                ShimmerName = "----" 
+            });
         }
         else if (!adapter.IsEnabled)
         {
-            AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth disabled", Port1 = "(enable it from settings)", ShimmerName = "----" });
+            AvailableDevices.Add(new ShimmerDevice {
+                DisplayName = "Bluetooth disabled",
+                Port1 = "(enable it from settings)",
+                ShimmerName = "----" 
+            });
         }
         else
         {
+
+            // Use paired devices; filter those whose Name contains "Shimmer".
             var bonded = adapter.BondedDevices;
             var any = false;
 
-            // IMPORTANT: evita blocchi UI
             foreach (var d in bonded)
             {
                 var name = d?.Name ?? string.Empty;
@@ -243,6 +263,8 @@ public partial class MainPageViewModel : ObservableObject
 
                 any = true;
                 var mac = d!.Address;
+
+                // Try to extract the 4-char Shimmer ID from the friendly name if present.
                 var shimmerName = ExtractShimmerName(deviceId: string.Empty, friendlyName: name);
 
                 var (ok, kind, raw) = await ShimmerSensorScanner.GetExpansionBoardKindAndroidAsync("scan", mac);
@@ -255,7 +277,7 @@ public partial class MainPageViewModel : ObservableObject
                     BoardRawId = raw,
                     IsExg = ok && kind == ShimmerSensorScanner.BoardKind.EXG,
 
-                    // ⬇️ prima: "unknown" –> ora "device off"
+                    // Badge mirrors EXG/IMU or "device off" when device fails.
                     RightBadge = ok
                         ? (kind == ShimmerSensorScanner.BoardKind.EXG ? "EXG" : "IMU")
                         : "device off",
@@ -277,33 +299,40 @@ public partial class MainPageViewModel : ObservableObject
 
             }
 
+            // If none matched, add a “pair first” row.
             if (!any)
             {
-                AvailableDevices.Add(new ShimmerDevice { DisplayName = "No Shimmer paired", Port1 = "(Pair in settings)",  ShimmerName = "----" });
+                AvailableDevices.Add(new ShimmerDevice 
+                { 
+                    DisplayName = "No Shimmer paired",
+                    Port1 = "(Pair in settings)",
+                    ShimmerName = "----" }
+                );
             }
         }
     }
     catch (Exception ex)
     {
-        AvailableDevices.Add(new ShimmerDevice { DisplayName = "Bluetooth Error", Port1 = ex.Message, ShimmerName = "----" });
+        AvailableDevices.Add(new ShimmerDevice 
+        { 
+            DisplayName = "Bluetooth Error",
+            Port1 = ex.Message,
+            ShimmerName = "----" 
+        });
     }
 
-#else
-    Console.WriteLine("No supported platforms.");
 #endif
+
     }
-
-
-
-
 
 
     /// <summary>
-    /// Connects to all selected Shimmer devices and, if successful,
-    /// opens a tabbed interface with a data page for each device.
+    /// Connects to all selected Shimmer devices. For each selected item it shows a modal
+    /// loading page that performs the connection and returns the created Shimmer instance.
+    /// If at least one device connects successfully, a tabbed UI is created.
     /// </summary>
     /// <param name="nav">The navigation object used to manage page transitions.</param>
-    /// <returns>A Task representing the asynchronous operation.</returns>
+    /// <returns>A task representing the asynchronous connection workflow.</returns>
     private async Task Connect(INavigation? nav)
     {
 
@@ -331,21 +360,21 @@ public partial class MainPageViewModel : ObservableObject
             var loadingPage = new LoadingPage(device, tcs);
             await Application.Current!.MainPage!.Navigation.PushModalAsync(loadingPage);
 
-
             // Wait for the loading page to finish connecting
             var shimmer = await tcs.Task;
 
             // Close the loading page after connection attempt
             await Application.Current.MainPage.Navigation.PopModalAsync();
 
-            // Se la connessione è riuscita, aggiungi alla lista
+            // If connection is successful, add to list
             if (shimmer != null)
             {
                 connectedShimmers.Add((shimmer, device));
             }
             else
             {
-                // >>> NEW: marca subito come device off e avvisa
+
+                // Failure path: mark the device as off and notify the user.
                 device.RightBadge = "device off";
                 await App.Current!.MainPage!.DisplayAlert(
                     "Device off",
@@ -356,7 +385,7 @@ public partial class MainPageViewModel : ObservableObject
 
         }
 
-        // If at least one device was connected, create the tabbed interface
+        // If at least one device connected, proceed to build the tabbed UI.
         if (connectedShimmers.Count > 0)
         {
             CreateTabbedPage();
@@ -364,9 +393,17 @@ public partial class MainPageViewModel : ObservableObject
     }
 
 
+    /// <summary>
+    /// Builds a tabbed UI with one <see cref="DataPage"/> per connected device
+    /// and sets it as the application's main page.
+    /// </summary>
     private void CreateTabbedPage()
     {
+
+        // Create the tab container that will host one page per device.
         var tabbedPage = new TabbedPage();
+
+        // For each connected (shimmer instance, device metadata) tuple, add a tab.
         foreach (var (shimmer, device) in connectedShimmers)
         {
             string TitleFor(ShimmerDevice d, int index) =>
@@ -374,40 +411,33 @@ public partial class MainPageViewModel : ObservableObject
                     ? $"Shimmer {d.ShimmerName}"
                     : $"Shimmer {index + 1}";
 
-
-#if WINDOWS || ANDROID
-    if (shimmer is ShimmerSDK.IMU.ShimmerSDK_IMU sImu)
-    {
-        var page = new DataPage(sImu, device);
-        page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
-        tabbedPage.Children.Add(page);
-    }
-    else if (shimmer is ShimmerSDK.EXG.ShimmerSDK_EXG sExg)
-    {
-        var page = new DataPage(sExg, device); // costruttore EXG in DataPage
-        page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device))) + " (EXG)";
-        tabbedPage.Children.Add(page);
-    }
-#else
-            // Android/iOS: solo IMU
-            if (shimmer is ShimmerSDK_IMU sImuDroid)
+            // IMU path: create a DataPage bound to the IMU shimmer instance.
+            if (shimmer is ShimmerSDK.IMU.ShimmerSDK_IMU sImu)
             {
-                var page = new DataPage(sImuDroid, device);
+
+                // DataPage IMU constructor
+                var page = new DataPage(sImu, device);
                 page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device)));
                 tabbedPage.Children.Add(page);
             }
-            // (se mai capitasse un EXG su Android, qui lo ignoriamo)
-#endif
 
+            // EXG path: create a DataPage bound to the EXG shimmer instance.
+            else if (shimmer is ShimmerSDK.EXG.ShimmerSDK_EXG sExg)
+            {
+
+                // DataPage EXG constructor
+                var page = new DataPage(sExg, device);
+                page.Title = TitleFor(device, connectedShimmers.IndexOf((shimmer, device))) + " (EXG)";
+                tabbedPage.Children.Add(page);
+            }
         }
 
-
+        // Swap the app shell to the newly built tabs (wrapped in a NavigationPage for a top bar).
         if (Application.Current != null)
         {
             Application.Current.MainPage = new NavigationPage(tabbedPage);
         }
     }
-
 
 
     ///// Windows ///////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -427,6 +457,7 @@ public partial class MainPageViewModel : ObservableObject
         var shimmerNames = new Dictionary<string, string>();
 
 #if WINDOWS
+
         try
         {
 
@@ -468,6 +499,7 @@ public partial class MainPageViewModel : ObservableObject
         {
             Debug.WriteLine($"WMI Error: {ex.Message}");
         }
+
 #endif
 
         return shimmerNames;
@@ -553,12 +585,6 @@ public partial class MainPageViewModel : ObservableObject
     }
 
 
-
-
-
-
-
-
     /// <summary>
     /// Provides a regular expression to extract a 4-character hexadecimal identifier
     /// from a DeviceID string that matches the pattern '&amp;00066680XXXX_',  where XXXX are hexadecimal digits.
@@ -568,4 +594,3 @@ public partial class MainPageViewModel : ObservableObject
     private static partial Regex DeviceIdRegex();
 
 }
-
