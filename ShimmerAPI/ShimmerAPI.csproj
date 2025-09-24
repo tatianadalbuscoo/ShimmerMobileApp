@@ -41,6 +41,11 @@
 		<PackageReference Include="System.IO.Ports" Version="5.0.1" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<Compile Remove="obj\**\*.cs" />
+		<Compile Remove="bin\**\*.cs" />
+	</ItemGroup>
+
 	<!-- Folders -->
 	<ItemGroup>
 		<Folder Include="Properties\" />
