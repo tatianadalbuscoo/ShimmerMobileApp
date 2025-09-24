@@ -1,8 +1,11 @@
 ﻿<!--
-DataPage.xaml
-This page displays real-time data from a selected Shimmer sensor device.
-It includes configuration controls, parameter selection, and a dynamically updated chart.
+    
+    DataPage.xaml
+    Displays real-time data from a Shimmer device (IMU/EXG) with configuration
+    controls, parameter selection, and a live-updating chart.
+    
 -->
+
 
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
@@ -10,7 +13,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
              x:Class="ShimmerInterface.Views.DataPage"
              BackgroundColor="{StaticResource PageBackground}">
 
-    <!-- Root layout: content + busy overlay -->
+    <!-- Root layout: content + modal busy overlay on top -->
     <Grid>
 
         <!-- 
@@ -39,7 +42,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                       ColumnSpacing="10"
                       RowSpacing="10">
 
-                    <!-- Parameter selection -->
+                    <!-- Parameter picker (bound to VM list + selection) -->
                     <Label Grid.Row="0" Grid.Column="0"
                            Text="Parameter:"
                            VerticalOptions="Center"
@@ -51,7 +54,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             FontSize="16"
                             BackgroundColor="White" />
 
-                    <!-- Chart display mode: Single / Multi / Split -->
+                    <!-- Live display of current chart mode computed by VM -->
                     <Label Grid.Row="1" Grid.Column="0"
                            Text="Chart Mode:"
                            VerticalOptions="Center"
@@ -64,7 +67,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                        Text="{Binding ChartModeLabel}" />
 
 
-                    <!-- Auto Y-axis toggle -->
+                    <!-- Auto Y toggles manual entries and triggers auto-range -->
                     <Label Grid.Row="2" Grid.Column="0"
                            Text="Auto Y-Axis:"
                            VerticalOptions="Center"
@@ -74,7 +77,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             IsToggled="{Binding AutoYAxis}"
                             VerticalOptions="Center" />
 
-                    <!-- Manual Y-axis min (Entry + ✓ button). NOTE: value is applied ONLY when clicking ✓ -->
+                    <!-- Y Min (applied only when pressing Apply; disabled when Auto Y is ON) -->
                     <Label Grid.Row="3" Grid.Column="0"
                            Text="Y Min:"
                            VerticalOptions="Center"
@@ -97,7 +100,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                                 IsEnabled="{Binding IsYAxisManualEnabled}" />
                     </Grid>
 
-                    <!-- Manual Y-axis max (Entry + ✓ button). NOTE: value is applied ONLY when clicking ✓ -->
+                    <!-- Y Max (applied only when pressing Apply; disabled when Auto Y is ON) -->
                     <Label Grid.Row="4" Grid.Column="0"
                            Text="Y Max:"
                            VerticalOptions="Center"
@@ -120,7 +123,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                                 IsEnabled="{Binding IsYAxisManualEnabled}" />
                     </Grid>
 
-                    <!-- Time window for visible data -->
+                    <!-- Time window (seconds) -->
                     <Label Grid.Row="5" Grid.Column="0"
                            Text="Time Window (s):"
                            VerticalOptions="Center"
@@ -132,7 +135,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                            FontSize="16"
                            BackgroundColor="White" />
 
-                    <!-- Interval between X-axis labels -->
+                    <!-- X labels interval -->
                     <Label Grid.Row="6" Grid.Column="0"
                            Text="X Labels every (s):"
                            VerticalOptions="Center"
@@ -145,7 +148,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                            FontSize="16"
                            BackgroundColor="White" />
 
-                    <!-- Sensor sampling rate (Entry + ✓ button) -->
+                    <!-- Sampling rate applied via async command Apply -->
                     <Label Grid.Row="7" Grid.Column="0"
                            Text="Sampling Rate (Hz):"
                            VerticalOptions="Center"
@@ -160,7 +163,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                                ReturnType="Done"
                                BackgroundColor="White"
                                FontSize="16" />
-                        <!-- Apply button next to the entry -->
+
+                        <!-- Apply button triggers ApplySamplingRateCommand -->
                         <Button Grid.Column="1"
                                 Text="✓"
                                 WidthRequest="44"
@@ -170,13 +174,13 @@ It includes configuration controls, parameter selection, and a dynamically updat
 
                 </Grid>
 
-                <!-- Grid visibility toggle -->
+                <!-- Toggle background grid on charts -->
                 <HorizontalStackLayout Spacing="10" VerticalOptions="Center">
                     <Label Text="Show Grid" VerticalOptions="Center" FontSize="14" />
                     <Switch IsToggled="{Binding ShowGrid}" />
                 </HorizontalStackLayout>
 
-                <!-- Real-time validation feedback -->
+                <!-- Inline validation from VM (hidden when empty/null) -->
                 <Label Text="{Binding ValidationMessage}"
                        TextColor="Red"
                        FontSize="14">
@@ -195,15 +199,13 @@ It includes configuration controls, parameter selection, and a dynamically updat
                          BackgroundColor="{StaticResource Gray200}"
                          Margin="0,10" />
 
-                <!-- Section title: Real-time chart -->
+                <!-- Realtime chart area -->
                 <Label Text="Real-time Chart"
                        Style="{StaticResource TitleLabel}" />
 
-                <!-- Chart legend (show only in Multi mode where lines are overlaid) -->
-                <!-- Chart legend (dinamica; mostra EXG1/EXG2 per i gruppi EXG) -->
+                <!-- Legend only in Multi mode -->
                 <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
                     <StackLayout.Triggers>
-                        <!-- Hide legend when Single OR Split -->
                         <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Single">
                             <Setter Property="IsVisible" Value="False" />
                         </DataTrigger>
@@ -212,7 +214,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                         </DataTrigger>
                     </StackLayout.Triggers>
 
-                    <!-- Serie 1 -->
+                    <!-- Series chips mirror VM legend labels/colors -->
                     <HorizontalStackLayout Spacing="5">
                         <HorizontalStackLayout.Triggers>
                             <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend1Text}" Value="">
@@ -223,7 +225,6 @@ It includes configuration controls, parameter selection, and a dynamically updat
                         <Label Text="{Binding Legend1Text}" FontSize="12" VerticalOptions="Center" />
                     </HorizontalStackLayout>
 
-                    <!-- Serie 2 -->
                     <HorizontalStackLayout Spacing="5">
                         <HorizontalStackLayout.Triggers>
                             <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend2Text}" Value="">
@@ -234,7 +235,6 @@ It includes configuration controls, parameter selection, and a dynamically updat
                         <Label Text="{Binding Legend2Text}" FontSize="12" VerticalOptions="Center" />
                     </HorizontalStackLayout>
 
-                    <!-- Serie 3 -->
                     <HorizontalStackLayout Spacing="5">
                         <HorizontalStackLayout.Triggers>
                             <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend3Text}" Value="">
@@ -247,7 +247,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                 </StackLayout>
 
 
-                <!-- Unified chart (Single/Multi). Hidden when Split. -->
+                <!-- Unified chart (Multi). Hidden when Split is active -->
                 <Border x:Name="UnifiedChartBorder"
                         BackgroundColor="White"
                         Stroke="{StaticResource Gray200}"
@@ -260,12 +260,13 @@ It includes configuration controls, parameter selection, and a dynamically updat
                         </DataTrigger>
                     </Border.Triggers>
 
+                    <!-- Skia canvas for unified view -->
                     <skia:SKCanvasView x:Name="canvasView"
                                        HeightRequest="290"
                                        PaintSurface="OnCanvasViewPaintSurface" />
                 </Border>
 
-                <!-- Split charts (X, Y, Z). Visible only when ChartDisplayMode == Split -->
+                <!-- Split charts (X/Y/Z or EXG1/EXG2). Visible only in Split mode -->
                 <VerticalStackLayout x:Name="SplitCharts"
                                      Spacing="10"
                                      IsVisible="False">
@@ -276,52 +277,48 @@ It includes configuration controls, parameter selection, and a dynamically updat
                         </DataTrigger>
                     </VerticalStackLayout.Triggers>
 
-                    <!-- X chart -->
+                    <!-- X / EXG1 -->
                     <Border BackgroundColor="White"
                             Stroke="{StaticResource Gray200}"
                             StrokeThickness="1"
                             Padding="5"
                             HeightRequest="220">
-                        <!-- One dedicated canvas for X axis -->
                         <skia:SKCanvasView x:Name="canvasX"
                                            HeightRequest="210"
-                                           PaintSurface="OnCanvasXPaintSurface" />
+                                           PaintSurface="OnCanvasFirstPaintSurface" />
                     </Border>
 
-                    <!-- Y chart -->
+                    <!-- Y / EXG2 -->
                     <Border BackgroundColor="White"
                             Stroke="{StaticResource Gray200}"
                             StrokeThickness="1"
                             Padding="5"
                             HeightRequest="220">
-                        <!-- One dedicated canvas for Y axis -->
                         <skia:SKCanvasView x:Name="canvasY"
                                            HeightRequest="210"
-                                           PaintSurface="OnCanvasYPaintSurface" />
+                                           PaintSurface="OnCanvasSecondPaintSurface" />
                     </Border>
 
-                    <!-- Z chart -->
+                    <!-- Z hidden when EXG split (only two channels) -->
                     <Border BackgroundColor="White"
-                        Stroke="{StaticResource Gray200}"
-                        StrokeThickness="1"
-                        Padding="5"
-                        HeightRequest="220">
-                                        <!-- AGGIUNTA: in Split EXG mostriamo solo 2 grafici (EXG1/EXG2) -->
-                                        <Border.Triggers>
-                                            <DataTrigger TargetType="Border" Binding="{Binding IsExgSplit}" Value="True">
-                                                <Setter Property="IsVisible" Value="False" />
-                                            </DataTrigger>
-                                        </Border.Triggers>
+                            Stroke="{StaticResource Gray200}"
+                            StrokeThickness="1"
+                            Padding="5"
+                            HeightRequest="220">
+                        <!-- Hide third chart when IsExgSplit = true -->
+                        <Border.Triggers>
+                            <DataTrigger TargetType="Border" Binding="{Binding IsExgSplit}" Value="True">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
+                        </Border.Triggers>
 
-                                        <skia:SKCanvasView x:Name="canvasZ"
-                                       HeightRequest="210"
-                                       PaintSurface="OnCanvasZPaintSurface" />
+                        <skia:SKCanvasView x:Name="canvasZ"
+                                            HeightRequest="210"
+                                            PaintSurface="OnCanvasThirdPaintSurface" />
                     </Border>
-
-
                 </VerticalStackLayout>
 
-                <!-- Compact summary of current settings -->
+                <!-- Read-only summary bound to VM state -->
                 <Frame BackgroundColor="{StaticResource Gray100}"
                        Padding="15"
                        Margin="0,10">
@@ -391,6 +388,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
                             </Label.FormattedText>
                         </Label>
 
+                        <!-- Mirrors actual applied rate (not just the text entry) -->
                         <Label FontSize="16" Margin="0,0,0,2">
                             <Label.FormattedText>
                                 <FormattedString>
@@ -414,7 +412,7 @@ It includes configuration controls, parameter selection, and a dynamically updat
             </VerticalStackLayout>
         </ScrollView>
 
-        <!-- Busy overlay shown while writing sampling rate -->
+        <!-- Busy overlay during long-running device ops (blocks input) -->
         <Grid x:Name="BusyOverlay"
               BackgroundColor="#80000000"
               IsVisible="False">
@@ -424,6 +422,8 @@ It includes configuration controls, parameter selection, and a dynamically updat
                 <ActivityIndicator IsRunning="True"
                                    WidthRequest="48"
                                    HeightRequest="48"/>
+
+                <!-- Text is set by VM events -->
                 <Label x:Name="BusyLabel"
                        Text="Writing sampling rate to device… Please wait."
                        TextColor="White"
@@ -431,6 +431,5 @@ It includes configuration controls, parameter selection, and a dynamically updat
                        FontSize="16"/>
             </VerticalStackLayout>
         </Grid>
-
     </Grid>
 </ContentPage>

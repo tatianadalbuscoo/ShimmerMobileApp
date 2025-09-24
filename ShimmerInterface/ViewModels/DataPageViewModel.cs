@@ -706,6 +706,62 @@ private void ApplyModeTitleToFlags(string? title)
         (ApplySamplingRateCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
     }
 
+    public async Task ConnectAndStartAsync()
+    {
+        // facoltativo: piccola UI hint
+        ShowBusyRequested?.Invoke(this, "Connecting to device… Please wait.");
+
+        try
+        {
+            // IMU
+            if (shimmerImu != null)
+            {
+                if (!shimmerImu.IsConnected())
+                {
+                    shimmerImu.Connect();
+                    await Task.Delay(100);
+                }
+            }
+
+            // EXG
+            if (shimmerExg != null)
+            {
+                if (!shimmerExg.IsConnected())
+                {
+                    shimmerExg.Connect();
+                    await Task.Delay(100);
+                }
+            }
+
+            // avvia lo streaming (usa i tuoi helper già esistenti)
+            DeviceStartStreaming();
+        }
+        catch (Exception ex)
+        {
+            ShowAlertRequested?.Invoke(this, $"Bridge connection failed:\n{ex.Message}");
+        }
+        finally
+        {
+            HideBusyRequested?.Invoke(this, EventArgs.Empty);
+        }
+    }
+    public async Task StopAsync(bool disconnect = false)
+    {
+        await Task.Run(() =>
+        {
+            try { DeviceStopStreaming(); } catch { }
+
+            if (disconnect)
+            {
+                // alcune SDK non espongono Disconnect(): prova solo a Dispose, se disponibile
+                try { (shimmerImu as IDisposable)?.Dispose(); } catch { }
+                try { (shimmerExg as IDisposable)?.Dispose(); } catch { }
+            }
+        });
+    }
+
+
+
     private async Task ApplySamplingRateAsync()
     {
         // validazione IDENTICA alla tua ApplySamplingRateNow()
