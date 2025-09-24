@@ -1263,7 +1263,7 @@ private void ApplyModeTitleToFlags(string? title)
         else
         {
 
-            // Invalid input: show error and revert text field
+            // Invalid input: show error and revert text field.
             ValidationMessage = "Time Window must be a valid positive number.";
             ResetTimeWindowText();
         }
