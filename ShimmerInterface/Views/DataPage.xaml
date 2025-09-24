@@ -203,12 +203,8 @@
                 <Label Text="Real-time Chart"
                        Style="{StaticResource TitleLabel}" />
 
-                <!-- Legend only in Multi mode -->
                 <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
                     <StackLayout.Triggers>
-                        <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Single">
-                            <Setter Property="IsVisible" Value="False" />
-                        </DataTrigger>
                         <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Split">
                             <Setter Property="IsVisible" Value="False" />
                         </DataTrigger>

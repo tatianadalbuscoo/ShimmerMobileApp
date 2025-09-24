@@ -1,65 +1,39 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿
+
+
+using CommunityToolkit.Mvvm.ComponentModel;
 using ShimmerSDK.IMU;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using ShimmerInterface.Models;
-using System.Linq;
-using System.Collections.Generic;
 using CommunityToolkit.Mvvm.Input;
-using System.Threading.Tasks;
-using Microsoft.Maui.Graphics;
 using System.Reflection;
-using System.Globalization;
+using ShimmerSDK.EXG;
 
 
 #if IOS || MACCATALYST
-using Microsoft.Maui.ApplicationModel;  // MainThread
+using Microsoft.Maui.ApplicationModel;
 #endif
-
-using ShimmerSDK.EXG;  // XR2Learn_ShimmerEXG, ExgMode
-
-
 
 
 namespace ShimmerInterface.ViewModels;
 
 
 /// <summary>
-/// Specifies the chart visualization mode: either a single parameter (e.g., only X),
-/// or multiple parameters (e.g., X, Y, Z on the same chart).
+/// Chart display modes:
+/// <list type="bullet">
+/// <item><term>Multi</term><description>Single canvas with overlaid series (IMU: X/Y/Z; EXG: EXG1/EXG2 or single series).</description></item>
+/// <item><term>Split</term><description>Separate panels (IMU: three panels X/Y/Z; EXG: two panels EXG1/EXG2, third hidden).</description></item>
+/// </list>
 /// </summary>
-public enum ChartDisplayMode { Single, Multi, Split }
+public enum ChartDisplayMode { Multi, Split }
 
 
-/// <summary>
-/// ViewModel for the DataPage.
-/// Manages real-time data acquisition, sensor configuration, and chart display options for a connected Shimmer device.
-/// Exposes observable properties and commands for UI binding, following the MVVM pattern.
-/// Implements IDisposable for proper cleanup of timers and resources.
-/// </summary>
+
 public partial class DataPageViewModel : ObservableObject, IDisposable
 {
-#if IOS || MACCATALYST
-    // --- EXG mode (il “pallino” dal bridge) ---
-    private ShimmerSDK_EXG? _exgBridge;
-    private string _exgModeTitle = string.Empty;
 
-    public string ExgModeTitle
-    {
-        get => _exgModeTitle;
-        private set
-        {
-            if (_exgModeTitle == value) return;
-            _exgModeTitle = value;
-            OnPropertyChanged(nameof(ExgModeTitle));
-            OnPropertyChanged(nameof(HasExgMode));
-        }
-    }
-
-    public bool HasExgMode => !string.IsNullOrEmpty(_exgModeTitle);
-#endif
-
-    // ==== Application-wide numeric limits for validation ====
+    // ----- Application-wide numeric limits for validation -----
     private const double MAX_DOUBLE = 1e6;
     private const double MIN_DOUBLE = -1e6;
     private const double MAX_Y_AXIS = 100_000;
@@ -71,56 +45,61 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private const double MAX_SAMPLING_RATE = 100;
     private const double MIN_SAMPLING_RATE = 1;
 
-    // ==== Device references and internal timer for periodic updates ====
+    // ----- Device references (IMU/EXG) -----
     private readonly ShimmerSDK_IMU? shimmerImu;
+    private readonly ShimmerSDK_EXG? shimmerExg;
 
-private readonly ShimmerSDK_EXG? shimmerExg;
+    // ----- Enabled-sensor flags for this session -----
+    private bool enableLowNoiseAccelerometer;
+    private bool enableWideRangeAccelerometer;
+    private bool enableGyroscope;
+    private bool enableMagnetometer;
+    private bool enablePressureTemperature;
+    private bool enableBattery;
+    private bool enableExtA6;
+    private bool enableExtA7;
+    private bool enableExtA15;
 
-    // flag di sessione EXG (copiati dal config)
+    // ----- EXG session flags -----
     private bool enableExg;
     private bool exgModeECG;
     private bool exgModeEMG;
     private bool exgModeTest;
     private bool exgModeRespiration;
+
+    // ----- Tracks whether Dispose() has already run to prevent double cleanup -----
     private bool _disposed = false;
 
-    // ==== Data storage for real-time series ====
+    // ----- Data storage for real-time series -----
     private readonly Dictionary<string, List<float>> dataPointsCollections = new();
     private readonly Dictionary<string, List<int>> timeStampsCollections = new();
+
+    // ----- Synchronizes access to series while updating from the sample thread -----
     private readonly object _dataLock = new();
+
+    // ----- Total number of received samples since (re)start -----
     private int sampleCounter = 0;
 
-    // ==== Sensor enablement flags (from current device config) ====
-    // These indicate which sensors are enabled for this device/session
-    private bool enableLowNoiseAccelerometer;
-    private  bool enableWideRangeAccelerometer;
-    private  bool enableGyroscope;
-    private bool enableMagnetometer;
-    private  bool enablePressureTemperature;
-    private  bool enableBattery;
-    private  bool enableExtA6;
-    private  bool enableExtA7;
-    private bool enableExtA15;
 
-    // ==== Last valid values for restoring user input ====
+    // ----- Last valid values for restoring user input -----
     private double _lastValidYAxisMin = 0;
     private double _lastValidYAxisMax = 1;
     private int _lastValidTimeWindowSeconds = 20;
     private int _lastValidXAxisLabelInterval = 5;
     private double _lastValidSamplingRate = 51.2;
 
-    // ==== Backing fields for user input (text entry fields) ====
+    // ----- Backing fields for user input (text entry fields) -----
     private string _yAxisMinText = "0";
     private string _yAxisMaxText = "1";
     private string _timeWindowSecondsText = "20";
     private string _xAxisLabelIntervalText = "5";
     private string _samplingRateText = "51.2";
 
-    // ==== Temporary values for auto-range Y axis calculation ====
+    // ----- Temporary values for auto-range Y axis calculation -----
     private double _autoYAxisMin = 0;
     private double _autoYAxisMax = 1;
 
-    // ==== Parameter name arrays for each sensor group ====
+    // ----- Parameter name arrays for each sensor group -----
     private static readonly string[] LowNoiseAccelerometerAxes = ["Low-Noise AccelerometerX", "Low-Noise AccelerometerY", "Low-Noise AccelerometerZ"];
     private static readonly string[] WideRangeAccelerometerAxes = [ "Wide-Range AccelerometerX", "Wide-Range AccelerometerY", "Wide-Range AccelerometerZ" ];
     private static readonly string[] GyroscopeAxes = [ "GyroscopeX", "GyroscopeY", "GyroscopeZ" ];
@@ -128,73 +107,93 @@ private readonly ShimmerSDK_EXG? shimmerExg;
     private static readonly string[] EnvSensors = [ "Temperature_BMP180", "Pressure_BMP180" ];
     private static readonly string[] BatteryParams = ["BatteryVoltage", "BatteryPercent"];
 
+    // ----- X-axis baseline offset (s) used to start charts at 0 after (re)open -----
     private double timeBaselineSeconds = 0;
 
-    // ==== MVVM Bindable Properties ====
-    // These properties are observable and used for data binding in the UI
-    [ObservableProperty]
-    private string selectedParameter = "Low-Noise AccelerometerX";
-
-    [ObservableProperty]
-    private double yAxisMin = 0;
-
-    [ObservableProperty]
-    private double yAxisMax = 1;
-
-    [ObservableProperty]
-    private int timeWindowSeconds = 20;
-
-    [ObservableProperty]
-    private string yAxisLabel = "Value";
-
-    [ObservableProperty]
-    private string yAxisUnit = "Unit";
-
-    [ObservableProperty]
-    private string chartTitle = "Real-time Data";
-
-    [ObservableProperty]
-    private int xAxisLabelInterval = 5;
-
-    [ObservableProperty]
-    private string validationMessage = "";
-
-    [ObservableProperty]
-    private bool isXAxisLabelIntervalEnabled = true;
-
-    [ObservableProperty]
-    private double samplingRateDisplay;
-
-    [ObservableProperty]
-    private bool showGrid = true;
-
-    [ObservableProperty]
-    private bool autoYAxis = false;
-
-    [ObservableProperty]
-    private bool isYAxisManualEnabled = true;
-
-    [ObservableProperty]
-    private ChartDisplayMode chartDisplayMode = ChartDisplayMode.Single;
-
-    // AVVISO/STATO durante la scrittura del sampling rate
-    [ObservableProperty] private bool isApplyingSamplingRate;
-
+    // ----- UI hooks: raised by the VM for the view to show/hide the busy overlay and display alerts (string = message) -----
     public event EventHandler<string>? ShowBusyRequested;
     public event EventHandler? HideBusyRequested;
     public event EventHandler<string>? ShowAlertRequested;
 
+    // ----- MVVM Bindable Properties -----
+    // These properties are observable and used for data binding in the UI
+    [ObservableProperty]
+    private string selectedParameter = "Low-Noise AccelerometerX";          // current series/group selection
+
+    [ObservableProperty]
+    private double yAxisMin = 0;                                            // Y-axis lower bound
+
+    [ObservableProperty]
+    private double yAxisMax = 1;                                            // Y-axis upper bound
+
+    [ObservableProperty]
+    private int timeWindowSeconds = 20;                                     // visible time window (s)
+
+    [ObservableProperty]
+    private string yAxisLabel = "Value";                                    // label for Y-axis
+
+    [ObservableProperty]
+    private string yAxisUnit = "Unit";                                      // unit for Y-axis
+
+    [ObservableProperty]
+    private string chartTitle = "Real-time Data";                           // chart header
+
+    [ObservableProperty]
+    private int xAxisLabelInterval = 5;                                     // tick labels spacing on X (s)
+
+    [ObservableProperty]
+    private string validationMessage = "";                                  // UI validation/errors
+
+    [ObservableProperty]
+    private bool isXAxisLabelIntervalEnabled = true;                        // enable X-interval entry
+
+    [ObservableProperty]
+    private double samplingRateDisplay;                                     // applied device rate (Hz)
+
+    [ObservableProperty]
+    private bool showGrid = true;                                           // toggle gridlines
+
+    [ObservableProperty]
+    private bool autoYAxis = false;                                         // auto-scale Y on/off
+
+    [ObservableProperty]
+    private bool isYAxisManualEnabled = true;                               // manual Y entries enabled
+
+    [ObservableProperty]
+    private ChartDisplayMode chartDisplayMode = ChartDisplayMode.Multi;     // Multi/Split
+
+    [ObservableProperty] 
+    private bool isApplyingSamplingRate;                                    // busy flag while writing SR
+
+
+    /// <summary>
+    /// Indicates whether the view should use the EXG split layout:
+    /// true when the chart is in <c>Split</c> mode and the selected parameter
+    /// belongs to the EXG family (ECG/EMG/EXG Test/Respiration).
+    /// </summary>
+    /// <returns>
+    /// <c>true</c> to render two EXG panels (EXG1/EXG2); otherwise, <c>false</c>.
+    /// </returns>
+    public bool IsExgSplit
+    {
+        get
+        {
+            return ChartDisplayMode == ChartDisplayMode.Split &&
+                   (CleanParameterName(SelectedParameter) is "ECG" or "EMG" or "EXG Test" or "Respiration");
+        }
+    }
+
+
+
+
+
+
     public IRelayCommand ApplyYMinCommand { get; }
     public IRelayCommand ApplyYMaxCommand { get; }
-
-    public bool IsExgSplit =>
-    ChartDisplayMode == ChartDisplayMode.Split &&
-    (CleanParameterName(SelectedParameter) is "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration");
-
-
-
-    // Command da bindare al bottone ✓
     public IAsyncRelayCommand ApplySamplingRateCommand { get; }
+
+
+
 
     private double DeviceSamplingRate => shimmerImu?.SamplingRate
                                      ?? shimmerExg?.SamplingRate
@@ -367,7 +366,25 @@ private readonly ShimmerSDK_EXG? shimmerExg;
         _disposed = true;
     }
 
+#if IOS || MACCATALYST
+    // --- EXG mode (il “pallino” dal bridge) ---
+    private ShimmerSDK_EXG? _exgBridge;
+    private string _exgModeTitle = string.Empty;
 
+    public string ExgModeTitle
+    {
+        get => _exgModeTitle;
+        private set
+        {
+            if (_exgModeTitle == value) return;
+            _exgModeTitle = value;
+            OnPropertyChanged(nameof(ExgModeTitle));
+            OnPropertyChanged(nameof(HasExgMode));
+        }
+    }
+
+    public bool HasExgMode => !string.IsNullOrEmpty(_exgModeTitle);
+#endif
 
     public DataPageViewModel(ShimmerSDK_IMU shimmerDevice, ShimmerDevice config)
     {
@@ -883,14 +900,13 @@ private void ApplyModeTitleToFlags(string? title)
 
             return ChartDisplayMode switch
             {
-                ChartDisplayMode.Single => "Single Parameter",
                 ChartDisplayMode.Multi => isExg
                     ? "Multi Parameter (EXG1, EXG2)"
                     : "Multi Parameter (X, Y, Z)",
                 ChartDisplayMode.Split => isExg
                     ? "Split (two separate charts)"
                     : "Split (three separate charts)",
-                _ => "Single Parameter"
+                _ => "Unified"
             };
         }
     }
@@ -2105,9 +2121,7 @@ private void ApplyModeTitleToFlags(string? title)
         bool split = IsSplitVariantLabel(value);
         string cleanName = CleanParameterName(value);
 
-        ChartDisplayMode = split
-            ? ChartDisplayMode.Split
-            : (IsMultiChart(cleanName) ? ChartDisplayMode.Multi : ChartDisplayMode.Single);
+        ChartDisplayMode = split ? ChartDisplayMode.Split : ChartDisplayMode.Multi;
 
         OnPropertyChanged(nameof(ChartModeLabel));
         OnPropertyChanged(nameof(IsExgSplit)); // <-- AGGIUNGI QUESTA
@@ -2518,5 +2532,5 @@ private void ApplyModeTitleToFlags(string? title)
             }
         }
     }
-}
 
+}
