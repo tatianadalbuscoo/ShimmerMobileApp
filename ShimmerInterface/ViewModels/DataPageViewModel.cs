@@ -1,4 +1,13 @@
-﻿
+﻿/*
+ * DataPageViewModel — MAUI MVVM
+ * Drives real-time charting for Shimmer IMU/EXG on Windows/Android/iOS/macOS.
+ * Exposes observable UI state (axes, units, titles, grid, legend) and commands (apply Y min/max, sampling rate).
+ * Subscribes to device samples, buffers and trims by time window, updates chart via events, and rebuilds timestamps.
+ * Supports Multi/Split modes (IMU: X/Y/Z; EXG: EXG1/EXG2), legend labels/colors, and auto/manual Y-axis with margins.
+ * Validates user input (culture-aware doubles/ints), applies nearest firmware sampling rate, and restarts streaming.
+ * iOS/macCatalyst integrates EXG bridge (mode title + change notifications); thread-safe updates via _dataLock.
+ * Cleans up subscriptions and buffers via IDisposable; provides sensor configuration snapshot helpers.
+ */
 
 
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -7,7 +16,6 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using ShimmerInterface.Models;
 using CommunityToolkit.Mvvm.Input;
-using System.Reflection;
 using ShimmerSDK.EXG;
 
 
@@ -29,7 +37,14 @@ namespace ShimmerInterface.ViewModels;
 public enum ChartDisplayMode { Multi, Split }
 
 
-
+/// <summary>
+/// ViewModel for the DataPage.  
+/// Drives real-time charting for Shimmer IMU/EXG sensors.
+/// Manages device connections and streaming, buffers time-series data,
+/// handles axis/legend/parameter selection, applies sampling-rate changes,
+/// and updates the UI on new samples. Implements <see cref="IDisposable"/>
+/// to clean up device event subscriptions and data buffers.
+/// </summary>
 public partial class DataPageViewModel : ObservableObject, IDisposable
 {
 
@@ -110,10 +125,17 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     // ----- X-axis baseline offset (s) used to start charts at 0 after (re)open -----
     private double timeBaselineSeconds = 0;
 
-    // ----- UI hooks: raised by the VM for the view to show/hide the busy overlay and display alerts (string = message) -----
+    // ----- Public properties and events -----
+
+    // UI hooks (view subscribes)
     public event EventHandler<string>? ShowBusyRequested;
     public event EventHandler? HideBusyRequested;
     public event EventHandler<string>? ShowAlertRequested;
+    public event EventHandler? ChartUpdateRequested;
+
+    // Parameters available for charting based on enabled sensors.
+    public ObservableCollection<string> AvailableParameters { get; } = new();
+
 
     // ----- MVVM Bindable Properties -----
     // These properties are observable and used for data binding in the UI
@@ -166,141 +188,45 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     private bool isApplyingSamplingRate;                                    // busy flag while writing SR
 
 
-    /// <summary>
-    /// Indicates whether the view should use the EXG split layout:
-    /// true when the chart is in <c>Split</c> mode and the selected parameter
-    /// belongs to the EXG family (ECG/EMG/EXG Test/Respiration).
-    /// </summary>
-    /// <returns>
-    /// <c>true</c> to render two EXG panels (EXG1/EXG2); otherwise, <c>false</c>.
-    /// </returns>
-    public bool IsExgSplit
-    {
-        get
-        {
-            return ChartDisplayMode == ChartDisplayMode.Split &&
-                   (CleanParameterName(SelectedParameter) is "ECG" or "EMG" or "EXG Test" or "Respiration");
-        }
-    }
-
-
-
-
-
-
-    public IRelayCommand ApplyYMinCommand { get; }
-    public IRelayCommand ApplyYMaxCommand { get; }
-    public IAsyncRelayCommand ApplySamplingRateCommand { get; }
-
-
-
-
-    private double DeviceSamplingRate => shimmerImu?.SamplingRate
-                                     ?? shimmerExg?.SamplingRate
-                                         ?? 51.2;
-
-
-    private void DeviceStartStreaming()
-    {
-        try { shimmerImu?.StartStreaming(); } catch { }
-    try { shimmerExg?.StartStreaming(); } catch { }
-    }
-    private void DeviceStopStreaming()
-    {
-        try { shimmerImu?.StopStreaming(); } catch { }
-    try { shimmerExg?.StopStreaming(); } catch { }
-    }
-
-
-    private double SetFirmwareSamplingRateNearestUnified(double newRate)
-    {
-        if (shimmerImu != null) return shimmerImu.SetFirmwareSamplingRateNearest(newRate);
-    if (shimmerExg != null) return shimmerExg.SetFirmwareSamplingRateNearest(newRate);
-        return newRate;
-    }
-
-
-    private void SubscribeSamples()
-    {
-        if (shimmerImu != null) shimmerImu.SampleReceived += OnSampleReceived;
-
-    if (shimmerExg != null) shimmerExg.SampleReceived += OnSampleReceived;
-    }
-    private void UnsubscribeSamples()
-    {
-        if (shimmerImu != null) shimmerImu.SampleReceived -= OnSampleReceived;
-    if (shimmerExg != null) shimmerExg.SampleReceived -= OnSampleReceived;
-    }
-
-
-
-
-    // ==== Public properties and events ====
+    // ----- Text-entry (bindable string) properties -----
 
     /// <summary>
-    /// Gets the list of available parameters that can be displayed or selected for charting,
-    /// based on the current enabled sensors.
-    /// </summary>
-    public ObservableCollection<string> AvailableParameters { get; } = new();
-
-    /// <summary>
-    /// Event triggered when the chart needs to be updated.
-    /// The view subscribes to this to redraw the chart in real time.
-    /// </summary>
-    public event EventHandler? ChartUpdateRequested;
-
-    // ==== Public calculated property ====
-
-    /// <summary>
-    /// Gets the current elapsed time in seconds since data collection started.
-    /// </summary>
-    public double CurrentTimeInSeconds
-        => Math.Max(0, (sampleCounter / DeviceSamplingRate) - timeBaselineSeconds);
-
-
-
-
-    /// <summary>
-    /// Gets or sets the sampling rate value entered by the user (string for binding).
-    /// Triggers validation and updates sampling logic on change.
+    /// User-entered sampling rate as text (for Entry binding).
+    /// Only updates the text; validation and applying the value happen elsewhere (e.g., on Apply/Enter).
     /// </summary>
     public string SamplingRateText
     {
         get => _samplingRateText;
         set
         {
-            // solo aggiorna il testo; niente apply finché non premi Enter
             SetProperty(ref _samplingRateText, value);
         }
     }
 
 
-
     /// <summary>
-    /// Gets or sets the minimum value for the Y axis, as entered by the user (text binding).
-    /// Triggers validation and updates the chart when changed.
+    /// User-entered Y-axis minimum (text binding).
+    /// Updates only the backing text; validation/apply are handled elsewhere.
     /// </summary>
     public string YAxisMinText
     {
         get => _yAxisMinText;
         set
         {
-            // Just update the text. Do NOT validate here.
             SetProperty(ref _yAxisMinText, value);
         }
     }
 
 
     /// <summary>
-    /// Gets or sets the maximum value for the Y axis, as entered by the user (text binding).
-    /// Triggers validation and updates the chart when changed.
+    /// User-entered Y-axis maximum (text binding).
+    /// Updates only the backing text; validation/apply are handled elsewhere.
     /// </summary>
     public string YAxisMaxText
     {
         get => _yAxisMaxText;
         set
         {
-            // Just update the text. Do NOT validate here.
             SetProperty(ref _yAxisMaxText, value);
         }
     }
@@ -340,58 +266,161 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
-    // ==== IDisposable implementation ====
+    // ----- Computed / Derived properties -----
 
-
-    // ==== IDisposable implementation ====
-
-    public void Dispose()
+    /// <summary>
+    /// Indicates whether the view should use the EXG split layout:
+    /// true when the chart is in <c>Split</c> mode and the selected parameter
+    /// belongs to the EXG family (ECG/EMG/EXG Test/Respiration).
+    /// </summary>
+    /// <returns>
+    /// <c>true</c> to render two EXG panels (EXG1/EXG2); otherwise, <c>false</c>.
+    /// </returns>
+    public bool IsExgSplit
     {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_disposed) return;
-
-        if (disposing)
+        get
         {
-            // sgancia eventi e pulisci risorse gestite
-            UnsubscribeSamples();
-            ChartUpdateRequested = null;
-            ClearAllDataCollections();
-        }
-
-        _disposed = true;
-    }
-
-#if IOS || MACCATALYST
-    // --- EXG mode (il “pallino” dal bridge) ---
-    private ShimmerSDK_EXG? _exgBridge;
-    private string _exgModeTitle = string.Empty;
-
-    public string ExgModeTitle
-    {
-        get => _exgModeTitle;
-        private set
-        {
-            if (_exgModeTitle == value) return;
-            _exgModeTitle = value;
-            OnPropertyChanged(nameof(ExgModeTitle));
-            OnPropertyChanged(nameof(HasExgMode));
+            return ChartDisplayMode == ChartDisplayMode.Split &&
+                   (CleanParameterName(SelectedParameter) is "ECG" or "EMG" or "EXG Test" or "Respiration");
         }
     }
 
-    public bool HasExgMode => !string.IsNullOrEmpty(_exgModeTitle);
-#endif
 
+    /// <summary>
+    /// Gets the current elapsed time in seconds since data collection started.
+    /// </summary>
+    public double CurrentTimeInSeconds
+        => Math.Max(0, (sampleCounter / DeviceSamplingRate) - timeBaselineSeconds);
+
+
+    // ----- Commands -----
+
+    /// <summary>
+    /// Command that validates and applies the user-entered Y-axis minimum.
+    /// </summary>
+    public IRelayCommand ApplyYMinCommand { get; }
+
+
+    /// <summary>
+    /// Command that validates and applies the user-entered Y-axis maximum.
+    /// </summary>
+    public IRelayCommand ApplyYMaxCommand { get; }
+
+
+    /// <summary>
+    /// Command that writes the requested sampling rate to the device asynchronously,
+    /// restarts streaming if needed, and refreshes the chart state.
+    /// </summary>
+    public IAsyncRelayCommand ApplySamplingRateCommand { get; }
+
+
+    // ----- Device helpers: sampling rate, start/stop streaming, subscriptions -----
+
+    /// <summary>
+    /// Effective sampling rate in Hz: IMU, otherwise EXG, otherwise 51.2.
+    /// </summary>
+    private double DeviceSamplingRate => shimmerImu?.SamplingRate
+                                     ?? shimmerExg?.SamplingRate
+                                         ?? 51.2;
+
+
+    /// <summary>
+    /// Starts streaming on whichever device(s) are present (IMU/EXG).
+    /// Swallows device-specific exceptions to avoid crashing the UI.
+    /// Consider logging exceptions.
+    /// </summary>
+    private void DeviceStartStreaming()
+    {
+        try { 
+            shimmerImu?.StartStreaming(); 
+        } 
+        catch {}
+
+        try { 
+            shimmerExg?.StartStreaming(); 
+        } 
+        catch {}
+    }
+
+
+    /// <summary>
+    /// Stops streaming on whichever device(s) are present (IMU/EXG).
+    /// Exceptions are intentionally ignored; consider logging.
+    /// </summary>
+    private void DeviceStopStreaming()
+    {
+        try 
+        { 
+            shimmerImu?.StopStreaming(); 
+        } 
+        catch {}
+
+        try {
+            shimmerExg?.StopStreaming(); 
+        } 
+        catch {}
+    }
+
+
+    /// <summary>
+    /// Sets the closest supported firmware sampling rate on the connected device.
+    /// Tries IMU first, then EXG; if neither is available, returns the requested rate.
+    /// </summary>
+    /// <param name="newRate">Requested sampling rate (Hz).</param>
+    /// <returns>The actual rate applied (or the input if no device is present).</returns>
+    private double SetFirmwareSamplingRateNearestUnified(double newRate)
+    {
+        if (shimmerImu != null) 
+            return shimmerImu.SetFirmwareSamplingRateNearest(newRate);
+        if (shimmerExg != null)
+            return shimmerExg.SetFirmwareSamplingRateNearest(newRate);
+
+        return newRate;
+    }
+
+
+    /// <summary>
+    /// Subscribes to SampleReceived on available devices (IMU/EXG).
+    /// </summary>
+    private void SubscribeSamples()
+    {
+        if (shimmerImu != null) 
+            shimmerImu.SampleReceived += OnSampleReceived;
+
+        if (shimmerExg != null) 
+            shimmerExg.SampleReceived += OnSampleReceived;
+    }
+
+    /// <summary>
+    /// Unsubscribes from SampleReceived on available devices (IMU/EXG).
+    /// </summary>
+    private void UnsubscribeSamples()
+    {
+        if (shimmerImu != null) 
+            shimmerImu.SampleReceived -= OnSampleReceived;
+
+        if (shimmerExg != null) 
+            shimmerExg.SampleReceived -= OnSampleReceived;
+    }
+
+
+    // ----- Constructors & initialization -----
+
+    /// <summary>
+    /// IMU-mode constructor. Wires sample events, copies enabled IMU flags from
+    /// <paramref name="config"/>, initializes parameter lists and buffers,
+    /// applies initial axis/rate UI state, and sets up commands.
+    /// </summary>
+    /// <param name="shimmerDevice">Connected IMU device instance.</param>
+    /// <param name="config">Initial sensor configuration to mirror in the VM.</param>
     public DataPageViewModel(ShimmerSDK_IMU shimmerDevice, ShimmerDevice config)
     {
+
+        // Keep a reference to the IMU device and start listening to samples
         shimmerImu = shimmerDevice;
         SubscribeSamples();
 
-        // IMU: copia sensori
+        // Mirror IMU-related sensor flags from the provided configuration
         enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
         enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
         enableGyroscope = config.EnableGyroscope;
@@ -402,25 +431,30 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         enableExtA7 = config.EnableExtA7;
         enableExtA15 = config.EnableExtA15;
 
-        // EXG: in sessione IMU disattiva tutto
+        // EXG is off in a pure-IMU session
         enableExg = false;
         exgModeECG = exgModeEMG = exgModeTest = exgModeRespiration = false;
 
+        // Seed UI with the current device sampling rate
         samplingRateDisplay = DeviceSamplingRate;
 
+        // Build the parameter list for the combo / selector
         InitializeAvailableParameters();
 
+        // Ensure the selected parameter is valid
         if (!AvailableParameters.Contains(SelectedParameter))
             SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
 
+        // Prepare empty data buffers for all enabled parameters
         InitializeDataCollections();
 
+        // Apply initial Y-axis/labels based on the selection
         if (!string.IsNullOrEmpty(SelectedParameter))
         {
             UpdateYAxisSettings(SelectedParameter);
-            IsXAxisLabelIntervalEnabled = SelectedParameter != "HeartRate";
         }
 
+        // Capture “last valid” values used by validation rollback
         _lastValidYAxisMin = YAxisMin;
         _lastValidYAxisMax = YAxisMax;
         _samplingRateText = DeviceSamplingRate.ToString(CultureInfo.InvariantCulture);
@@ -429,111 +463,184 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         _lastValidTimeWindowSeconds = TimeWindowSeconds;
         _lastValidXAxisLabelInterval = XAxisLabelInterval;
 
+        // Commands (async for sampling rate; guarded by CanExecute where needed)
         ApplySamplingRateCommand = new AsyncRelayCommand(ApplySamplingRateAsync, () => !IsApplyingSamplingRate);
         ApplyYMinCommand = new RelayCommand(() => ApplyYMin(), () => IsYAxisManualEnabled);
         ApplyYMaxCommand = new RelayCommand(() => ApplyYMax(), () => IsYAxisManualEnabled);
 
+        // Sync text-entry mirrors (string) with numeric properties
         UpdateTextProperties();
     }
 
-public DataPageViewModel(ShimmerSDK_EXG shimmerDevice, ShimmerDevice config)
-{
-    shimmerExg = shimmerDevice;
-    SubscribeSamples();
 
-    // sensori IMU: puoi mantenerli se l’EXG li forwarda
-    enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
-    enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
-    enableGyroscope = config.EnableGyroscope;
-    enableMagnetometer = config.EnableMagnetometer;
-    enablePressureTemperature = config.EnablePressureTemperature;
-    enableBattery = config.EnableBattery;
-    enableExtA6 = config.EnableExtA6;
-    enableExtA7 = config.EnableExtA7;
-    enableExtA15 = config.EnableExtA15;
-
-    // EXG: abilita e copia modalità
-    enableExg = config.EnableExg;
-    exgModeECG = config.IsExgModeECG;
-    exgModeEMG = config.IsExgModeEMG;
-    exgModeTest = config.IsExgModeTest;
-    exgModeRespiration = config.IsExgModeRespiration;
-
-    samplingRateDisplay = DeviceSamplingRate;
-
-    InitializeAvailableParameters();
-#if IOS || MACCATALYST
-_exgBridge = shimmerDevice;
-
-// inizializza da ciò che eventualmente è già noto
-ExgModeTitle = shimmerDevice.CurrentExgModeTitle;
-ApplyModeTitleToFlags(ExgModeTitle);
-InitializeAvailableParameters();
-
-// ascolta i cambi del “pallino”
-shimmerDevice.ExgModeChanged += (_, title) =>
-{
-    Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+    /// <summary>
+    /// EXG-mode constructor. Wires sample events, mirrors IMU flags from
+    /// <paramref name="config"/>, applies EXG mode flags (ECG/EMG/Test/Resp),
+    /// initializes parameter lists and buffers, sets initial axis/rate UI state,
+    /// and configures commands. On iOS/macOS, also reacts to live EXG mode changes
+    /// coming from the bridge (“dot”) via <c>ExgModeChanged</c>.
+    /// </summary>
+    /// <param name="shimmerDevice">Connected EXG device instance (bridge).</param>
+    /// <param name="config">Initial sensor configuration to mirror in the VM.</param>
+    public DataPageViewModel(ShimmerSDK_EXG shimmerDevice, ShimmerDevice config)
     {
-        ExgModeTitle = title;
-        ApplyModeTitleToFlags(title);
+
+        // Keep a reference to the EXG device and start listening to samples
+        shimmerExg = shimmerDevice;
+        SubscribeSamples();
+
+        // IMU flags
+        enableLowNoiseAccelerometer = config.EnableLowNoiseAccelerometer;
+        enableWideRangeAccelerometer = config.EnableWideRangeAccelerometer;
+        enableGyroscope = config.EnableGyroscope;
+        enableMagnetometer = config.EnableMagnetometer;
+        enablePressureTemperature = config.EnablePressureTemperature;
+        enableBattery = config.EnableBattery;
+        enableExtA6 = config.EnableExtA6;
+        enableExtA7 = config.EnableExtA7;
+        enableExtA15 = config.EnableExtA15;
+
+        // Enable EXG and copy its current mode flags
+        enableExg = config.EnableExg;
+        exgModeECG = config.IsExgModeECG;
+        exgModeEMG = config.IsExgModeEMG;
+        exgModeTest = config.IsExgModeTest;
+        exgModeRespiration = config.IsExgModeRespiration;
+
+        // Seed UI with the current device sampling rate
+        samplingRateDisplay = DeviceSamplingRate;
+
+        // Build the parameter list for the combo / selector
         InitializeAvailableParameters();
 
+#if IOS || MACCATALYST
 
-        UpdateChart();
-    });
-};
+        // iOS/macOS: keep a bridge reference and sync mode title/flags now and on changes
+        _exgBridge = shimmerDevice;
+
+        // Initialize from bridge’s current mode (if known)
+        ExgModeTitle = shimmerDevice.CurrentExgModeTitle;
+        ApplyModeTitleToFlags(ExgModeTitle);
+        InitializeAvailableParameters();
+
+        // React to future EXG mode changes coming from the bridge UI indicator (“dot”)
+        shimmerDevice.ExgModeChanged += (_, title) =>
+        {
+            Microsoft.Maui.ApplicationModel.MainThread.BeginInvokeOnMainThread(() =>
+            {
+                ExgModeTitle = title;
+                ApplyModeTitleToFlags(title);
+                InitializeAvailableParameters();
+                UpdateChart();
+            });
+        };
+
 #endif
 
+        // Ensure current selection is valid
         if (!AvailableParameters.Contains(SelectedParameter))
-        SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
+            SelectedParameter = AvailableParameters.FirstOrDefault() ?? "";
 
-    InitializeDataCollections();
+        // Prepare empty data buffers for all enabled parameters
+        InitializeDataCollections();
 
-    if (!string.IsNullOrEmpty(SelectedParameter))
-    {
-        UpdateYAxisSettings(SelectedParameter);
-        IsXAxisLabelIntervalEnabled = SelectedParameter != "HeartRate";
+        // Apply initial Y-axis/labels based on the selection
+        if (!string.IsNullOrEmpty(SelectedParameter))
+        {
+            UpdateYAxisSettings(SelectedParameter);
+        }
+
+        // Capture “last valid” values used by validation rollback
+        _lastValidYAxisMin = YAxisMin;
+        _lastValidYAxisMax = YAxisMax;
+        _samplingRateText = DeviceSamplingRate.ToString(CultureInfo.InvariantCulture);
+        _lastValidSamplingRate = DeviceSamplingRate;
+        OnPropertyChanged(nameof(SamplingRateText));
+        _lastValidTimeWindowSeconds = TimeWindowSeconds;
+        _lastValidXAxisLabelInterval = XAxisLabelInterval;
+
+        // Commands (async for sampling rate; guarded by CanExecute where needed)
+        ApplySamplingRateCommand = new AsyncRelayCommand(ApplySamplingRateAsync, () => !IsApplyingSamplingRate);
+        ApplyYMinCommand = new RelayCommand(() => ApplyYMin(), () => IsYAxisManualEnabled);
+        ApplyYMaxCommand = new RelayCommand(() => ApplyYMax(), () => IsYAxisManualEnabled);
+
+        // Sync text-entry mirrors (string) with numeric properties
+        UpdateTextProperties();
     }
 
-    _lastValidYAxisMin = YAxisMin;
-    _lastValidYAxisMax = YAxisMax;
-    _samplingRateText = DeviceSamplingRate.ToString(CultureInfo.InvariantCulture);
-    _lastValidSamplingRate = DeviceSamplingRate;
-    OnPropertyChanged(nameof(SamplingRateText));
-    _lastValidTimeWindowSeconds = TimeWindowSeconds;
-    _lastValidXAxisLabelInterval = XAxisLabelInterval;
 
-    ApplySamplingRateCommand = new AsyncRelayCommand(ApplySamplingRateAsync, () => !IsApplyingSamplingRate);
-    ApplyYMinCommand = new RelayCommand(() => ApplyYMin(), () => IsYAxisManualEnabled);
-    ApplyYMaxCommand = new RelayCommand(() => ApplyYMax(), () => IsYAxisManualEnabled);
+    // ----- IDisposable implementation -----
 
-    UpdateTextProperties();
-}
+    /// <summary>
+    /// Releases resources and suppresses finalization.
+    /// </summary>
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
 
 
+    /// <summary>
+    /// Core dispose method. When <paramref name="disposing"/> is true,
+    /// releases managed resources (unsubscribes events, clears collections).
+    /// Safe to call multiple times.
+    /// </summary>
+    /// <param name="disposing">True to dispose managed resources.</param>
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return;
+
+        if (disposing)
+        {
+            UnsubscribeSamples();
+            ChartUpdateRequested = null;
+            ClearAllDataCollections();
+        }
+
+        _disposed = true;
+    }
+
+
+    // ----- Commands & change handlers -----
+
+    /// <summary>
+    /// Updates the enabled/disabled state of Y–axis commands when manual mode changes.
+    /// </summary>
+    /// <param name="value">
+    /// <c>true</c> if manual Y–axis editing is enabled; <c>false</c> if auto-scaling is active.
+    /// </param>
     partial void OnIsYAxisManualEnabledChanged(bool value)
     {
         (ApplyYMinCommand as RelayCommand)?.NotifyCanExecuteChanged();
         (ApplyYMaxCommand as RelayCommand)?.NotifyCanExecuteChanged();
     }
 
+
+    /// <summary>
+    /// Validates and applies the current Y–axis minimum entered in the bound textbox.
+    /// </summary>
     private void ApplyYMin()
     {
-        // Riusa la stessa validazione dell'Entry
         ValidateAndUpdateYAxisMin(YAxisMinText);
     }
 
 
+    /// <summary>
+    /// Validates and applies the current Y–axis maximum entered in the bound textbox.
+    /// </summary>
     private void ApplyYMax()
     {
-        // Riusa la stessa validazione dell'Entry
         ValidateAndUpdateYAxisMax(YAxisMaxText);
     }
 
+
+    // ----- Device capability sync (EXG bridge → IMU flags) -----
+
     /// <summary>
-    /// Sincronizza i flag IMU/env dal device EXG (se sono cambiati) e dice se qualcosa è cambiato.
+    /// Synchronizes IMU flags from the EXG device and reports whether any value changed.
     /// </summary>
+    /// <returns><c>true</c> if at least one flag was updated; otherwise, <c>false</c>.</returns>
     private bool SyncImuFlagsFromExgDeviceIfChanged()
     {
         if (shimmerExg == null) return false;
@@ -559,10 +666,17 @@ shimmerDevice.ExgModeChanged += (_, title) =>
     }
 
 
+    // ----- Sample handling (event handlers) -----
+
+    /// <summary>
+    /// Handles each incoming sample from IMU/EXG:
+    /// syncs IMU flags when bridged via EXG, keeps selection valid,
+    /// updates buffers and requests a chart refresh.
+    /// </summary>
+    /// <param name="sender">Source device raising the event.</param>
+    /// <param name="sample">Dynamic sample payload from the SDK.</param>
     private void OnSampleReceived(object? sender, dynamic sample)
     {
-        // Se sono collegato via EXG, sincronizzo i flag IMU/env dal bridge.
-        // Se qualcosa è cambiato, rigenero lista parametri, sistemo la selezione e pulisco i buffer.
         if (shimmerExg != null && SyncImuFlagsFromExgDeviceIfChanged())
         {
             InitializeAvailableParameters();
@@ -574,136 +688,21 @@ shimmerDevice.ExgModeChanged += (_, title) =>
             UpdateChart();
         }
 
-        // Incrementa il contatore e calcola il tempo corrente
+        // Advance global sample count and compute current time (s).
         sampleCounter++;
-        double currentTimeSeconds = CurrentTimeInSeconds; 
+        double currentTimeSeconds = CurrentTimeInSeconds;
 
-        // Aggiorna strutture e grafico (riusi le tue funzioni attuali)
+        // Push values into buffers and request a redraw.
         UpdateDataCollectionsWithSingleSample(sample, currentTimeSeconds);
         UpdateChart();
     }
 
 
-#if IOS || MACCATALYST
-private void ApplyModeTitleToFlags(string? title)
-{
-    var t = (title ?? "").Trim();
-    exgModeECG         = t.Equals("ECG", StringComparison.OrdinalIgnoreCase);
-    exgModeEMG         = t.Equals("EMG", StringComparison.OrdinalIgnoreCase);
-    exgModeTest        = t.Equals("EXG Test", StringComparison.OrdinalIgnoreCase);
-    exgModeRespiration = t.Equals("Respiration", StringComparison.OrdinalIgnoreCase);
-    enableExg = true; // stiamo comunque mostrando EXG
-}
-#endif
-
+    // ----- Device attach / detach / connect / start / stop -----
 
     /// <summary>
-    /// Imposta il baseline dell'asse X alla prima apertura della pagina.
-    /// Se clearBuffers=true, azzera anche dati e contatori, così la traccia parte vuota da 0.
+    /// Re-subscribes to device events safely.
     /// </summary>
-    public void MarkFirstOpenBaseline(bool clearBuffers = true)
-    {
-        if (clearBuffers)
-        {
-            // partenza "pulita"
-            timeBaselineSeconds = 0;
-            ClearAllDataCollections();
-            ResetAllCounters();
-            UpdateChart();
-        }
-        else
-        {
-            // solo ri-baseline senza perdere i dati
-            timeBaselineSeconds = sampleCounter / DeviceSamplingRate;
-            UpdateChart();
-        }
-    }
-
-
-    public void ApplySamplingRateNow()
-    {
-        if (TryParseDouble(SamplingRateText, out var req))
-        {
-            if (req > MAX_SAMPLING_RATE) { ValidationMessage = $"Sampling rate too high. Maximum {MAX_SAMPLING_RATE} Hz."; ResetSamplingRateText(); return; }
-            if (req < MIN_SAMPLING_RATE) { ValidationMessage = $"Sampling rate too low. Minimum {MIN_SAMPLING_RATE} Hz."; ResetSamplingRateText(); return; }
-
-            ValidationMessage = "";
-            UpdateSamplingRateAndRestart(req);
-        }
-        else
-        {
-            ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
-            ResetSamplingRateText();
-        }
-    }
-
-    private static bool TryUnwrap(object? v, out float value)
-    {
-        value = 0;
-        if (v == null) return false;
-
-        var vt = v.GetType();
-        var dataProp = vt.GetProperty("Data", BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-        if (dataProp != null)
-        {
-            var dataVal = dataProp.GetValue(v);
-            if (dataVal is IConvertible)
-            {
-                value = Convert.ToSingle(dataVal, CultureInfo.InvariantCulture);
-                return true;
-            }
-        }
-        if (v is IConvertible)
-        {
-            value = Convert.ToSingle(v, CultureInfo.InvariantCulture);
-            return true;
-        }
-        return false;
-    }
-
-    private static bool TryGetScalar(object obj, string name, out float value)
-    {
-        value = 0;
-        var t = obj.GetType();
-        var p = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-        if (p != null)
-        {
-            var v = p.GetValue(obj);
-            return TryUnwrap(v, out value);
-        }
-        var f = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-        if (f != null)
-        {
-            var v = f.GetValue(obj);
-            return TryUnwrap(v, out value);
-        }
-        return false;
-    }
-
-    // prova su sample e (se esiste) dentro a contenitori tipici: Exg/EXG/Ecg/ECG
-    private static bool TryGetAnyEXG(object sample, string[] names, out float value)
-    {
-        foreach (var n in names)
-            if (TryGetScalar(sample, n, out value))
-                return true;
-
-        string[] containers = { "Exg", "EXG", "Ecg", "ECG" };
-        var t = sample.GetType();
-        foreach (var c in containers)
-        {
-            var containerProp = t.GetProperty(c, BindingFlags.Instance | BindingFlags.Public | BindingFlags.IgnoreCase);
-            if (containerProp?.GetValue(sample) is object inner)
-            {
-                foreach (var n in names)
-                    if (TryGetScalar(inner, n, out value))
-                        return true;
-            }
-        }
-        value = 0;
-        return false;
-    }
-
-
     public void AttachToDevice()
     {
         try { UnsubscribeSamples(); SubscribeSamples(); }
@@ -711,6 +710,10 @@ private void ApplyModeTitleToFlags(string? title)
 
     }
 
+
+    /// <summary>
+    /// Unsubscribes from device events safely.
+    /// </summary>
     public void DetachFromDevice()
     {
         try { UnsubscribeSamples(); } catch { }
@@ -718,14 +721,22 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    /// <summary>
+    /// Updates ApplySamplingRateCommand CanExecute when busy state changes.
+    /// </summary>
     partial void OnIsApplyingSamplingRateChanged(bool value)
     {
         (ApplySamplingRateCommand as AsyncRelayCommand)?.NotifyCanExecuteChanged();
     }
 
+
+    /// <summary>
+    /// Connects to the IMU/EXG devices if needed and starts streaming.
+    /// Shows a busy hint, attempts connection, then starts streaming on available devices.
+    /// </summary>
+    /// <returns>A task that completes when the connection and streaming start attempt has finished.</returns>
     public async Task ConnectAndStartAsync()
     {
-        // facoltativo: piccola UI hint
         ShowBusyRequested?.Invoke(this, "Connecting to device… Please wait.");
 
         try
@@ -750,7 +761,6 @@ private void ApplyModeTitleToFlags(string? title)
                 }
             }
 
-            // avvia lo streaming (usa i tuoi helper già esistenti)
             DeviceStartStreaming();
         }
         catch (Exception ex)
@@ -762,6 +772,15 @@ private void ApplyModeTitleToFlags(string? title)
             HideBusyRequested?.Invoke(this, EventArgs.Empty);
         }
     }
+
+
+    /// <summary>
+    /// Stops streaming and, optionally, disposes device resources.
+    /// </summary>
+    /// <param name="disconnect">
+    /// If <c>true</c>, attempts to dispose device instances after stopping streaming; otherwise only stops streaming.
+    /// </param>
+    /// <returns>A task that completes when streaming is stopped (and optional disposal is done).</returns>
     public async Task StopAsync(bool disconnect = false)
     {
         await Task.Run(() =>
@@ -770,18 +789,29 @@ private void ApplyModeTitleToFlags(string? title)
 
             if (disconnect)
             {
-                // alcune SDK non espongono Disconnect(): prova solo a Dispose, se disponibile
-                try { (shimmerImu as IDisposable)?.Dispose(); } catch { }
-                try { (shimmerExg as IDisposable)?.Dispose(); } catch { }
+                try { 
+                    (shimmerImu as IDisposable)?.Dispose(); 
+                } 
+                catch { }
+                try {
+                    (shimmerExg as IDisposable)?.Dispose(); 
+                } 
+                catch { }
             }
         });
     }
 
 
+    // ----- Sampling rate apply / restart -----
 
+    /// <summary>
+    /// Validates the user-entered sampling rate, shows a busy overlay,
+    /// applies the nearest supported firmware rate asynchronously,
+    /// and restarts streaming to make the change effective. Updates UI feedback on success or failure.
+    /// </summary>
+    /// <returns>A <see cref="Task"/> that completes when the apply-and-restart flow finishes.</returns>
     private async Task ApplySamplingRateAsync()
     {
-        // validazione IDENTICA alla tua ApplySamplingRateNow()
         if (!TryParseDouble(SamplingRateText, out var req))
         {
             ValidationMessage = "Sampling rate must be a valid number (no letters or special characters allowed).";
@@ -794,15 +824,11 @@ private void ApplyModeTitleToFlags(string? title)
         ValidationMessage = "";
         IsApplyingSamplingRate = true;
 
-        // WARNING in inglese mentre scrive
         ShowBusyRequested?.Invoke(this, "Writing sampling rate to device…\nPlease wait.");
 
         try
         {
-            // eseguo l’apply senza bloccare la UI
             await Task.Run(() => UpdateSamplingRateAndRestart(req));
-
-            // conferma finale con OK (inglese, vale anche su Windows)
             ShowAlertRequested?.Invoke(this, $"Sampling rate set to {DeviceSamplingRate:0.###} Hz.\nClick OK to continue.");
         }
         catch (Exception ex)
@@ -818,8 +844,38 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    /// <summary>
+    /// Applies the requested sampling rate (snapped to the nearest supported by firmware),
+    /// restarts streaming to apply the change, refreshes UI-bound values and clears buffers.
+    /// </summary>
+    /// <param name="newRate">Requested sampling rate in Hz.</param>
+    private void UpdateSamplingRateAndRestart(double newRate)
+    {
+        try
+        {
+            try { DeviceStopStreaming(); } catch { }
+            double applied = SetFirmwareSamplingRateNearestUnified(newRate);
+            try { DeviceStartStreaming(); } catch { }
+
+            SamplingRateDisplay = applied;
+            _lastValidSamplingRate = applied;
+            _samplingRateText = applied.ToString(CultureInfo.InvariantCulture);
+            OnPropertyChanged(nameof(SamplingRateText));
+
+            ClearAllDataCollections();
+            ResetAllCounters();
+            ValidationMessage = "";
+            UpdateChart();
+        }
+        catch (Exception ex)
+        {
+            ValidationMessage = $"Impossibile applicare il sampling rate: {ex.Message}";
+            ResetSamplingRateText();
+        }
+    }
 
 
+    // ----- Data buffers and chart/timeline helpers -----
 
     /// <summary>
     /// Initializes the internal collections used for storing time series data.
@@ -855,6 +911,7 @@ private void ApplyModeTitleToFlags(string? title)
             dataParameters.Add("ExtADC_A7");
         if (enableExtA15)
             dataParameters.Add("ExtADC_A15");
+
         // EXG
         if (enableExg)
         {
@@ -867,18 +924,8 @@ private void ApplyModeTitleToFlags(string? title)
             {
                 dataPointsCollections["Exg2"] = new List<float>();
                 timeStampsCollections["Exg2"] = new List<int>();
-                            }
-            // opzionale: se un domani vuoi traccia separata per la respirazione
-            // dopo
-            if (!dataPointsCollections.ContainsKey("ExgRespiration"))
-            {
-                dataPointsCollections["ExgRespiration"] = new List<float>();
-                timeStampsCollections["ExgRespiration"] = new List<int>();
             }
-
         }
-
-
 
         // Create empty data and timestamp collections if not already present
         foreach (var parameter in dataParameters)
@@ -891,12 +938,126 @@ private void ApplyModeTitleToFlags(string? title)
         }
     }
 
+
+    /// <summary>
+    /// Sets/clears the X-axis baseline on first open. If <paramref name="clearBuffers"/> is true,
+    /// also clears data and counters so the trace restarts from 0.
+    /// </summary>
+    /// <param name="clearBuffers">If true, clears buffers and counters; otherwise keeps data.</param>
+    public void MarkFirstOpenBaseline(bool clearBuffers = true)
+    {
+        if (clearBuffers)
+        {
+            timeBaselineSeconds = 0;
+            ClearAllDataCollections();
+            ResetAllCounters();
+            UpdateChart();
+        }
+        else
+        {
+            timeBaselineSeconds = sampleCounter / DeviceSamplingRate;
+            UpdateChart();
+        }
+    }
+
+
+    /// <summary>
+    /// Clears all data and timestamp collections for every parameter.
+    /// </summary>
+    private void ClearAllDataCollections()
+    {
+        foreach (var key in dataPointsCollections.Keys.ToList())
+        {
+            dataPointsCollections[key].Clear();
+        }
+
+        foreach (var key in timeStampsCollections.Keys.ToList())
+        {
+            timeStampsCollections[key].Clear();
+        }
+    }
+
+
+    /// <summary>
+    /// Ensures that the data and timestamp lists for the given parameter
+    /// do not exceed the specified maximum number of points. Removes oldest samples if needed.
+    /// </summary>
+    /// <param name="parameter">Parameter key to trim.</param>
+    /// <param name="maxPoints">Maximum number of samples to retain.</param>
+    private void TrimCollection(string parameter, int maxPoints)
+    {
+
+        // Check if both data and timestamp lists exist for the parameter
+        if (dataPointsCollections.TryGetValue(parameter, out var dataList) &&
+            timeStampsCollections.TryGetValue(parameter, out var timeList))
+        {
+
+            // Remove oldest items until the collection is within the maximum size
+            while (dataList.Count > maxPoints && timeList.Count > 0)
+            {
+                if (dataList.Count > 0)
+                    dataList.RemoveAt(0);   // Remove oldest data point
+                if (timeList.Count > 0)
+                    timeList.RemoveAt(0);   // Remove corresponding timestamp
+            }
+        }
+    }
+
+
+    /// <summary>
+    /// Retrieves a snapshot (deep copy) of the data and timestamp series for a given parameter.
+    /// This method is thread-safe and returns empty lists if the parameter does not exist.
+    /// </summary>
+    /// <param name="parameter">The name of the parameter whose data series to retrieve.</param>
+    /// <returns>
+    /// A tuple containing:
+    /// - data: a list of float values representing the parameter data,
+    /// - time: a list of int values representing the corresponding timestamps (in ms).
+    /// </returns>
+    public (List<float> data, List<int> time) GetSeriesSnapshot(string parameter)
+    {
+        lock (_dataLock)
+        {
+            string key = MapToInternalKey(parameter);
+
+            var dataList = dataPointsCollections.TryGetValue(key, out var d) ? new List<float>(d) : new List<float>();
+            var timeList = timeStampsCollections.TryGetValue(key, out var t) ? new List<int>(t) : new List<int>();
+
+            return (dataList, timeList);
+        }
+    }
+
+
+    /// <summary>
+    /// Triggers an event to notify that the chart should be updated.
+    /// Subscribers to ChartUpdateRequested will be notified.
+    /// </summary>
+    private void UpdateChart()
+    {
+        ChartUpdateRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+
+    // ----- UI labels & mode description -----
+
+    /// <summary>
+    /// Human-readable label for the current chart mode (Multi/Split),
+    /// adapted to the selected parameter family (IMU: X·Y·Z, EXG: EXG1·EXG2).
+    /// </summary>
+    /// <returns>
+    /// UI-ready string:
+    /// - "Multi Parameter (X, Y, Z)" for IMU groups in Multi,
+    /// - "Multi Parameter (EXG1, EXG2)" for EXG in Multi,
+    /// - "Split (three charts)" for IMU in Split,
+    /// - "Split (two charts)" for EXG in Split,
+    /// - "Unified" as a fallback.
+    /// </returns>
     public string ChartModeLabel
     {
         get
         {
             var clean = CleanParameterName(SelectedParameter);
-            bool isExg = clean is "EXG" or "ECG" or "EMG" or "EXG Test" or "Respiration";
+            bool isExg = clean is "ECG" or "EMG" or "EXG Test" or "Respiration";
 
             return ChartDisplayMode switch
             {
@@ -912,13 +1073,65 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    // ----- Legend (labels and colors) -----
+
+    // Readable labels for the current legend (bindable from the view)
+    public List<string> LegendLabels =>
+        GetCurrentSubParameters().Select(p => GetLegendLabel(SelectedParameter, p)).ToList();
+
+    // Single labels for the legend (convenient to bind in XAML)
+    public string Legend1Text => LegendLabels.ElementAtOrDefault(0) ?? "";
+    public string Legend2Text => LegendLabels.ElementAtOrDefault(1) ?? "";
+    public string Legend3Text => LegendLabels.ElementAtOrDefault(2) ?? "";
+
+    // Colors consistent with the drawn series.
+    public Color Legend1Color => Colors.Red;
+    public Color Legend2Color => (LegendLabels.Count == 2) ? Colors.Blue : Colors.Green;
+    public Color Legend3Color => Colors.Blue;
+
+#if IOS || MACCATALYST
+
+    // EXG bridge handle for iOS/macOS
+    private ShimmerSDK_EXG? _exgBridge;
+
+    // Backing field for the current EXG mode title (e.g., "ECG", "EMG")
+    private string _exgModeTitle = string.Empty;
+
 
     /// <summary>
-    /// Handles logic when the AutoYAxis property changes.
-    /// Switches between auto-scaling and manual Y-axis mode, backing up or restoring manual values as needed,
-    /// recalculates the axis range if automatic mode is activated, and updates all relevant UI fields.
+    /// Bindable EXG mode title used by the UI and legend (e.g., "ECG", "EMG").
+    /// Notifies changes and also triggers an update of <see cref="HasExgMode"/>.
     /// </summary>
-    /// <param name="value">True if auto-scaling is enabled, false if manual Y range is active.</param>
+    /// <returns>The current EXG mode title; empty if no mode is set.</returns>
+    public string ExgModeTitle
+    {
+        get => _exgModeTitle;
+        private set
+        {
+            if (_exgModeTitle == value) return;
+            _exgModeTitle = value;
+            OnPropertyChanged(nameof(ExgModeTitle));
+            OnPropertyChanged(nameof(HasExgMode));
+        }
+    }
+
+
+    /// <summary>
+    /// Indicates whether an EXG mode is currently set (non-empty title).
+    /// </summary>
+    /// <returns><c>true</c> when an EXG mode title is available; otherwise <c>false</c>.</returns>
+    public bool HasExgMode => !string.IsNullOrEmpty(_exgModeTitle);
+
+#endif
+
+
+    // ----- Auto Y-axis handling -----
+
+    /// <summary>
+    /// Handles toggling between auto-scaling and manual Y-axis mode. 
+    /// Backs up/restores manual values, recalculates auto range, updates UI, and refreshes the chart.
+    /// </summary>
+    /// <param name="value">True to enable auto-scaling; false to use manual Y-axis limits.</param>
     partial void OnAutoYAxisChanged(bool value)
     {
 
@@ -959,10 +1172,8 @@ private void ApplyModeTitleToFlags(string? title)
 
 
     /// <summary>
-    /// Automatically calculates the best Y-axis range for the current chart,
-    /// based on the min and max of all available data points for the selected parameter(s).
-    /// Adds a margin to the range for visual clarity.
-    /// Falls back to default values if no data is available.
+    /// Computes the best-fit Y-axis range for the current selection based on available data,
+    /// with a small margin. Falls back to defaults when no data is present.
     /// </summary>
     private void CalculateAutoYAxisRange()
     {
@@ -1015,12 +1226,11 @@ private void ApplyModeTitleToFlags(string? title)
         }
 
         // Single parameter selected
-        // Single parameter selected
         else
         {
             var key = MapToInternalKey(cleanParam);
 
-            // Se non ci sono dati per questo parametro (display→key interna), usa i default del "display"
+            // If there is no data for this parameter (display→internal key), use the "display" defaults
             if (!dataPointsCollections.TryGetValue(key, out var list) || list.Count == 0)
             {
                 _autoYAxisMin = GetDefaultYAxisMin(cleanParam);
@@ -1048,18 +1258,17 @@ private void ApplyModeTitleToFlags(string? title)
             }
         }
 
-
         // Round the limits
         _autoYAxisMin = Math.Round(_autoYAxisMin, 3);
         _autoYAxisMax = Math.Round(_autoYAxisMax, 3);
     }
 
 
+    // ----- Text-entry sync helpers -----
 
     /// <summary>
-    /// Updates the backing string properties for all numeric input fields,
-    /// so that the UI entries reflect the current numeric property values.
-    /// Also raises property changed notifications for the UI to update.
+    /// Synchronizes all text-entry backing strings (Y min/max, time window, X label interval)
+    /// with their numeric counterparts and notifies the UI.
     /// </summary>
     private void UpdateTextProperties()
     {
@@ -1079,10 +1288,25 @@ private void ApplyModeTitleToFlags(string? title)
 
 
     /// <summary>
-    /// Validates and updates the minimum Y-axis value based on user input.
-    /// Enforces numeric range and logical consistency with the Y max value.
-    /// Shows validation messages for invalid inputs.
+    /// Updates only the Y-axis text-entry strings from the numeric Y min/max values
+    /// and notifies the UI.
     /// </summary>
+    private void UpdateYAxisTextPropertiesOnly()
+    {
+        _yAxisMinText = YAxisMin.ToString(CultureInfo.InvariantCulture);
+        _yAxisMaxText = YAxisMax.ToString(CultureInfo.InvariantCulture);
+        OnPropertyChanged(nameof(YAxisMinText));
+        OnPropertyChanged(nameof(YAxisMaxText));
+    }
+
+
+    // ----- Validation handlers (user input → numeric state) -----
+
+    /// <summary>
+    /// Validates and applies a new Y-axis minimum. Enforces allowed range and consistency with Y max.
+    /// Shows a validation message on error and restores the last valid value.
+    /// </summary>
+    /// <param name="value">User-entered text for Y-axis minimum.</param>
     private void ValidateAndUpdateYAxisMin(string value)
     {
 
@@ -1145,10 +1369,10 @@ private void ApplyModeTitleToFlags(string? title)
 
 
     /// <summary>
-    /// Validates and updates the maximum Y-axis value based on user input.
-    /// Enforces numeric range and logical consistency with the Y min value.
-    /// Shows validation messages for invalid inputs.
+    /// Validates and applies a new Y-axis maximum. Enforces allowed range and consistency with Y min.
+    /// Shows a validation message on error and restores the last valid value.
     /// </summary>
+    /// <param name="value">User-entered text for Y-axis maximum.</param>
     private void ValidateAndUpdateYAxisMax(string value)
     {
 
@@ -1209,15 +1433,12 @@ private void ApplyModeTitleToFlags(string? title)
         }
     }
 
-   
-
 
     /// <summary>
-    /// Validates and updates the time window (in seconds) for the displayed data,
-    /// based on user input. Ensures the value is within allowed range and resets
-    /// all data collections and counters as needed. Shows validation messages for
-    /// invalid input.
+    /// Validates and applies a new time window (seconds). Enforces allowed range,
+    /// clears series data and counters, and refreshes the chart.
     /// </summary>
+    /// <param name="value">User-entered text for the time window in seconds.</param>
     private void ValidateAndUpdateTimeWindow(string value)
     {
 
@@ -1271,10 +1492,10 @@ private void ApplyModeTitleToFlags(string? title)
 
 
     /// <summary>
-    /// Validates and updates the interval for X-axis labels (in seconds),
-    /// based on user input. Ensures the value is within allowed range and
-    /// triggers a chart refresh. Shows validation messages for invalid input.
+    /// Validates and applies the X-axis label interval (seconds). Enforces allowed range
+    /// and refreshes the chart.
     /// </summary>
+    /// <param name="value">User-entered text for the X-axis label interval in seconds.</param>
     private void ValidateAndUpdateXAxisInterval(string value)
     {
 
@@ -1324,38 +1545,11 @@ private void ApplyModeTitleToFlags(string? title)
         }
     }
 
-    private void UpdateSamplingRateAndRestart(double newRate)
-    {
-        try
-        {
-            try { DeviceStopStreaming(); } catch { }
-            double applied = SetFirmwareSamplingRateNearestUnified(newRate);
-            try { DeviceStartStreaming(); } catch { }
 
-            SamplingRateDisplay = applied;
-            _lastValidSamplingRate = applied;
-            _samplingRateText = applied.ToString(CultureInfo.InvariantCulture);
-            OnPropertyChanged(nameof(SamplingRateText));
-
-            ClearAllDataCollections();
-            ResetAllCounters();
-            ValidationMessage = "";
-            UpdateChart();
-        }
-        catch (Exception ex)
-        {
-            ValidationMessage = $"Impossibile applicare il sampling rate: {ex.Message}";
-            ResetSamplingRateText();
-        }
-    }
-
-
-
-
-
+    // ----- Reset helpers -----
 
     /// <summary>
-    /// Resets all internal counters used for tracking data samples (e.g., sample index).
+    /// Resets all internal counters related to sample tracking (e.g., sample index).
     /// </summary>
     private void ResetAllCounters()
     {
@@ -1363,10 +1557,8 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
-
     /// <summary>
-    /// Resets the sampling rate input field to the last valid value,
-    /// and triggers property changed notification to update the UI.
+    /// Restores the sampling-rate text field to the last valid value and notifies the UI.
     /// </summary>
     private void ResetSamplingRateText()
     {
@@ -1375,111 +1567,8 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
-    private static double GetDefaultYAxisMin(string parameter)
-    {
-        return parameter switch
-        {
-            // === Gruppi (visualizzazione Multi: X,Y,Z) ===
-            // Accelerometri (m/s²): range largo per vedere variazioni su tutte le componenti
-            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" => -20,
-            // Giroscopio (deg/s)
-            "Gyroscope" => -250,
-            // Magnetometro (unità relative/local_flux*)
-            "Magnetometer" => -5,
-
-            // === Singole componenti/parametri ===
-            // Accelerometri (m/s²)
-            "Low-Noise AccelerometerX" => -5,
-            "Low-Noise AccelerometerY" => -5,
-            "Low-Noise AccelerometerZ" => -15,   // Z spesso include gravità: range più ampio
-            "Wide-Range AccelerometerX" => -5,
-            "Wide-Range AccelerometerY" => -5,
-            "Wide-Range AccelerometerZ" => -15,
-
-            // Giroscopio (deg/s)
-            "GyroscopeX" => -250,
-            "GyroscopeY" => -250,
-            "GyroscopeZ" => -250,
-
-            // Magnetometro (unità relative/local_flux*)
-            "MagnetometerX" => -5,
-            "MagnetometerY" => -5,
-            "MagnetometerZ" => -5,
-
-            // Sensori ambientali
-            "Temperature_BMP180" => 15,  // °C
-            "Pressure_BMP180" => 90,  // kPa
-
-            // Batteria
-            "BatteryVoltage" => 3.3,   // V
-            "BatteryPercent" => 0,     // %
-
-            // ADC esterni (V)
-            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
-
-            "ECG" or "EMG" or "EXG Test" => -15.0,
-            "Respiration" => -15.0,
-
-
-            // Fallback generico
-            _ => 0
-        };
-    }
-
-
-
-    private static double GetDefaultYAxisMax(string parameter)
-    {
-        return parameter switch
-        {
-            // === Gruppi (visualizzazione Multi: X,Y,Z) ===
-            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" => 20,  // m/s²
-            "Gyroscope" => 250,                                             // deg/s
-            "Magnetometer" => 5,                                            // unità relative/local_flux*
-
-            // === Singole componenti/parametri ===
-            // Accelerometri (m/s²)
-            "Low-Noise AccelerometerX" => 5,
-            "Low-Noise AccelerometerY" => 5,
-            "Low-Noise AccelerometerZ" => 15,
-            "Wide-Range AccelerometerX" => 5,
-            "Wide-Range AccelerometerY" => 5,
-            "Wide-Range AccelerometerZ" => 15,
-
-            // Giroscopio (deg/s)
-            "GyroscopeX" => 250,
-            "GyroscopeY" => 250,
-            "GyroscopeZ" => 250,
-
-            // Magnetometro (unità relative/local_flux*)
-            "MagnetometerX" => 5,
-            "MagnetometerY" => 5,
-            "MagnetometerZ" => 5,
-
-            // Sensori ambientali
-            "Temperature_BMP180" => 40,   // °C
-            "Pressure_BMP180" => 110,  // kPa
-
-            // Batteria
-            "BatteryVoltage" => 4.2,   // V
-            "BatteryPercent" => 100,   // %
-
-            // ADC esterni (V)
-            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3.3,
-
-            "ECG" or "EMG" or "EXG Test" => 15.0,
-            "Respiration" => 15.0,
-
-
-
-            // Fallback generico
-            _ => 1
-        };
-    }
-
-
     /// <summary>
-    /// Restores the Y-axis minimum input field text to the last valid value.
+    /// Restores the Y min text field to the last valid value and notifies the UI.
     /// </summary>
     private void ResetYAxisMinText()
     {
@@ -1489,7 +1578,7 @@ private void ApplyModeTitleToFlags(string? title)
 
 
     /// <summary>
-    /// Restores the Y-axis maximum input field text to the last valid value.
+    /// Restores the Y max text field to the last valid value and notifies the UI.
     /// </summary>
     private void ResetYAxisMaxText()
     {
@@ -1499,7 +1588,7 @@ private void ApplyModeTitleToFlags(string? title)
 
 
     /// <summary>
-    /// Restores the time window input field text to the last valid value.
+    /// Restores the time-window text field to the last valid value and notifies the UI.
     /// </summary>
     private void ResetTimeWindowText()
     {
@@ -1509,7 +1598,7 @@ private void ApplyModeTitleToFlags(string? title)
 
 
     /// <summary>
-    /// Restores the X-axis label interval input field text to the last valid value.
+    /// Restores the X-axis label interval text field to the last valid value and notifies the UI.
     /// </summary>
     private void ResetXAxisIntervalText()
     {
@@ -1518,10 +1607,95 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    // ----- Default axis ranges -----
+
+
     /// <summary>
-    /// Populates the <see cref="AvailableParameters"/> collection based on which sensors are currently enabled.
-    /// Includes both group headers (e.g., "Gyroscope") and their sub-parameters (e.g., "GyroscopeX", "GyroscopeY", "GyroscopeZ").
-    /// Ensures the SelectedParameter is valid after updating the list.
+    /// Provides a default Y-axis minimum for the given parameter or group,
+    /// used when no data is available or input is empty.
+    /// </summary>
+    /// <param name="parameter">Parameter or group display name.</param>
+    /// <returns>Default Y-axis minimum.</returns>
+    private static double GetDefaultYAxisMin(string parameter)
+    {
+        return parameter switch
+        {
+            // Groups
+            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" => -20,
+            "Gyroscope" => -250,
+            "Magnetometer" => -5,
+
+            // Single
+            "Low-Noise AccelerometerX" => -5,
+            "Low-Noise AccelerometerY" => -5,
+            "Low-Noise AccelerometerZ" => -15,
+            "Wide-Range AccelerometerX" => -5,
+            "Wide-Range AccelerometerY" => -5,
+            "Wide-Range AccelerometerZ" => -15,
+            "GyroscopeX" => -250,
+            "GyroscopeY" => -250,
+            "GyroscopeZ" => -250,
+            "MagnetometerX" => -5,
+            "MagnetometerY" => -5,
+            "MagnetometerZ" => -5,
+            "Temperature_BMP180" => 15,
+            "Pressure_BMP180" => 90,
+            "BatteryVoltage" => 3.3,
+            "BatteryPercent" => 0,     // %
+            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 0,
+            "ECG" or "EMG" or "EXG Test" => -15.0,
+            "Respiration" => -15.0,
+
+            _ => 0
+        };
+    }
+
+
+    /// <summary>
+    /// Provides a default Y-axis maximum for the given parameter or group,
+    /// used when no data is available or input is empty.
+    /// </summary>
+    /// <param name="parameter">Parameter or group display name.</param>
+    /// <returns>Default Y-axis maximum.</returns>
+    private static double GetDefaultYAxisMax(string parameter)
+    {
+        return parameter switch
+        {
+            // Groups
+            "Low-Noise Accelerometer" or "Wide-Range Accelerometer" => 20,  
+            "Gyroscope" => 250,                                             
+            "Magnetometer" => 5,                                            
+
+            // Single
+            "Low-Noise AccelerometerX" => 5,
+            "Low-Noise AccelerometerY" => 5,
+            "Low-Noise AccelerometerZ" => 15,
+            "Wide-Range AccelerometerX" => 5,
+            "Wide-Range AccelerometerY" => 5,
+            "Wide-Range AccelerometerZ" => 15,
+            "GyroscopeX" => 250,
+            "GyroscopeY" => 250,
+            "GyroscopeZ" => 250,
+            "MagnetometerX" => 5,
+            "MagnetometerY" => 5,
+            "MagnetometerZ" => 5,
+            "Temperature_BMP180" => 40,  
+            "Pressure_BMP180" => 110,
+            "BatteryVoltage" => 4.2,
+            "BatteryPercent" => 100,   // %
+            "ExtADC_A6" or "ExtADC_A7" or "ExtADC_A15" => 3.3,
+            "ECG" or "EMG" or "EXG Test" => 15.0,
+            "Respiration" => 15.0,
+
+            _ => 1
+        };
+    }
+
+    // ----- Available parameters and mapping -----
+
+    /// <summary>
+    /// Rebuilds <see cref="AvailableParameters"/> based on enabled sensors and EXG mode,
+    /// and keeps <see cref="SelectedParameter"/> valid.
     /// </summary>
     private void InitializeAvailableParameters()
     {
@@ -1555,7 +1729,7 @@ private void ApplyModeTitleToFlags(string? title)
             AvailableParameters.Add("    → Magnetometer — separate charts (X·Y·Z)");
         }
 
-        // Add BatteryVoltage and BatteryPercent if battery monitoring is enabled (no group header)
+        // Add BatteryVoltage and BatteryPercent if battery monitoring is enabled
         if (enableBattery)
         {
             AvailableParameters.Add("BatteryVoltage");
@@ -1577,7 +1751,7 @@ private void ApplyModeTitleToFlags(string? title)
         if (enableExtA15)
             AvailableParameters.Add("ExtADC_A15");
 
-        // ===== EXG (gruppo + variante split EXG1·EXG2) =====
+        // EXG (group + split variant EXG1·EXG2)
         if (enableExg)
         {
             if (exgModeRespiration)
@@ -1607,9 +1781,6 @@ private void ApplyModeTitleToFlags(string? title)
             }
         }
 
-
-
-
         // If the current selection is no longer available, select the first parameter
         if (!AvailableParameters.Contains(SelectedParameter))
         {
@@ -1618,6 +1789,11 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    /// <summary>
+    /// Removes UI adornments (split/multi hints) from a display name.
+    /// </summary>
+    /// <param name="displayName">Raw display name as shown in the UI.</param>
+    /// <returns>Clean parameter/group name.</returns>
     public static string CleanParameterName(string? displayName)
     {
         if (string.IsNullOrWhiteSpace(displayName)) return "";
@@ -1633,18 +1809,28 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    /// <summary>
+    /// Maps a display name to its internal series key (e.g., "EXG1" → "Exg1").
+    /// </summary>
+    /// <param name="displayName">Display name.</param>
+    /// <returns>Internal key for series dictionaries.</returns>
     public static string MapToInternalKey(string displayName)
     {
         var name = CleanParameterName(displayName);
-        if (name.Equals("EXG1", StringComparison.OrdinalIgnoreCase)) return "Exg1";
-        if (name.Equals("EXG2", StringComparison.OrdinalIgnoreCase)) return "Exg2";
+        if (name.Equals("EXG1", StringComparison.OrdinalIgnoreCase)) 
+            return "Exg1";
+        if (name.Equals("EXG2", StringComparison.OrdinalIgnoreCase)) 
+            return "Exg2";
+
         return name;
     }
 
 
-
-
-
+    /// <summary>
+    /// Detects whether a display label refers to a split variant (separate charts).
+    /// </summary>
+    /// <param name="displayName">Display label to check.</param>
+    /// <returns>True if it's a split variant label; otherwise false.</returns>
     private static bool IsSplitVariantLabel(string? displayName)
     {
         if (string.IsNullOrWhiteSpace(displayName)) return false;
@@ -1653,62 +1839,28 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
-
     /// <summary>
-    /// Determines if the specified parameter is a multi-parameter group,
-    /// meaning it represents a sensor with multiple sub-components (e.g., X, Y, Z).
+    /// Determines if a parameter represents a multi-series group (e.g., X/Y/Z or EXG1/EXG2).
     /// </summary>
-    /// <param name="parameter">The parameter or group name to check.</param>
-    /// <returns>True if the parameter is a group (MultiChart); otherwise, false.</returns>
+    /// <param name="parameter">Parameter or group name.</param>
+    /// <returns>True if it’s a multi-series group; otherwise false.</returns>
     private static bool IsMultiChart(string parameter)
     {
-        // Clean the display name to get the actual parameter name (remove formatting)
         string cleanName = CleanParameterName(parameter);
-
-        // Return true for sensor groups that support multi-line charting
               return cleanName is "Low-Noise Accelerometer" or "Wide-Range Accelerometer"
-         or "Gyroscope" or "Magnetometer"
-                                  // Trattiamo anche le modalità EXG come gruppi a 2 serie
-        or "ECG" or "EMG" or "EXG Test" or "Respiration" or "EXG";
-
-
-    }
-
-    [System.Diagnostics.Conditional("DEBUG")]
-    private void LogExg(Dictionary<string, float> values, int tMs)
-    {
-        try
-        {
-            var has1 = values.TryGetValue("Exg1", out var v1);
-            var has2 = values.TryGetValue("Exg2", out var v2);
-                        if (has1 || has2)
-            {
-                string mode = exgModeRespiration ? "Respiration"
-                                            : exgModeECG ? "ECG"
-                                            : exgModeEMG ? "EMG"
-                                            : exgModeTest ? "EXG Test"
-                                            : "EXG";
-                string s1 = has1 ? v1.ToString("F4") : "-";
-                string s2 = has2 ? v2.ToString("F4") : "-";
-                            }
-                        else if (enableExg && sampleCounter % 50 == 0)
-                            {
-                System.Diagnostics.Debug.WriteLine("[EXG] nessun campo EXG trovato nel sample (Exg1/Exg2/ExgRespiration).");
-                            }
-        }
-        catch { }
+                or "Gyroscope" or "Magnetometer"
+                or "ECG" or "EMG" or "EXG Test" or "Respiration" or "EXG";
     }
 
 
-
-
+    // ----- Parameter groups and legend helpers -----
 
     /// <summary>
-    /// Returns the list of sub-parameters (typically X, Y, Z) for a given sensor group.
-    /// If the group is not recognized, returns an empty list.
+    /// Returns the list of sub-parameters for a given sensor group (e.g., X/Y/Z or EXG1/EXG2).
+    /// Returns an empty list if the group is not recognized.
     /// </summary>
-    /// <param name="groupParameter">The display name or group name selected by the user.</param>
-    /// <returns>List of parameter names for the group (e.g., X/Y/Z axes).</returns>
+    /// <param name="groupParameter">Display/group name selected by the user.</param>
+    /// <returns>List of parameter names for the group (e.g., X/Y/Z or EXG1/EXG2).</returns>
     public static List<string> GetSubParameters(string groupParameter)
     {
 
@@ -1728,12 +1880,18 @@ private void ApplyModeTitleToFlags(string? title)
 
     }
 
-    // === Legend helpers ===
+
+    /// <summary>
+    /// Returns the legend label for a sub-parameter within a group (e.g., "X", "Y", "Z", or "EXG1"/"EXG2").
+    /// </summary>
+    /// <param name="groupParameter">Group display name.</param>
+    /// <param name="subParameter">Sub-parameter internal name (e.g., "GyroscopeX", "Exg1").</param>
+    /// <returns>Readable legend label for the UI.</returns>
     public static string GetLegendLabel(string groupParameter, string subParameter)
     {
         var group = CleanParameterName(groupParameter);
 
-        // Nei gruppi EXG vogliamo "EXG1/EXG2" al posto di Exg1/Exg2
+        // EXG groups: prefer EXG1/EXG2 labels
         if (group is "ECG" or "EMG" or "EXG Test" or "Respiration" or "EXG")
         {
             return subParameter switch
@@ -1744,120 +1902,41 @@ private void ApplyModeTitleToFlags(string? title)
             };
         }
 
-        // Per i gruppi IMU usa X/Y/Z
+        // IMU groups: compress axis suffix
         if (subParameter.EndsWith("X")) return "X";
         if (subParameter.EndsWith("Y")) return "Y";
         if (subParameter.EndsWith("Z")) return "Z";
 
-        // Parametri singoli: riusa il nome pulito
+        // Single parameters: reuse cleaned name
         return CleanParameterName(subParameter);
     }
 
-    // Etichette leggibili per la legenda corrente (bindabile dalla view)
-    public List<string> LegendLabels =>
-        GetCurrentSubParameters().Select(p => GetLegendLabel(SelectedParameter, p)).ToList();
 
-    // Etichette singole per la legenda (comode da bindare in XAML)
-    public string Legend1Text => LegendLabels.ElementAtOrDefault(0) ?? "";
-    public string Legend2Text => LegendLabels.ElementAtOrDefault(1) ?? "";
-    public string Legend3Text => LegendLabels.ElementAtOrDefault(2) ?? "";
-
-    // Colori coerenti con le serie disegnate.
-    // Nota: se in Multi hai solo 2 serie, la seconda la faccio Blu (come nello screenshot)
-    public Color Legend1Color => Colors.Red;
-    public Color Legend2Color => (LegendLabels.Count == 2) ? Colors.Blue : Colors.Green;
-    public Color Legend3Color => Colors.Blue;
-
-
-
+    // ----- Selection -> sub-parameters -----
 
     /// <summary>
-    /// Clears all data and timestamp collections for every parameter.
+    /// Returns sub-parameters for the currently selected parameter. 
+    /// If the selection is a group (multi-chart), returns all sub-parameters; 
+    /// otherwise returns a single-item list with the cleaned name.
     /// </summary>
-    private void ClearAllDataCollections()
-    {
-
-        // Iterate over all parameter keys and clear the corresponding data lists
-        foreach (var key in dataPointsCollections.Keys.ToList())
-        {
-            dataPointsCollections[key].Clear();
-        }
-
-        // Do the same for the timestamp lists
-        foreach (var key in timeStampsCollections.Keys.ToList())
-        {
-            timeStampsCollections[key].Clear();
-        }
-    }
-
-
-    /// <summary>
-    /// Ensures that the data and timestamp lists for the given parameter
-    /// do not exceed the specified maximum number of points.
-    /// If the collections grow too large (e.g., after a time window change),
-    /// oldest samples are removed.
-    /// </summary>
-    /// <param name="parameter">The parameter whose data/timestamps should be trimmed.</param>
-    /// <param name="maxPoints">The maximum number of points to retain in each collection.</param>
-    private void TrimCollection(string parameter, int maxPoints)
-    {
-
-        // Check if both data and timestamp lists exist for the parameter
-        if (dataPointsCollections.TryGetValue(parameter, out var dataList) &&
-            timeStampsCollections.TryGetValue(parameter, out var timeList))
-        {
-
-            // Remove oldest items until the collection is within the maximum size
-            while (dataList.Count > maxPoints && timeList.Count > 0)
-            {
-                if (dataList.Count > 0)
-                    dataList.RemoveAt(0);   // Remove oldest data point
-                if (timeList.Count > 0)
-                    timeList.RemoveAt(0);   // Remove corresponding timestamp
-            }
-        }
-    }
-
-
-    /// <summary>
-    /// Returns the list of sub-parameters to be displayed for the currently selected parameter.
-    /// If the parameter supports multiple sub-parameters (i.e., is a multi-chart),
-    /// the method returns all sub-parameters; otherwise, it returns a list containing
-    /// only the cleaned parameter name.
-    /// </summary>
-    /// <returns>
-    /// A list of strings containing the sub-parameters for the current parameter selection.
-    /// </returns>
+    /// <returns>List of sub-parameter names for the current selection.</returns>
     public List<string> GetCurrentSubParameters()
     {
         string cleanName = CleanParameterName(SelectedParameter);
         return IsMultiChart(cleanName) ? GetSubParameters(cleanName) : new List<string> { cleanName };
     }
 
-    public string GetSplitParameterForCanvas(int slotIndex)
-    {
-        // slotIndex: 0 = primo riquadro (in XAML è canvasX), 1 = secondo (canvasY), 2 = terzo (canvasZ)
-        var clean = CleanParameterName(SelectedParameter);
 
-        if (ChartDisplayMode != ChartDisplayMode.Split)
-            return clean; // non in split: ignora
+    // ----- Sample ingestion and storage -----
 
-        // Caso EXG: 2 soli canali
-        if (IsExgSplit)
-        {
-            return slotIndex switch
-            {
-                0 => "Exg1",
-                1 => "Exg2",
-                _ => "" // il terzo grafico (Z) resta vuoto/nascosto
-            };
-        }
-
-        // Caso IMU XYZ: 3 assi
-        var sub = GetSubParameters(clean);
-        return (slotIndex >= 0 && slotIndex < sub.Count) ? sub[slotIndex] : "";
-    }
-
+    /// <summary>
+    /// Try to extract a numeric value from a dynamic sample field:
+    /// accepts primitives or wrappers exposing a public 'Data' property.
+    /// </summary>
+    /// <param name="sample">Dynamic sample object.</param>
+    /// <param name="field">Field/property name to read.</param>
+    /// <param name="val">On success, receives the numeric value.</param>
+    /// <returns>True if a numeric value was found and converted; otherwise false.</returns>
     private static bool TryGetNumeric(dynamic sample, string field, out float val)
     {
         val = 0f;
@@ -1887,22 +1966,19 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
-
     /// <summary>
-    /// Processes a single data sample from the Shimmer device, updates all enabled data collections
-    /// with the new values, manages timestamps, trims collections to respect the time window,
-    /// and updates the Y-axis range automatically if required.
+    /// Process one device sample: gather enabled values, compute battery %, push into
+    /// data/timestamp collections (bounded by time window), and optionally auto-scale Y.
     /// </summary>
-    /// <param name="sample">The latest dynamic data sample from the Shimmer device.</param>
-    /// <param name="currentTimeSeconds">The timestamp (in seconds) of the current sample.</param>
+    /// <param name="sample">Latest dynamic device sample.</param>
+    /// <param name="currentTimeSeconds">Current timestamp in seconds.</param>
     private void UpdateDataCollectionsWithSingleSample(dynamic sample, double currentTimeSeconds)
     {
         var values = new Dictionary<string, float>();
 
-
         try
         {
-            // ===== Low-noise Accelerometer =====
+            // Low-noise Accelerometer
             if (enableLowNoiseAccelerometer)
             {
                 if (HasProp(sample, "LowNoiseAccelerometerX") && sample.LowNoiseAccelerometerX != null)
@@ -1913,7 +1989,7 @@ private void ApplyModeTitleToFlags(string? title)
                     values["Low-Noise AccelerometerZ"] = (float)sample.LowNoiseAccelerometerZ.Data;
             }
 
-            // ===== Wide-range Accelerometer =====
+            // Wide-range Accelerometer
             if (enableWideRangeAccelerometer)
             {
                 if (HasProp(sample, "WideRangeAccelerometerX") && sample.WideRangeAccelerometerX != null)
@@ -1924,7 +2000,7 @@ private void ApplyModeTitleToFlags(string? title)
                     values["Wide-Range AccelerometerZ"] = (float)sample.WideRangeAccelerometerZ.Data;
             }
 
-            // ===== Gyroscope =====
+            // Gyroscope
             if (enableGyroscope)
             {
                 if (HasProp(sample, "GyroscopeX") && sample.GyroscopeX != null)
@@ -1935,7 +2011,7 @@ private void ApplyModeTitleToFlags(string? title)
                     values["GyroscopeZ"] = (float)sample.GyroscopeZ.Data;
             }
 
-            // ===== Magnetometer =====
+            // Magnetometer
             if (enableMagnetometer)
             {
                 if (HasProp(sample, "MagnetometerX") && sample.MagnetometerX != null)
@@ -1946,7 +2022,7 @@ private void ApplyModeTitleToFlags(string? title)
                     values["MagnetometerZ"] = (float)sample.MagnetometerZ.Data;
             }
 
-            // ===== Env (BMP180) =====
+            // BMP180
             if (enablePressureTemperature)
             {
                 if (HasProp(sample, "Temperature_BMP180") && sample.Temperature_BMP180 != null)
@@ -1955,7 +2031,7 @@ private void ApplyModeTitleToFlags(string? title)
                     values["Pressure_BMP180"] = (float)sample.Pressure_BMP180.Data;
             }
 
-            // ===== Battery =====
+            // Battery
             if (enableBattery && HasProp(sample, "BatteryVoltage") && sample.BatteryVoltage != null)
             {
                 values["BatteryVoltage"] = (float)sample.BatteryVoltage.Data / 1000f; // mV → V
@@ -1970,49 +2046,43 @@ private void ApplyModeTitleToFlags(string? title)
                 values["BatteryPercent"] = Math.Clamp(percent, 0, 100);
             }
 
-            // ===== External ADC =====
+            // External ADC
             if (enableExtA6 && HasProp(sample, "ExtADC_A6") && sample.ExtADC_A6 != null)
                 values["ExtADC_A6"] = (float)sample.ExtADC_A6.Data / 1000f;
             if (enableExtA7 && HasProp(sample, "ExtADC_A7") && sample.ExtADC_A7 != null)
                 values["ExtADC_A7"] = (float)sample.ExtADC_A7.Data / 1000f;
             if (enableExtA15 && HasProp(sample, "ExtADC_A15") && sample.ExtADC_A15 != null)
                 values["ExtADC_A15"] = (float)sample.ExtADC_A15.Data / 1000f;
-            // ===== EXG: sempre due canali visibili (CH1/CH2) + opzionale respiration =====
-            // ===== EXG: 2 canali + (opz.) respiration — alias per piattaforma =====
+
+            // EXG (two channels)
             if (enableExg)
             {
+
 #if IOS || MACCATALYST
-                // 🔒 iOS/Mac — tieni IDENTICHE le tue righe
+
                 if (TryGetNumeric(sample, "Exg1", out float vExg1))
                     values["Exg1"] = vExg1;
 
                 if (TryGetNumeric(sample, "Exg2", out float vExg2))
                     values["Exg2"] = vExg2;
 
-                // opzionale, solo se usi davvero Respiration
-                if (TryGetNumeric(sample, "ExgRespiration", out float vResp))
-                    values["ExgRespiration"] = vResp;
-
 #elif WINDOWS
+
                 if (HasProp(sample, "Exg1") && sample.Exg1 != null)
                     values["Exg1"] = (float)sample.Exg1.Data;
                 if (HasProp(sample, "Exg2") && sample.Exg2 != null)
                     values["Exg2"] = (float)sample.Exg2.Data;
-                if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
-                    values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
 
 #elif ANDROID
+
                 if (HasProp(sample, "Exg1") && sample.Exg1 != null)
                     values["Exg1"] = (float)sample.Exg1.Data;
                 if (HasProp(sample, "Exg2") && sample.Exg2 != null)
                     values["Exg2"] = (float)sample.Exg2.Data;
-                if (HasProp(sample, "ExgRespiration") && sample.ExgRespiration != null)
-                    values["ExgRespiration"] = (float)sample.ExgRespiration.Data;
 
 #endif
+
             }
-
-
         }
         catch (Exception ex)
         {
@@ -2020,13 +2090,12 @@ private void ApplyModeTitleToFlags(string? title)
             return;
         }
 
-        // ==== Store (thread-safe) ====
+        // Store (thread-safe)
         lock (_dataLock)
         {
             int timestampMs = (int)Math.Round(currentTimeSeconds * 1000);
             int maxPoints = (int)(TimeWindowSeconds * DeviceSamplingRate);
 
-            LogExg(values, timestampMs);
 
             foreach (var kv in values)
             {
@@ -2045,7 +2114,7 @@ private void ApplyModeTitleToFlags(string? title)
             }
         }
 
-        // ==== Auto Y-axis ====
+        // Auto Y-axis
         if (AutoYAxis)
         {
             CalculateAutoYAxisRange();
@@ -2060,6 +2129,12 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    /// <summary>
+    /// True if the dynamic object exposes a property or field with the given name.
+    /// </summary>
+    /// <param name="obj">Dynamic object to probe.</param>
+    /// <param name="name">Member name.</param>
+    /// <returns>True if property or field exists; otherwise false.</returns>
     private static bool HasProp(dynamic obj, string name)
     {
         try
@@ -2071,50 +2146,13 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    // ----- Selection change -> chart mode and Y axis -----
 
     /// <summary>
-    /// Retrieves a snapshot (deep copy) of the data and timestamp series for a given parameter.
-    /// This method is thread-safe and returns empty lists if the parameter does not exist.
+    /// Reacts to SelectedParameter changes: sets display mode (Multi/Split), 
+    /// updates Y-axis settings and legend bindings, and refreshes the chart.
     /// </summary>
-    /// <param name="parameter">The name of the parameter whose data series to retrieve.</param>
-    /// <returns>
-    /// A tuple containing:
-    /// - data: a list of float values representing the parameter data,
-    /// - time: a list of int values representing the corresponding timestamps (in ms).
-    /// </returns>
-    public (List<float> data, List<int> time) GetSeriesSnapshot(string parameter)
-    {
-        lock (_dataLock)
-        {
-            string key = MapToInternalKey(parameter);
-
-            var dataList = dataPointsCollections.TryGetValue(key, out var d) ? new List<float>(d) : new List<float>();
-            var timeList = timeStampsCollections.TryGetValue(key, out var t) ? new List<int>(t) : new List<int>();
-
-            return (dataList, timeList);
-        }
-    }
-
-
-
-    /// <summary>
-    /// Triggers an event to notify that the chart should be updated.
-    /// Subscribers to ChartUpdateRequested will be notified.
-    /// </summary>
-    private void UpdateChart()
-    {
-
-        // Raise the ChartUpdateRequested event
-        ChartUpdateRequested?.Invoke(this, EventArgs.Empty);
-    }
-
-
-    /// <summary>
-    /// Handles changes to the selected parameter, updating the chart display mode,
-    /// Y-axis settings, label intervals, and triggers a chart update.
-    /// This method is called automatically when the SelectedParameter property changes.
-    /// </summary>
-    /// <param name="value">The newly selected parameter name.</param>
+    /// <param name="value">Newly selected parameter display name.</param>
     partial void OnSelectedParameterChanged(string value)
     {
         value ??= string.Empty;
@@ -2124,7 +2162,7 @@ private void ApplyModeTitleToFlags(string? title)
         ChartDisplayMode = split ? ChartDisplayMode.Split : ChartDisplayMode.Multi;
 
         OnPropertyChanged(nameof(ChartModeLabel));
-        OnPropertyChanged(nameof(IsExgSplit)); // <-- AGGIUNGI QUESTA
+        OnPropertyChanged(nameof(IsExgSplit));
 
         UpdateYAxisSettings(cleanName);
 
@@ -2151,13 +2189,10 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
-
-
     /// <summary>
-    /// Sets the Y-axis label, unit, chart title, and min/max limits according to the selected parameter.
-    /// This ensures the chart is correctly labeled and scaled for the currently displayed data.
+    /// Sets Y-axis label/unit/title and default min/max based on selected parameter.
     /// </summary>
-    /// <param name="parameter">The name of the selected parameter.</param>
+    /// <param name="parameter">Selected parameter display name.</param
     private void UpdateYAxisSettings(string parameter)
     {
 
@@ -2283,7 +2318,7 @@ private void ApplyModeTitleToFlags(string? title)
                 YAxisMax = 5;
                 break;
 
-            // Environmental sensors
+            // BMP180 sensor
             case "Temperature_BMP180":
                 YAxisLabel = "Temperature";
                 YAxisUnit = "°C";
@@ -2315,7 +2350,7 @@ private void ApplyModeTitleToFlags(string? title)
                 YAxisMax = 100;
                 break;
 
-            // External ADC channels
+            // External ADC
             case "ExtADC_A6":
                 YAxisLabel = "External ADC A6";
                 YAxisUnit = "V";
@@ -2337,61 +2372,50 @@ private void ApplyModeTitleToFlags(string? title)
                 YAxisMin = 0;
                 YAxisMax = 3.3;
                 break;
+
+            // EXG mode
             case "ECG":
                 YAxisLabel = "ECG"; YAxisUnit = "mV";
                 ChartTitle = "ECG";
                 YAxisMin = -15; YAxisMax = 15;
                 break;
-
-
             case "EMG":
                 YAxisLabel = "EMG"; YAxisUnit = "mV";
                 ChartTitle = "EMG";
                 YAxisMin = -15; YAxisMax = 15;
                 break;
-
-
             case "EXG Test":
                 YAxisLabel = "EXG Test"; YAxisUnit = "mV";
                 ChartTitle = "EXG Test";
                 YAxisMin = -15; YAxisMax = 15;
                 break;
-
-
             case "Respiration":
                 YAxisLabel = "Respiration";
-                YAxisUnit = "mV";           
+                YAxisUnit = "mV";
                 ChartTitle = "Respiration";
-                YAxisMin = -15;               
-                YAxisMax = 15;               
+                YAxisMin = -15;
+                YAxisMax = 15;
                 break;
-
-
-
-
-
         }
     }
 
 
+    // ----- Parsing helpers (double / int) -----
+
     /// <summary>
-    /// Attempts to convert a string to a valid double value.
-    /// Handles partial user input (e.g. just "-" or "+") as temporarily valid,
-    /// and accepts both '.' and ',' as decimal separators.
+    /// Attempts to parse a string into a valid double. Accepts temporary inputs like "+" or "-",
+    /// and both '.' and ',' as decimal separators.
     /// </summary>
-    /// <param name="input">The string to parse.</param>
+    /// <param name="input">User input string.</param>
     /// <param name="result">
-    /// When this method returns, contains the double value equivalent of the input string, if the conversion succeeded,
-    /// or 0 if the conversion failed or input is a partial sign ("-" or "+").
+    /// Parsed double value (0 for temporary '+'/'-') if successful; otherwise undefined.
     /// </param>
-    /// <returns>
-    /// True if the input is a valid double (or a temporarily valid partial input like "+" or "-"); otherwise, false.
-    /// </returns>
+    /// <returns>True if the input is a valid double or a temporary sign; otherwise false.</returns>
     public static bool TryParseDouble(string input, out double result)
     {
         result = 0;
 
-        // Reject null, empty, or whitespace input as invalid
+        // Reject null, empty, or whitespace input
         if (string.IsNullOrWhiteSpace(input))
             return false;
 
@@ -2399,11 +2423,11 @@ private void ApplyModeTitleToFlags(string? title)
         if (string.IsNullOrEmpty(cleanInput))
             return false;
 
-        // Special case: allow single "+" or "-" as a valid partial input during user editing
+        // Accept single '+' or '-' as a temporary editing state
         if (cleanInput == "-" || cleanInput == "+")
         {
-            result = 0;   // Temporary value
-            return true;  // Considered valid for input scenarios
+            result = 0;
+            return true;
         }
 
         // Check for valid characters and proper position of sign
@@ -2429,29 +2453,18 @@ private void ApplyModeTitleToFlags(string? title)
             }
         }
 
-        // Try to parse using both InvariantCulture and CurrentCulture
-        // to support both dot and comma as decimal separators
+        // Parse with both invariant and current culture
         return double.TryParse(cleanInput, NumberStyles.Float, CultureInfo.InvariantCulture, out result) ||
                double.TryParse(cleanInput, NumberStyles.Float, CultureInfo.CurrentCulture, out result);
     }
 
-    private void UpdateYAxisTextPropertiesOnly()
-    {
-        _yAxisMinText = YAxisMin.ToString(CultureInfo.InvariantCulture);
-        _yAxisMaxText = YAxisMax.ToString(CultureInfo.InvariantCulture);
-        OnPropertyChanged(nameof(YAxisMinText));
-        OnPropertyChanged(nameof(YAxisMaxText));
-    }
 
     /// <summary>
-    /// Attempts to convert a string to a valid integer value.
-    /// Accepts optional leading '+' or '-' signs and checks for valid numeric characters only.
+    /// Attempts to parse a string into a valid integer. Accepts optional leading '+' or '-'.
     /// </summary>
-    /// <param name="input">The string to parse.</param>
-    /// <param name="result">
-    /// When this method returns, contains the integer value equivalent of the input string if the conversion succeeded, or 0 if the conversion failed.
-    /// </param>
-    /// <returns>True if the input is a valid integer; otherwise, false.</returns>
+    /// <param name="input">User input string.</param>
+    /// <param name="result">Parsed integer value if successful; otherwise undefined.</param>
+    /// <returns>True if the input is a valid integer; otherwise false.</returns>
     public static bool TryParseInt(string input, out int result)
     {
         result = 0;
@@ -2476,13 +2489,12 @@ private void ApplyModeTitleToFlags(string? title)
     }
 
 
+    // ----- Sensor configuration snapshot -----
+
     /// <summary>
-    /// Returns an object representing the current sensor configuration.
-    /// Each property indicates whether a specific sensor is enabled.
+    /// Builds a snapshot of current sensor enable flags as a <see cref="ShimmerDevice"/>.
     /// </summary>
-    /// <returns>
-    /// A <see cref="ShimmerDevice"/> object reflecting the currently selected sensor settings.
-    /// </returns>
+    /// <returns>ShimmerDevice populated with the current sensor configuration.</returns>
     public ShimmerDevice GetCurrentSensorConfiguration()
     {
         return new ShimmerDevice
@@ -2507,12 +2519,31 @@ private void ApplyModeTitleToFlags(string? title)
 
     }
 
+#if IOS || MACCATALYST
+
 
     /// <summary>
-    /// Resets all timestamps in the timeStampsCollections for each parameter.
-    /// The timestamps are set as if acquired regularly based on the current sampling rate,
-    /// starting from zero and increasing by a fixed interval for each sample.
-    /// This method is thread-safe.
+    /// Maps a human-readable EXG mode title to internal EXG flags (ECG/EMG/Test/Respiration).
+    /// </summary>
+    /// <param name="title">Mode title to apply.</param>
+    private void ApplyModeTitleToFlags(string? title)
+    {
+        var t = (title ?? "").Trim();
+        exgModeECG         = t.Equals("ECG", StringComparison.OrdinalIgnoreCase);
+        exgModeEMG         = t.Equals("EMG", StringComparison.OrdinalIgnoreCase);
+        exgModeTest        = t.Equals("EXG Test", StringComparison.OrdinalIgnoreCase);
+        exgModeRespiration = t.Equals("Respiration", StringComparison.OrdinalIgnoreCase);
+        enableExg = true;   // we are displaying EXG anyway
+    }
+
+#endif
+
+
+    // ----- Timestamp utilities -----
+
+    /// <summary>
+    /// Rebuilds all timestamps as evenly spaced (ms) from zero, using the current sampling rate.
+    /// Thread-safe.
     /// </summary>
     public void ResetAllTimestamps()
     {
@@ -2532,5 +2563,4 @@ private void ApplyModeTitleToFlags(string? title)
             }
         }
     }
-
 }
