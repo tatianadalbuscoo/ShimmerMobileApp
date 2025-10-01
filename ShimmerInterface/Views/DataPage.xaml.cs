@@ -160,7 +160,7 @@ public partial class DataPage : ContentPage
 #endif
 
         // Bind EXG ViewModel and wire up page bindings
-        viewModel = new DataPageViewModel(shimmer, sensorConfig); // usa il ctor EXG del VM
+        viewModel = new DataPageViewModel(shimmer, sensorConfig);
         BindingContext = viewModel;
 
 #if IOS || MACCATALYST
@@ -631,7 +631,7 @@ public partial class DataPage : ContentPage
             "Gyroscope" => cfg.EnableGyroscope,
             "Magnetometer" => cfg.EnableMagnetometer,
 
-            // EXG (gruppi a due canali)
+            // EXG (two-channel groups)
             "ECG" => cfg.EnableExg && cfg.IsExgModeECG,
             "EMG" => cfg.EnableExg && cfg.IsExgModeEMG,
             "EXG Test" => cfg.EnableExg && cfg.IsExgModeTest,

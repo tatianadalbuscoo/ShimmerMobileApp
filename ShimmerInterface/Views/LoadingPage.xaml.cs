@@ -30,7 +30,7 @@ public partial class LoadingPage : ContentPage
     /// Also subscribes to property change notifications to reactively respond to state transitions such as alerts.
     /// </summary>
     /// <param name="device">The Shimmer device selected by the user for connection.</param>
-    /// <param name="completion">A TaskCompletionSource used to return the connected device instance (IMU o EXG) asincronamente al chiamante.</param>
+    /// <param name="completion">A TaskCompletionSource used to return the connected device instance (IMU or EXG) asynchronously to the caller.</param>
     public LoadingPage(ShimmerDevice device, TaskCompletionSource<object?> completion)
     {
         InitializeComponent();

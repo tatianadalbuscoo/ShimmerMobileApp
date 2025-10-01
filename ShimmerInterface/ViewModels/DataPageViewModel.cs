@@ -869,7 +869,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex)
         {
-            ValidationMessage = $"Impossibile applicare il sampling rate: {ex.Message}";
+            ValidationMessage = $"Unable to apply sampling rate: {ex.Message}";
             ResetSamplingRateText();
         }
     }
@@ -1947,11 +1947,11 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             var x = pi.GetValue(sample);
             if (x == null) return false;
 
-            // Caso 1: già numero
+            // Case 1: already number
             if (x is sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal)
             { val = Convert.ToSingle(x); return true; }
 
-            // Caso 2: wrapper con proprietà .Data
+            // Case 2: Wrapper with .Data property
             var dp = x.GetType().GetProperty("Data");
             if (dp != null)
             {
@@ -2140,7 +2140,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         try
         {
             var t = obj.GetType();
-            return t.GetProperty(name) != null || t.GetField(name) != null; // <-- aggiungi il check dei field
+            return t.GetProperty(name) != null || t.GetField(name) != null;
         }
         catch { return false; }
     }

@@ -89,7 +89,7 @@
                                        BorderColor="Gray"
                                        VerticalOptions="Center">
 
-                                            <!-- Mostra EXG/IMU o "device off" -->
+                                            <!-- Shows EXG/IMU or "device off" -->
                                             <Label Text="{Binding RightBadge}"
                                            FontAttributes="Bold"
                                            FontSize="12"
