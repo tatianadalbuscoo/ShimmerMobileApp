@@ -257,12 +257,17 @@ public partial class MainPageViewModel : ObservableObject
 
             foreach (var d in bonded)
             {
-                var name = d?.Name ?? string.Empty;
+                if (d is null) continue;
+
+                var name = d.Name ?? string.Empty;
                 if (string.IsNullOrWhiteSpace(name)) continue;
                 if (!name.Contains("Shimmer", StringComparison.OrdinalIgnoreCase)) continue;
 
                 any = true;
-                var mac = d!.Address;
+
+                var mac = d.Address ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(mac)) continue; 
+
 
                 // Try to extract the 4-char Shimmer ID from the friendly name if present.
                 var shimmerName = ExtractShimmerName(deviceId: string.Empty, friendlyName: name);
@@ -495,7 +500,7 @@ public partial class MainPageViewModel : ObservableObject
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception)
         {}
 
 #endif

@@ -119,11 +119,12 @@ namespace ShimmerSDK.EXG
 #elif WINDOWS
 
             await Task.Delay(1000);
-            shimmer.StartStreaming();
+            var s = shimmer ?? throw new InvalidOperationException("Device not initialized/connected.");
+            s.StartStreaming();
 
 #elif MACCATALYST || IOS
 
-    await StartStreamingMacAsync();
+            await StartStreamingMacAsync();
 
 #endif
         }
@@ -191,4 +192,5 @@ namespace ShimmerSDK.EXG
             await Task.Delay(t);
         }
     }
+
 }

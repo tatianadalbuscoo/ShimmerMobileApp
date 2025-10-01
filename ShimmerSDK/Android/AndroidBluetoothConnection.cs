@@ -13,6 +13,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Android.Bluetooth;
 using Java.Util;
+using System.Runtime.Versioning;
 
 
 namespace ShimmerSDK.Android
@@ -96,10 +97,12 @@ namespace ShimmerSDK.Android
 
                 System.Exception? last = null;
 
+                var d = device ?? throw new ArgumentNullException(nameof(device));
+
                 // Try secure, insecure, then reflection-based RFCOMM connection (stop at first success).
-                if (TryConnect(CreateSecure(device), out last)) return;
-                if (TryConnect(CreateInsecure(device), out last)) return;
-                if (TryConnect(CreateReflectChannel1(device), out last)) return;
+                if (TryConnect(CreateSecure(d), out last)) return;
+                if (TryConnect(CreateInsecure(d), out last)) return;
+                if (TryConnect(CreateReflectChannel1(d), out last)) return;
 
                 throw new IOException($"Unable to connect to {_mac}. Last error: {last?.Message}", last);
             }
@@ -191,18 +194,20 @@ namespace ShimmerSDK.Android
         /// </summary>
         /// <param name="d">Target Bluetooth device.</param>
         /// <returns>A <see cref="BluetoothSocket"/> created via reflection.</returns>
+        [SupportedOSPlatform("android21.0")]
         private static BluetoothSocket CreateReflectChannel1(BluetoothDevice d)
         {
-
-            // Lookup method: BluetoothDevice.createRfcommSocket(int)
-            Java.Lang.Reflect.Method m = d.Class.GetMethod(
+            var m = d.Class.GetMethod(
                 "createRfcommSocket",
-                new Java.Lang.Class[] { Java.Lang.Integer.Type }    // parameter type: int
-            );
+                new Java.Lang.Class[] { Java.Lang.Integer.Type })
+                ?? throw new MissingMethodException("BluetoothDevice.createRfcommSocket(int) not found.");
 
-            // Invoke with channel 1 (common for SPP)
             var socketObj = m.Invoke(d, new Java.Lang.Object[] { Java.Lang.Integer.ValueOf(1) });
-            return (BluetoothSocket)socketObj;
+
+            if (socketObj is not BluetoothSocket socket)
+                throw new InvalidOperationException("Reflection returned null or an unexpected type for RFCOMM socket.");
+
+            return socket;
         }
 
 

@@ -189,7 +189,7 @@ namespace ShimmerSDK
                 kind  = MapBoardStringToKind(boardStr); // "EXG" -> EXG, else IMU
                 return true;
             }
-            catch (System.Exception ex)
+            catch (System.Exception)
             {
                 kind  = BoardKind.Unknown;
                 rawId = "";
@@ -462,7 +462,7 @@ namespace ShimmerSDK
 
         /// <summary>
         /// Reference-based equality comparer used to track visited objects in BFS traversal.
-        /// Compares by object identity (<see cref="ReferenceEquals"/>) and uses
+        /// Compares by object identity (<see cref="System.Object.ReferenceEquals(object, object)"/>) and uses
         /// <see cref="System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(object)"/> for hashing.
         /// </summary>
         private sealed class RefEqComparer : IEqualityComparer<object>

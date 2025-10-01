@@ -11,6 +11,7 @@ namespace ShimmerSDK.EXG
     /// <summary>
     /// Partial class that manages configuration parameters and sensor enable flags
     /// for a Shimmer EXG device.
+    /// </summary>
     public partial class ShimmerSDK_EXG
     {
 
@@ -30,13 +31,6 @@ namespace ShimmerSDK.EXG
         // EXG operating mode (enum: ECG/EMG/etc.).
         private ExgMode _exgMode;
 
-#if ANDROID
-
-        // Android: MAC + device ID.
-        private string? _endpointMac;
-        private string? _deviceId;
-
-#endif
 
         /// <summary>
         /// Gets or sets the sampling rate in Hz for the Shimmer device.

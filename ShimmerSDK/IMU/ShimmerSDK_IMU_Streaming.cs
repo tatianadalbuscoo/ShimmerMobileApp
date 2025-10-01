@@ -6,6 +6,7 @@
 
 
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 
@@ -37,21 +38,24 @@ namespace ShimmerSDK.IMU
 #elif WINDOWS
 
             if (IsConnected()) return;
-            shimmer.Connect();
+
+            var dev = shimmer ?? throw new InvalidOperationException("Shimmer device not configured (null).");
+            dev.Connect();
 
             var sr = (int)Math.Round(_samplingRate <= 0 ? 51.2 : _samplingRate);
 
             // Apply sampling rate
-            shimmer.WriteSamplingRate(sr);
+            dev.WriteSamplingRate(sr);
             System.Threading.Thread.Sleep(150);
 
             // Apply sensor bitmap
-            shimmer.WriteSensors(_winEnabledSensors);
+            dev.WriteSensors(_winEnabledSensors);
             System.Threading.Thread.Sleep(200);
 
             // Refresh metadata
-            shimmer.Inquiry();
+            dev.Inquiry();
             System.Threading.Thread.Sleep(200);
+
 
 #elif MACCATALYST || IOS
 
@@ -77,8 +81,12 @@ namespace ShimmerSDK.IMU
 
 #elif WINDOWS
 
+            var s = shimmer;
+            if (s is null)
+                throw new InvalidOperationException("Device not initialized. Call Configure/Connect before StartStreaming().");
+
             await DelayWork(1000);
-            shimmer.StartStreaming();
+            s.StartStreaming();
 
 #elif MACCATALYST || IOS
 
@@ -127,8 +135,9 @@ namespace ShimmerSDK.IMU
             return shimmerAndroid != null && shimmerAndroid.IsConnected();
 
 #elif WINDOWS
-
-            return shimmer.IsConnected();
+            
+            var s = Volatile.Read(ref shimmer);
+            return s != null && s.IsConnected();
 
 #elif MACCATALYST || IOS
 
@@ -227,8 +236,13 @@ namespace ShimmerSDK.IMU
             }
             catch (Exception ex)
             {
-                global::Android.Util.Log.Error("Shimmer", "StartStreamingAndroidSequenceAsync exception:");
-                global::Android.Util.Log.Error("Shimmer", ex.ToString());
+
+                if (OperatingSystem.IsAndroid() && OperatingSystem.IsAndroidVersionAtLeast(21))
+                {
+                    global::Android.Util.Log.Error("Shimmer", "StartStreamingAndroidSequenceAsync exception:");
+                    global::Android.Util.Log.Error("Shimmer", ex.ToString());
+                }
+
                 System.Diagnostics.Debug.WriteLine(ex);
                 throw;
             }

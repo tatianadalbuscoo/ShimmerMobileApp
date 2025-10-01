@@ -276,7 +276,8 @@ namespace ShimmerInterface.Models
 
 
         /// <summary>
-        /// Raises <see cref="PropertyChanged"/> for EXG helper properties after mode/toggle changes.
+        /// Raises <see cref="System.ComponentModel.INotifyPropertyChanged.PropertyChanged"/>  
+        /// for EXG helper properties after mode/toggle changes.
         /// </summary>
         private void RaiseExgHelpersChanged()
         {
@@ -310,5 +311,4 @@ namespace ShimmerInterface.Models
 #endif
 
     }
-
 }

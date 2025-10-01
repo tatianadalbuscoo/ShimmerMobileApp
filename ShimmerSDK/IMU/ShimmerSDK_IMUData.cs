@@ -26,53 +26,53 @@ namespace ShimmerSDK.IMU
 #if WINDOWS || ANDROID
 
         // Timestamp
-        public readonly SensorData TimeStamp;
+        public readonly SensorData? TimeStamp;
 
         // Low-noise accelerometer
-        public readonly SensorData LowNoiseAccelerometerX;
-        public readonly SensorData LowNoiseAccelerometerY;
-        public readonly SensorData LowNoiseAccelerometerZ;
+        public readonly SensorData? LowNoiseAccelerometerX;
+        public readonly SensorData? LowNoiseAccelerometerY;
+        public readonly SensorData? LowNoiseAccelerometerZ;
 
         // Wide-range accelerometer
-        public readonly SensorData WideRangeAccelerometerX;
-        public readonly SensorData WideRangeAccelerometerY;
-        public readonly SensorData WideRangeAccelerometerZ;
+        public readonly SensorData? WideRangeAccelerometerX;
+        public readonly SensorData? WideRangeAccelerometerY;
+        public readonly SensorData? WideRangeAccelerometerZ;
 
         // Gyroscope
-        public readonly SensorData GyroscopeX;
-        public readonly SensorData GyroscopeY;
-        public readonly SensorData GyroscopeZ;
+        public readonly SensorData? GyroscopeX;
+        public readonly SensorData? GyroscopeY;
+        public readonly SensorData? GyroscopeZ;
 
         // Magnetometer
-        public readonly SensorData MagnetometerX;
-        public readonly SensorData MagnetometerY;
-        public readonly SensorData MagnetometerZ;
+        public readonly SensorData? MagnetometerX;
+        public readonly SensorData? MagnetometerY;
+        public readonly SensorData? MagnetometerZ;
 
         // Pressure and Temperature
-        public readonly SensorData Pressure_BMP180;
-        public readonly SensorData Temperature_BMP180;
+        public readonly SensorData? Pressure_BMP180;
+        public readonly SensorData? Temperature_BMP180;
 
         // Battery
-        public readonly SensorData BatteryVoltage;
+        public readonly SensorData? BatteryVoltage;
 
         // External ADCs
-        public readonly SensorData ExtADC_A6;
-        public readonly SensorData ExtADC_A7;
-        public readonly SensorData ExtADC_A15;
+        public readonly SensorData? ExtADC_A6;
+        public readonly SensorData? ExtADC_A7;
+        public readonly SensorData? ExtADC_A15;
 
 
         /// <summary>
         /// Constructs a full Shimmer IMU data frame with all sensor channels.
         /// </summary>
         public ShimmerSDK_IMUData(
-            SensorData timeStamp,
-            SensorData accelerometerX, SensorData accelerometerY, SensorData accelerometerZ,
-            SensorData wideAccelerometerX, SensorData wideAccelerometerY, SensorData wideAccelerometerZ,
-            SensorData gyroscopeX, SensorData gyroscopeY, SensorData gyroscopeZ,
-            SensorData magnetometerX, SensorData magnetometerY, SensorData magnetometerZ,
-            SensorData temperatureBMP180, SensorData pressureBMP180,
-            SensorData batteryVoltage,
-            SensorData extADC_A6, SensorData extADC_A7, SensorData extADC_A15
+            SensorData? timeStamp,
+            SensorData? accelerometerX, SensorData? accelerometerY, SensorData? accelerometerZ,
+            SensorData? wideAccelerometerX, SensorData? wideAccelerometerY, SensorData? wideAccelerometerZ,
+            SensorData? gyroscopeX, SensorData? gyroscopeY, SensorData? gyroscopeZ,
+            SensorData? magnetometerX, SensorData? magnetometerY, SensorData? magnetometerZ,
+            SensorData? temperatureBMP180, SensorData? pressureBMP180,
+            SensorData? batteryVoltage,
+            SensorData? extADC_A6, SensorData? extADC_A7, SensorData? extADC_A15
         )
         {
             TimeStamp = timeStamp;
@@ -107,53 +107,53 @@ namespace ShimmerSDK.IMU
 #elif IOS || MACCATALYST
 
         // Timestamp
-        public readonly object TimeStamp;
+        public readonly object? TimeStamp;
 
         // Low-noise accelerometer
-        public readonly object LowNoiseAccelerometerX;
-        public readonly object LowNoiseAccelerometerY;
-        public readonly object LowNoiseAccelerometerZ;
+        public readonly object? LowNoiseAccelerometerX;
+        public readonly object? LowNoiseAccelerometerY;
+        public readonly object? LowNoiseAccelerometerZ;
 
         // Wide-range accelerometer
-        public readonly object WideRangeAccelerometerX;
-        public readonly object WideRangeAccelerometerY;
-        public readonly object WideRangeAccelerometerZ;
+        public readonly object? WideRangeAccelerometerX;
+        public readonly object? WideRangeAccelerometerY;
+        public readonly object? WideRangeAccelerometerZ;
 
         // Gyroscope
-        public readonly object GyroscopeX;
-        public readonly object GyroscopeY;
-        public readonly object GyroscopeZ;
+        public readonly object? GyroscopeX;
+        public readonly object? GyroscopeY;
+        public readonly object? GyroscopeZ;
 
         // Magnetometer
-        public readonly object MagnetometerX;
-        public readonly object MagnetometerY;
-        public readonly object MagnetometerZ;
+        public readonly object? MagnetometerX;
+        public readonly object? MagnetometerY;
+        public readonly object? MagnetometerZ;
 
         // Pressure and Temperature
-        public readonly object Pressure_BMP180;
-        public readonly object Temperature_BMP180;
+        public readonly object? Pressure_BMP180;
+        public readonly object? Temperature_BMP180;
 
         // Battery
-        public readonly object BatteryVoltage;
+        public readonly object? BatteryVoltage;
 
         // External ADCs
-        public readonly object ExtADC_A6;
-        public readonly object ExtADC_A7;
-        public readonly object ExtADC_A15;
+        public readonly object? ExtADC_A6;
+        public readonly object? ExtADC_A7;
+        public readonly object? ExtADC_A15;
 
 
         /// <summary>
         /// Constructs a full Shimmer IMU data frame with all sensor channels.
         /// </summary>
         public ShimmerSDK_IMUData(
-            object timeStamp = null,
-            object accelerometerX = null, object accelerometerY = null, object accelerometerZ = null,
-            object wideAccelerometerX = null, object wideAccelerometerY = null, object wideAccelerometerZ = null,
-            object gyroscopeX = null, object gyroscopeY = null, object gyroscopeZ = null,
-            object magnetometerX = null, object magnetometerY = null, object magnetometerZ = null,
-            object temperatureBMP180 = null, object pressureBMP180 = null,
-            object batteryVoltage = null,
-            object extADC_A6 = null, object extADC_A7 = null, object extADC_A15 = null
+            object? timeStamp = null,
+            object? accelerometerX = null, object? accelerometerY = null, object? accelerometerZ = null,
+            object? wideAccelerometerX = null, object? wideAccelerometerY = null, object? wideAccelerometerZ = null,
+            object? gyroscopeX = null, object? gyroscopeY = null, object? gyroscopeZ = null,
+            object? magnetometerX = null, object? magnetometerY = null, object? magnetometerZ = null,
+            object? temperatureBMP180 = null, object? pressureBMP180 = null,
+            object? batteryVoltage = null,
+            object? extADC_A6 = null, object? extADC_A7 = null, object? extADC_A15 = null
         )
         {
             TimeStamp = timeStamp;

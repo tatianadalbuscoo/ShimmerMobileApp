@@ -36,7 +36,7 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
-        Application.Current.UserAppTheme = AppTheme.Light;
+        UserAppTheme = AppTheme.Light;
 
 #if IOS || MACCATALYST
         

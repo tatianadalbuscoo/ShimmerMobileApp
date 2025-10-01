@@ -2192,7 +2192,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Sets Y-axis label/unit/title and default min/max based on selected parameter.
     /// </summary>
-    /// <param name="parameter">Selected parameter display name.</param
+    /// <param name="parameter">Selected parameter display name.</param>
     private void UpdateYAxisSettings(string parameter)
     {
 

@@ -8,6 +8,8 @@ using Android.App;
 using Android.Content.PM;
 using Android.OS;
 using Android.Runtime;
+using AndroidX.Core.App;
+using AndroidX.Core.Content;
 using Microsoft.Maui;
 using Microsoft.Maui.ApplicationModel;
 
@@ -75,13 +77,23 @@ namespace ShimmerInterface
         /// </summary>
         void RequestMissing(string[] permissions)
         {
-            var missing = new List<string>();
+            // Su API < 23 i permessi sono grant all’install: nulla da fare
+            if (!OperatingSystem.IsAndroidVersionAtLeast(23))
+                return;
+
+            var missing = new List<string>(permissions.Length);
             foreach (var p in permissions)
-                if (CheckSelfPermission(p) != Permission.Granted)
+            {
+                // Usa ContextCompat invece di this.CheckSelfPermission
+                if (ContextCompat.CheckSelfPermission(this, p) != Permission.Granted)
                     missing.Add(p);
+            }
 
             if (missing.Count > 0)
-                RequestPermissions(missing.ToArray(), RequestCodeBt);
+            {
+                // Usa ActivityCompat invece di this.RequestPermissions
+                ActivityCompat.RequestPermissions(this, missing.ToArray(), RequestCodeBt);
+            }
         }
     }
 }

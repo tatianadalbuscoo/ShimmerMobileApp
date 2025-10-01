@@ -9,6 +9,8 @@
 
 		<RootNamespace>ShimmerSDK</RootNamespace>
 		<AssemblyName>ShimmerSDK</AssemblyName>
+
+		<Nullable>enable</Nullable>
 	  
 		<!-- C#10 pinned --> 
 		<LangVersion>10.0</LangVersion>
@@ -16,7 +18,7 @@
 		<!-- Manual AssemblyInfo --> 
 		<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
 	</PropertyGroup>
-	
+
 	<!-- Exclude duplicate -->
 	<ItemGroup>
 		<Compile Remove="Windows\SerialPortsManager.cs" />

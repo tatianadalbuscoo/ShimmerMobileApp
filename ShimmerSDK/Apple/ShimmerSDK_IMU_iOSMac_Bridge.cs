@@ -17,6 +17,7 @@ using System.Threading.Tasks;
 using System.Globalization;
 using UIKit;
 using Foundation;
+using System.Runtime.Versioning;
 
 
 namespace ShimmerSDK.IMU
@@ -59,9 +60,6 @@ namespace ShimmerSDK.IMU
 
         // True once the bridge confirmed "open" for the target MAC
         private volatile bool _subscribed;
-
-        // True after at least one valid sample was received
-        private volatile bool _gotAnySample;
 
         // Awaiters for control ACKs (hello/open/config/start)
         private TaskCompletionSource<bool>? _tcsHello, _tcsOpen, _tcsConfig, _tcsStart;
@@ -146,6 +144,9 @@ namespace ShimmerSDK.IMU
         /// Executes the given action on the iOS main (UI) thread.
         /// </summary>
         /// <param name="action">The delegate to run; ignored if <c>null</c>.</param>
+        [SupportedOSPlatform("ios")]
+        [SupportedOSPlatform("maccatalyst")]
+        [SupportedOSPlatform("tvos")]
         private static void RunOnMainThread(Action action)
         {
             if (action == null) return;
@@ -553,9 +554,6 @@ namespace ShimmerSDK.IMU
                     case "sample":
                     {
 
-                        // Parse and publish a new sample (UI callback on main thread).
-                        _gotAnySample = true;
-
                         double? ts = root.TryGetProperty("ts", out var tsEl) && tsEl.ValueKind == JsonValueKind.Number ? tsEl.GetDouble() : (double?)null;
 
                         static double? N(JsonElement parent, string name)
@@ -610,13 +608,16 @@ namespace ShimmerSDK.IMU
 
                         try
                         {
-                            if (HasAnyValue(LatestData))
-                            {
-                                RunOnMainThread(() =>
-                                    SampleReceived?.Invoke(this, LatestData));
+                                if (HasAnyValue(LatestData))
+                                {
+                                    if (OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst() || OperatingSystem.IsTvOS())
+                                        RunOnMainThread(() => SampleReceived?.Invoke(this, LatestData));
+                                    else
+                                        SampleReceived?.Invoke(this, LatestData);
+                                }
+
                             }
-                        }
-                        catch { }
+                            catch { }
                         break;
                     }
 
@@ -663,7 +664,7 @@ namespace ShimmerSDK.IMU
                     while (!result.EndOfMessage && offset < buffer.Length);
                 }
                 catch (OperationCanceledException) { break; }
-                catch (Exception ex) {  break; }
+                catch (Exception) {  break; }
 
                 if (result.MessageType == WebSocketMessageType.Close) { break; }
                 if (offset <= 0) continue;

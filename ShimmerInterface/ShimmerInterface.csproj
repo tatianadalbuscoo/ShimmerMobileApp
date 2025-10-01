@@ -1,29 +1,19 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<!-- Android + iOS ovunque -->
+
+		<!-- Target Android + iOS everywhere -->
 		<TargetFrameworks>net8.0-android;net8.0-ios</TargetFrameworks>
 
-		<!-- aggiungi Mac Catalyst SOLO su macOS -->
+		<!-- Append Mac Catalyst ONLY on macOS hosts -->
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('OSX'))">
 		  $(TargetFrameworks);net8.0-maccatalyst
 		</TargetFrameworks>
 
-		<!-- aggiungi Windows SOLO su Windows -->
+		<!-- Append Windows ONLY on Windows hosts -->
 		<TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('windows'))">
 		  $(TargetFrameworks);net8.0-windows10.0.19041.0
 		</TargetFrameworks>
-
-
-		<!-- Uncomment to also build the tizen app. You will need to install tizen by following this: https://github.com/Samsung/Tizen.NET -->
-		<!-- <TargetFrameworks>$(TargetFrameworks);net8.0-tizen</TargetFrameworks> -->
-
-		<!-- Note for MacCatalyst:
-    The default runtime is maccatalyst-x64, except in Release config, in which case the default is maccatalyst-x64;maccatalyst-arm64.
-    When specifying both architectures, use the plural <RuntimeIdentifiers> instead of the singular <RuntimeIdentifier>.
-    The Mac App Store will NOT accept apps with ONLY maccatalyst-arm64 indicated;
-    either BOTH runtimes must be indicated or ONLY macatalyst-x64. -->
-		<!-- For example: <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
 
 		<OutputType>Exe</OutputType>
 		<RootNamespace>ShimmerInterface</RootNamespace>
@@ -33,16 +23,17 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 
-		<!-- Display name -->
+		<!-- App display name -->
 		<ApplicationTitle>ShimmerInterface</ApplicationTitle>
 
-		<!-- App Identifier -->
+		<!-- Reverse-DNS app id -->
 		<ApplicationId>com.companyname.shimmerinterface</ApplicationId>
 
-		<!-- Versions -->
+		<!-- Marketing/build versions -->
 		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
 		<ApplicationVersion>1</ApplicationVersion>
 
+		<!-- Minimum supported OS versions per TFM -->
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">11.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">13.1</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
@@ -52,30 +43,27 @@
 		<Platforms>AnyCPU</Platforms>
 	</PropertyGroup>
 
-	<!-- ✨ ADD: PropertyGroup specifico Mac Catalyst per collegare gli entitlements -->
+	<!-- Mac Catalyst: wire entitlements (required for capabilities) -->
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-maccatalyst'">
 		<Entitlements>Platforms/MacCatalyst/Entitlements.plist</Entitlements>
-		<!-- facoltativo per distribuzione su App Store:
-    <RuntimeIdentifiers>maccatalyst-x64;maccatalyst-arm64</RuntimeIdentifiers> -->
 	</PropertyGroup>
 
 	<ItemGroup>
+		
 		<!-- App Icon -->
 		<MauiIcon Include="Resources\AppIcon\appicon.svg" ForegroundFile="Resources\AppIcon\appiconfg.svg" Color="#512BD4" />
 
 		<!-- Splash Screen -->
 		<MauiSplashScreen Include="Resources\Splash\splash.svg" Color="#512BD4" BaseSize="128,128" />
-		
 
-
-		<!-- Images -->
+		<!-- Images (auto-resized as needed) -->
 		<MauiImage Include="Resources\Images\*" />
 		<MauiImage Update="Resources\Images\dotnet_bot.png" Resize="True" BaseSize="300,185" />
 
-		<!-- Custom Fonts -->
+		<!-- Custom fonts -->
 		<MauiFont Include="Resources\Fonts\*" />
 
-		<!-- Raw Assets (also remove the "Resources\Raw" prefix) -->
+		<!-- Raw assets exposed without the 'Resources\Raw' prefix -->
 		<MauiAsset Include="Resources\Raw\**" LogicalName="%(RecursiveDir)%(Filename)%(Extension)" />
 	</ItemGroup>
 
@@ -91,35 +79,39 @@
 		<PackageReference Include="MathNet.Numerics" Version="5.0.0" />
 	</ItemGroup>
 
-	<!-- Only for Windows -->
+	<!-- Windows-only dependencies -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows10.0.19041.0'">
+
+		<!-- WMI access for COM port discovery -->
 		<PackageReference Include="System.Management" Version="8.0.0" />
 	</ItemGroup>
 
-	<!-- Only for Android -->
+	<!-- Android-only dependencies -->
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
-		<!-- SkiaSharp: pacchetti necessari per Android -->
+
+		<!-- Skia native assets for Android runtime -->
 		<PackageReference Include="SkiaSharp.NativeAssets.Android" Version="2.88.9" />
 		<PackageReference Include="SkiaSharp.Views.Maui.Core" Version="2.88.9" />
-
-		<!-- Se stai usando MAUI + SKCanvasView, NON serve la Compatibility -->
-		<!-- RIMUOVI questa riga se presente -->
-		<!-- <PackageReference Include="SkiaSharp.Views.Maui.Controls.Compatibility" Version="2.88.9" /> -->
 	</ItemGroup>
 
-	<!-- Evita che il linker potature parti di Skia -->
+	<!-- Android linker: keep app stable with Skia; bump to 'Full' if size matters and you add keep descriptors -->
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
 		<AndroidLinkMode>SdkOnly</AndroidLinkMode>
 	</PropertyGroup>
+
+	<!-- iOS signing -->
 	<PropertyGroup Condition="'$(TargetFramework)'=='net8.0-ios'">
 	  <CodesignKey>Apple Development: Tatiana Dal Busco (GN7A92C8B6)</CodesignKey>
 	  <CodesignProvision>VS: WildCard Development</CodesignProvision>
 	</PropertyGroup>
 
 	<ItemGroup>
+
+		  <!-- Local project reference to ShimmerSDK -->
 		  <ProjectReference Include="..\ShimmerSDK\ShimmerSDK.csproj" />
 	</ItemGroup>
 
+	<!-- Ensure XAML files are compiled (explicit for clarity) -->
 	<ItemGroup>
 		<MauiXaml Update="Resources\Styles\BaseStyles.xaml">
 		  <Generator>MSBuild:Compile</Generator>
@@ -135,7 +127,7 @@
 		</MauiXaml>
 	</ItemGroup>
 
-
+	<!-- Keep code-behind associated with their XAML parents -->
 	<ItemGroup>
 		<Compile Update="Views\MainPage.xaml.cs">
 			<DependentUpon>MainPage.xaml</DependentUpon>
@@ -147,6 +139,5 @@
 			<DependentUpon>DataPage.xaml</DependentUpon>
 		</Compile>
 	</ItemGroup>
-
 
 </Project>

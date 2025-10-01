@@ -375,7 +375,7 @@ namespace ShimmerSDK.EXG
         /// </summary>
         /// <param name="sender">Driver instance raising the event.</param>
         /// <param name="args">Event payload (<see cref="CustomEventArgs"/>).</param>
-        private void HandleEvent(object sender, EventArgs args)
+        private void HandleEvent(object? sender, EventArgs args)
         {
 
             // Ignore packets while reconfiguring
@@ -687,7 +687,7 @@ namespace ShimmerSDK.EXG
         /// </summary>
         /// <param name="sender">Event source (Android transport).</param>
         /// <param name="args">Event payload (expected <see cref="CustomEventArgs"/>).</param>
-        private void HandleEventAndroid(object sender, EventArgs args)
+        private void HandleEventAndroid(object? sender, EventArgs args)
         {
             try
             {

@@ -116,7 +116,7 @@ namespace ShimmerSDK.IMU
 
 
         // Last parsed IMU sample (CAL values for enabled sensors)
-        public ShimmerSDK_IMUData LatestData { get; private set; }
+        public ShimmerSDK_IMUData? LatestData { get; private set; }
 
 
         /// <summary>
@@ -292,7 +292,7 @@ namespace ShimmerSDK.IMU
         /// </summary>
         /// <param name="sender">Event source (driver instance).</param>
         /// <param name="args">Event payload (<see cref="CustomEventArgs"/>).</param>
-        private void HandleEvent(object sender, EventArgs args)
+        private void HandleEvent(object? sender, EventArgs args)
         {
 
             // Ignore packets while reconfiguring
@@ -524,7 +524,7 @@ namespace ShimmerSDK.IMU
         /// <summary>Android event sink: route state changes, map indices on first packet, update <see cref="LatestData"/>, and raise <see cref="SampleReceived"/>.</summary>
         /// <param name="sender">Event source.</param>
         /// <param name="args">Event payload (<see cref="CustomEventArgs"/>).</param>
-        private void HandleEventAndroid(object sender, EventArgs args)
+        private void HandleEventAndroid(object? sender, EventArgs args)
         {
             try
             {
@@ -589,7 +589,7 @@ namespace ShimmerSDK.IMU
                     var i = c.GetIndex(name, fmt);
                     return i < 0 ? -1 : i;
                 }
-                static SensorData SafeGet(ObjectCluster c, int idx) => idx >= 0 ? c.GetData(idx) : null;
+                static SensorData? SafeGet(ObjectCluster c, int idx) => idx >= 0 ? c.GetData(idx) : null;
 
                 // On first packet, resolve and cache CAL indices once
                 if (firstDataPacketAndroid)

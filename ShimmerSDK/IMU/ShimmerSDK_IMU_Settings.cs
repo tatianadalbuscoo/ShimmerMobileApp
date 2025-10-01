@@ -27,14 +27,6 @@ namespace ShimmerSDK.IMU
         private bool _enableExtA7;
         private bool _enableExtA15;
 
-#if ANDROID
-
-        // Android: MAC + device ID.
-        private string? _endpointMac;
-        private string? _deviceId;
-
-#endif
-
         /// <summary>
         /// Gets or sets the sampling rate in Hz for the Shimmer device.
         /// </summary>

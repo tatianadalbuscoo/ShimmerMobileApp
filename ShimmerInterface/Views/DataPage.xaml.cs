@@ -261,7 +261,7 @@ public partial class DataPage : ContentPage
     /// renders the overlaid multi-series for the current time window (no-op when Split),
     /// then draws axes, tick labels, and title. Invoked on each SkiaSharp redraw.
     /// </summary>
-    /// <param name="sender">The <see cref="SkiaSharp.Views.Maui.SKCanvasView"/> that raised the event.</param>
+    /// <param name="sender">The <see cref="SkiaSharp.Views.Maui.Controls.SKCanvasView"/> that raised the event.</param>
     /// <param name="e">Event args providing the surface info and drawing canvas.</param>
     private void OnCanvasViewPaintSurface(object sender, SKPaintSurfaceEventArgs e)
     {

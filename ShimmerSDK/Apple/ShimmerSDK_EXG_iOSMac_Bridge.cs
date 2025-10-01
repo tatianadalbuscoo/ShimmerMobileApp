@@ -18,6 +18,7 @@ using System.Threading.Tasks;
 using System.Globalization;
 using UIKit;       
 using Foundation;
+using System.Runtime.Versioning;
 
 
 namespace ShimmerSDK.EXG
@@ -61,14 +62,11 @@ namespace ShimmerSDK.EXG
         // True once the bridge confirmed "open" for the target MAC
         private volatile bool _subscribed;
 
-        // True after at least one valid sample was received
-        private volatile bool _gotAnySample;
-
         // Awaiters for control ACKs (hello/open/config/start)
         private TaskCompletionSource<bool>? _tcsHello, _tcsOpen, _tcsConfig, _tcsStart;
 
         // Awaiter for set_sampling_rate ACK carrying the applied value
-        private TaskCompletionSource<double>? _tcsSetSR;
+        private TaskCompletionSource<double> _tcsSetSR = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // Normalized current EXG mode id
         private string _currentExgMode = "";
@@ -179,8 +177,11 @@ namespace ShimmerSDK.EXG
                 _currentExgMode = norm;
 
                 var title = CurrentExgModeTitle;
-                RunOnMainThread(() => ExgModeChanged?.Invoke(this, title));
 
+                if (OperatingSystem.IsIOS() || OperatingSystem.IsMacCatalyst() || OperatingSystem.IsTvOS() || OperatingSystem.IsMacOS())
+                    RunOnMainThread(() => ExgModeChanged?.Invoke(this, title));
+                else
+                    ExgModeChanged?.Invoke(this, title);
             }
         }
 
@@ -189,6 +190,10 @@ namespace ShimmerSDK.EXG
         /// Executes the given action on the iOS main (UI) thread.
         /// </summary>
         /// <param name="action">The delegate to run; ignored if <c>null</c>.</param>
+        [SupportedOSPlatform("ios")]
+        [SupportedOSPlatform("maccatalyst")]
+        [SupportedOSPlatform("tvos")]
+        [SupportedOSPlatform("macos")]
         private static void RunOnMainThread(Action action)
         {
             if (action == null) 
@@ -554,8 +559,12 @@ namespace ShimmerSDK.EXG
                                 SamplingRate = srEl.GetDouble();
 
                             // Dispatch the latest sample to subscribers on the main (UI) thread
-                            RunOnMainThread(() => SampleReceived?.Invoke(this, LatestData));
-                        }
+                            var snapshot = LatestData;
+                            if (snapshot is null) return;
+
+                            RunOnMainThread(() => SampleReceived?.Invoke(this, snapshot));
+
+                            }
 
                         break;
 
@@ -589,9 +598,6 @@ namespace ShimmerSDK.EXG
 
                     case "sample":
                     {
-
-                        // Parse and publish a new sample (UI callback on main thread).
-                        _gotAnySample = true;
 
                         double? ts = root.TryGetProperty("ts", out var tsEl) && tsEl.ValueKind == JsonValueKind.Number ? tsEl.GetDouble() : (double?)null;
 
