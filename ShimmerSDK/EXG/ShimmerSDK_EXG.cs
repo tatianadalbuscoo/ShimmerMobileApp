@@ -256,9 +256,30 @@ namespace ShimmerSDK.EXG
                 // Detach & dispose previous instance to avoid duplicate event handlers or stale streams
                 if (shimmer != null)
                 {
-                    try { shimmer.UICallback -= this.HandleEvent; } catch { }
-                    try { shimmer.StopStreaming(); } catch { }
-                    try { shimmer.Disconnect(); } catch { }
+                    try 
+                    { 
+                        shimmer.UICallback -= this.HandleEvent; 
+                    } 
+                    catch 
+                    {
+                    }
+
+                    try 
+                    { 
+                        shimmer.StopStreaming(); 
+                    } 
+                    catch 
+                    {
+                    }
+
+                    try 
+                    { 
+                        shimmer.Disconnect(); 
+                    } 
+                    catch 
+                    { 
+                    }
+
                     shimmer = null;
                 }
 
@@ -308,7 +329,13 @@ namespace ShimmerSDK.EXG
 
                 // Create new driver instance and subscribe exactly once
                 shimmer = new ShimmerLogAndStreamSystemSerialPortV2(deviceName, comPort);
-                try { shimmer.UICallback -= this.HandleEvent; } catch { }
+                try 
+                { 
+                    shimmer.UICallback -= this.HandleEvent; 
+                } 
+                catch 
+                {
+                }
                 shimmer.UICallback += this.HandleEvent;
             }
             finally
@@ -464,7 +491,13 @@ namespace ShimmerSDK.EXG
                 );
 
                 // Notify subscribers with the latest parsed sample
-                try { SampleReceived?.Invoke(this, latest); } catch { }
+                try 
+                { 
+                    SampleReceived?.Invoke(this, latest); 
+                } 
+                catch 
+                {
+                }
             }
         }
 
@@ -802,9 +835,18 @@ namespace ShimmerSDK.EXG
                 );
 
                 // Notify subscribers with the latest parsed sample.
-                try { SampleReceived?.Invoke(this, latest); } catch {}
+                try 
+                {
+                    SampleReceived?.Invoke(this, latest); 
+                }
+                catch 
+                {
+                }
             }
-            catch { }
+
+            catch 
+            {
+            }
         }
 
 #endif

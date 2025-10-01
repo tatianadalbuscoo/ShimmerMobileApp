@@ -336,7 +336,9 @@ namespace ShimmerSDK.IMU
             {
                 await SendJsonAsync(new { type = "stop" }).ConfigureAwait(false); 
             } 
-            catch { }
+            catch 
+            {
+            }
             _isStreaming = false;
         }
 
@@ -392,7 +394,13 @@ namespace ShimmerSDK.IMU
             await StopStreamingMacAsync().ConfigureAwait(false);
             if (_ws != null)
             {
-                try { await SendJsonAsync(new { type = "close" }).ConfigureAwait(false); } catch { }
+                try 
+                { 
+                    await SendJsonAsync(new { type = "close" }).ConfigureAwait(false); 
+                } 
+                catch 
+                {
+                }
             }
             await CloseWebSocketAsync().ConfigureAwait(false);
         }
@@ -433,8 +441,20 @@ namespace ShimmerSDK.IMU
             _isStreaming = false;
 
             var ws = _ws; _ws = null;
-            try { _wsCts?.Cancel(); } catch { }
-            try { if (_rxLoop != null) await _rxLoop.ConfigureAwait(false); } catch { }
+            try 
+            { 
+                _wsCts?.Cancel(); 
+            } 
+            catch 
+            {
+            }
+            try 
+            { 
+                if (_rxLoop != null) await _rxLoop.ConfigureAwait(false); 
+            } 
+            catch 
+            {
+            }
 
             if (ws != null)
             {
@@ -617,7 +637,9 @@ namespace ShimmerSDK.IMU
                                 }
 
                             }
-                            catch { }
+                            catch
+                            {
+                            }
                         break;
                     }
 
@@ -630,7 +652,9 @@ namespace ShimmerSDK.IMU
                         break;
                 }
             }
-            catch {}
+            catch
+            {
+            }
         }
 
                 
@@ -663,8 +687,14 @@ namespace ShimmerSDK.IMU
                     }
                     while (!result.EndOfMessage && offset < buffer.Length);
                 }
-                catch (OperationCanceledException) { break; }
-                catch (Exception) {  break; }
+                catch (OperationCanceledException) 
+                {
+                    break;
+                }
+                catch (Exception) 
+                {  
+                    break; 
+                }
 
                 if (result.MessageType == WebSocketMessageType.Close) { break; }
                 if (offset <= 0) continue;

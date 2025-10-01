@@ -595,5 +595,4 @@ public partial class MainPageViewModel : ObservableObject
     /// </summary>
     [GeneratedRegex(@"&00066680([A-F0-9]{4})_", RegexOptions.IgnoreCase)]
     private static partial Regex DeviceIdRegex();
-
 }

@@ -114,7 +114,13 @@ namespace ShimmerSDK
             {
 
                 // Disconnect safely
-                try { shim?.Disconnect(); } catch { }
+                try 
+                { 
+                    shim?.Disconnect(); 
+                } 
+                catch 
+                {
+                }
             }
         }
 
@@ -243,7 +249,13 @@ namespace ShimmerSDK
             }
             finally
             {
-                try { shim?.Disconnect(); } catch { }
+                try 
+                {
+                    shim?.Disconnect(); 
+                } 
+                catch 
+                {
+                }
             }
         }
 
@@ -312,7 +324,14 @@ namespace ShimmerSDK
                 foreach (var f in t.GetFields(flags))
                 {
                     object? val = null;
-                    try { val = f.GetValue(obj); } catch { }
+                    try 
+                    { 
+                        val = f.GetValue(obj); 
+                    } 
+                    catch
+                    {
+                    }
+
                     if (val == null) continue;
                     EnqueueIfNew(val, depth + 1);
                 }
@@ -321,7 +340,14 @@ namespace ShimmerSDK
                 {
                     if (p.GetIndexParameters().Length != 0) continue;
                     object? val = null;
-                    try { val = p.GetValue(obj); } catch { }
+                    try 
+                    {
+                        val = p.GetValue(obj); 
+                    } 
+                    catch 
+                    {
+                    }
+
                     if (val == null) continue;
                     EnqueueIfNew(val, depth + 1);
                 }
@@ -402,7 +428,13 @@ namespace ShimmerSDK
         /// <param name="ms">Delay in milliseconds.</param>
         private static void SafeDelay(int ms)
         {
-            try { System.Threading.Thread.Sleep(ms); } catch { }
+            try 
+            { 
+                System.Threading.Thread.Sleep(ms); 
+            } 
+            catch 
+            {
+            }
         }
 
 

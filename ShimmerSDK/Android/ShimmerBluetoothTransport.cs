@@ -125,4 +125,5 @@ namespace ShimmerSDK.Android
         public void FlushInput() => FlushInputConnection();
     }
 }
+
 #endif

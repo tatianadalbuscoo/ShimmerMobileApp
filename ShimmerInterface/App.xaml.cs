@@ -268,7 +268,9 @@ public partial class App : Application
                             .ToArray();
             }
         }
-        catch {}
+        catch 
+        {
+        }
 
         return Array.Empty<string>();
     }
@@ -352,7 +354,9 @@ public partial class App : Application
                 result["exg"] = exg;
             }
         }
-        catch {}
+        catch 
+        {
+        }
 
         return result;
     }

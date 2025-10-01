@@ -334,12 +334,16 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         try { 
             shimmerImu?.StartStreaming(); 
         } 
-        catch {}
+        catch 
+        {
+        }
 
         try { 
             shimmerExg?.StartStreaming(); 
         } 
-        catch {}
+        catch 
+        {
+        }
     }
 
 
@@ -353,12 +357,16 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
         { 
             shimmerImu?.StopStreaming(); 
         } 
-        catch {}
+        catch 
+        {
+        }
 
         try {
             shimmerExg?.StopStreaming(); 
         } 
-        catch {}
+        catch 
+        {
+        }
     }
 
 
@@ -706,7 +714,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     public void AttachToDevice()
     {
         try { UnsubscribeSamples(); SubscribeSamples(); }
-        catch { }
+        catch 
+        { 
+        }
 
     }
 
@@ -716,7 +726,13 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     /// </summary>
     public void DetachFromDevice()
     {
-        try { UnsubscribeSamples(); } catch { }
+        try 
+        { 
+            UnsubscribeSamples(); 
+        } 
+        catch 
+        {
+        }
 
     }
 
@@ -785,18 +801,28 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     {
         await Task.Run(() =>
         {
-            try { DeviceStopStreaming(); } catch { }
+            try 
+            { 
+                DeviceStopStreaming(); 
+            } 
+            catch 
+            { 
+            }
 
             if (disconnect)
             {
                 try { 
                     (shimmerImu as IDisposable)?.Dispose(); 
                 } 
-                catch { }
+                catch 
+                { 
+                }
                 try {
                     (shimmerExg as IDisposable)?.Dispose(); 
                 } 
-                catch { }
+                catch 
+                {
+                }
             }
         });
     }
@@ -853,9 +879,20 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     {
         try
         {
-            try { DeviceStopStreaming(); } catch { }
+            try 
+            { 
+                DeviceStopStreaming(); 
+            } 
+            catch 
+            { 
+            }
             double applied = SetFirmwareSamplingRateNearestUnified(newRate);
-            try { DeviceStartStreaming(); } catch { }
+            try {
+                DeviceStartStreaming(); 
+            } 
+            catch 
+            { 
+            }
 
             SamplingRateDisplay = applied;
             _lastValidSamplingRate = applied;
@@ -1961,7 +1998,9 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
                 return true;
             }
         }
-        catch { }
+        catch
+        {
+        }
         return false;
     }
 
@@ -2142,7 +2181,10 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
             var t = obj.GetType();
             return t.GetProperty(name) != null || t.GetField(name) != null;
         }
-        catch { return false; }
+        catch 
+        { 
+            return false; 
+        }
     }
 
 

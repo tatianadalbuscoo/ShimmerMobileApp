@@ -74,8 +74,21 @@ namespace ShimmerSDK.Android
         /// </summary>
         public void Disconnect()
         {
-            try { StopStreaming(); } catch { }
-            try { _core.Disconnect(); } catch { }
+            try 
+            { 
+                StopStreaming(); 
+            } 
+            catch 
+            {
+            }
+
+            try 
+            { 
+                _core.Disconnect(); 
+            } 
+            catch 
+            { 
+            }
         }
 
 
@@ -197,4 +210,5 @@ namespace ShimmerSDK.Android
         public string GetShimmerAddress() => _core.GetShimmerAddress();
     }
 }
+
 #endif

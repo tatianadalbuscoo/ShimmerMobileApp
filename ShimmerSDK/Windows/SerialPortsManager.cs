@@ -3,13 +3,21 @@
  * It acts as a thin wrapper over System.IO.Ports to help the app discover Shimmer devices. 
  */
 
+
 #if WINDOWS
+
 using System;
 using System.IO.Ports;
 
 
 namespace ShimmerSDK
 {
+
+    /// <summary>
+    /// Handles enumeration and verification of available serial ports on Windows.
+    /// Provides utility methods for listing COM ports and checking their availability,
+    /// to support Shimmer device discovery.
+    /// </summary>
     public class SerialPortsManager
     {
         /// <summary>
@@ -32,4 +40,5 @@ namespace ShimmerSDK
         }
     }
 }
+
 #endif

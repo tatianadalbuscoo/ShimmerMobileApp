@@ -120,9 +120,30 @@ namespace ShimmerSDK.Android
         /// </summary>
         public void Close()
         {
-            try { _in?.Close(); } catch { }
-            try { _out?.Close(); } catch { }
-            try { _socket?.Close(); } catch { }
+            try 
+            { 
+                _in?.Close(); 
+            } 
+            catch 
+            { 
+            }
+
+            try 
+            { 
+                _out?.Close(); 
+            }
+            catch 
+            {
+            }
+
+            try 
+            {
+                _socket?.Close(); 
+            } 
+            catch 
+            { 
+            }
+
             _in = null; _out = null; _socket = null;
         }
 
@@ -251,7 +272,13 @@ namespace ShimmerSDK.Android
             catch (System.Exception ex)
             {
                 error = ex;
-                try { sock.Close(); } catch { }
+                try 
+                { 
+                    sock.Close(); 
+                } 
+                catch 
+                {
+                }
                 _socket = null; _in = null; _out = null;
                 System.Threading.Thread.Sleep(200); // brief backoff before next strategy
                 return false;

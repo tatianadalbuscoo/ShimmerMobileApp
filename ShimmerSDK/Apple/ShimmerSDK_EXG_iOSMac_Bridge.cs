@@ -317,12 +317,33 @@ namespace ShimmerSDK.EXG
             _isStreaming = false;
 
             var ws = _ws; _ws = null;
-            try { _wsCts?.Cancel(); } catch { }
-            try { if (_rxLoop != null) await _rxLoop.ConfigureAwait(false); } catch { }
+            try 
+            {
+                _wsCts?.Cancel(); 
+            } 
+            
+            catch 
+            {
+            }
+
+            try 
+            { 
+                if (_rxLoop != null) await _rxLoop.ConfigureAwait(false); 
+            } 
+            catch 
+            {
+            }
 
             if (ws != null)
             {
-                try { await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None).ConfigureAwait(false); } catch { }
+                try 
+                { 
+                    await ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None).ConfigureAwait(false); 
+                } 
+
+                catch 
+                {
+                }
                 ws.Dispose();
             }
             _wsCts?.Dispose(); _wsCts = null; _rxLoop = null;
@@ -399,7 +420,11 @@ namespace ShimmerSDK.EXG
             { 
                 await SendJsonAsync(new { type = "stop" }).ConfigureAwait(false); 
             } 
-            catch {}
+
+            catch 
+            {
+            }
+
             _isStreaming = false;
         }
 
@@ -417,7 +442,13 @@ namespace ShimmerSDK.EXG
             await StopStreamingMacAsync().ConfigureAwait(false);
             if (_ws != null)
             {
-                try { await SendJsonAsync(new { type = "close" }).ConfigureAwait(false); } catch { }
+                try 
+                {
+                    await SendJsonAsync(new { type = "close" }).ConfigureAwait(false); 
+                } 
+                catch 
+                {
+                }
             }
             await CloseWebSocketAsync().ConfigureAwait(false);
         }
@@ -687,7 +718,9 @@ namespace ShimmerSDK.EXG
                                 RunOnMainThread(() => SampleReceived?.Invoke(this, snapshot));
                             }
                         }
-                        catch { }
+                        catch 
+                        {
+                        }
                         break;
                     }
 
@@ -698,7 +731,9 @@ namespace ShimmerSDK.EXG
                         break;
                 }
             }
-            catch {}
+            catch 
+            {
+            }
         }
 
 

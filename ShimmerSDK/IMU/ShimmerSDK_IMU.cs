@@ -221,9 +221,30 @@ namespace ShimmerSDK.IMU
                 // Detach & dispose previous instance to avoid duplicate event handlers or stale streams
                 if (shimmer != null)
                 {
-                    try { shimmer.UICallback -= this.HandleEvent; } catch {}
-                    try { shimmer.StopStreaming(); } catch {}
-                    try { shimmer.Disconnect(); } catch {}
+                    try 
+                    {
+                        shimmer.UICallback -= this.HandleEvent; 
+                    } 
+                    catch 
+                    {
+                    } 
+
+                    try 
+                    { 
+                        shimmer.StopStreaming(); 
+                    } 
+                    catch 
+                    {
+                    }
+
+                    try 
+                    { 
+                        shimmer.Disconnect(); 
+                    } 
+                    catch
+                    {
+                    }
+
                     shimmer = null;
                 }
 
@@ -266,7 +287,14 @@ namespace ShimmerSDK.IMU
 
                 // Create new driver instance and subscribe exactly once
                 shimmer = new ShimmerLogAndStreamSystemSerialPortV2(deviceName, comPort);
-                try { shimmer.UICallback -= this.HandleEvent; } catch {}
+                try 
+                { 
+                    shimmer.UICallback -= this.HandleEvent; 
+                } 
+                catch 
+                {
+                }
+
                 shimmer.UICallback += this.HandleEvent;
             }
             finally
@@ -630,9 +658,17 @@ namespace ShimmerSDK.IMU
                 );
 
                 // Notify subscribers with the latest parsed sample
-                try { SampleReceived?.Invoke(this, LatestData); } catch {}
+                try 
+                { 
+                    SampleReceived?.Invoke(this, LatestData); 
+                } 
+                catch 
+                {
+                }
             }
-            catch {}
+            catch 
+            {
+            }
         }
 
 #endif
