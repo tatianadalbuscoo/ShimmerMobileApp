@@ -203,17 +203,52 @@
                 <Label Text="Real-time Chart"
                        Style="{StaticResource TitleLabel}" />
 
+                <!-- Legend: visible normally (including Split), hidden only when there is a single series -->
                 <StackLayout Orientation="Horizontal" HorizontalOptions="Center" Spacing="20">
                     <StackLayout.Triggers>
-                        <DataTrigger TargetType="StackLayout" Binding="{Binding ChartDisplayMode}" Value="Split">
+                        <!-- Hide legend if both Legend2Text and Legend3Text are empty strings -->
+                        <MultiTrigger TargetType="StackLayout">
+                            <MultiTrigger.Conditions>
+                                <BindingCondition Binding="{Binding Legend2Text}" Value="" />
+                                <BindingCondition Binding="{Binding Legend3Text}" Value="" />
+                            </MultiTrigger.Conditions>
                             <Setter Property="IsVisible" Value="False" />
-                        </DataTrigger>
+                        </MultiTrigger>
+
+                        <!-- Hide legend if both are null -->
+                        <MultiTrigger TargetType="StackLayout">
+                            <MultiTrigger.Conditions>
+                                <BindingCondition Binding="{Binding Legend2Text}" Value="{x:Null}" />
+                                <BindingCondition Binding="{Binding Legend3Text}" Value="{x:Null}" />
+                            </MultiTrigger.Conditions>
+                            <Setter Property="IsVisible" Value="False" />
+                        </MultiTrigger>
+
+                        <!-- Mixed cases (one empty, one null) still mean single series -->
+                        <MultiTrigger TargetType="StackLayout">
+                            <MultiTrigger.Conditions>
+                                <BindingCondition Binding="{Binding Legend2Text}" Value="" />
+                                <BindingCondition Binding="{Binding Legend3Text}" Value="{x:Null}" />
+                            </MultiTrigger.Conditions>
+                            <Setter Property="IsVisible" Value="False" />
+                        </MultiTrigger>
+
+                        <MultiTrigger TargetType="StackLayout">
+                            <MultiTrigger.Conditions>
+                                <BindingCondition Binding="{Binding Legend2Text}" Value="{x:Null}" />
+                                <BindingCondition Binding="{Binding Legend3Text}" Value="" />
+                            </MultiTrigger.Conditions>
+                            <Setter Property="IsVisible" Value="False" />
+                        </MultiTrigger>
                     </StackLayout.Triggers>
 
                     <!-- Series chips mirror VM legend labels/colors -->
                     <HorizontalStackLayout Spacing="5">
                         <HorizontalStackLayout.Triggers>
                             <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend1Text}" Value="">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
+                            <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend1Text}" Value="{x:Null}">
                                 <Setter Property="IsVisible" Value="False" />
                             </DataTrigger>
                         </HorizontalStackLayout.Triggers>
@@ -226,6 +261,9 @@
                             <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend2Text}" Value="">
                                 <Setter Property="IsVisible" Value="False" />
                             </DataTrigger>
+                            <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend2Text}" Value="{x:Null}">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
                         </HorizontalStackLayout.Triggers>
                         <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="{Binding Legend2Color}" VerticalOptions="Center" />
                         <Label Text="{Binding Legend2Text}" FontSize="12" VerticalOptions="Center" />
@@ -236,12 +274,14 @@
                             <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend3Text}" Value="">
                                 <Setter Property="IsVisible" Value="False" />
                             </DataTrigger>
+                            <DataTrigger TargetType="HorizontalStackLayout" Binding="{Binding Legend3Text}" Value="{x:Null}">
+                                <Setter Property="IsVisible" Value="False" />
+                            </DataTrigger>
                         </HorizontalStackLayout.Triggers>
                         <BoxView WidthRequest="20" HeightRequest="3" BackgroundColor="{Binding Legend3Color}" VerticalOptions="Center" />
                         <Label Text="{Binding Legend3Text}" FontSize="12" VerticalOptions="Center" />
                     </HorizontalStackLayout>
                 </StackLayout>
-
 
                 <!-- Unified chart (Multi). Hidden when Split is active -->
                 <Border x:Name="UnifiedChartBorder"
