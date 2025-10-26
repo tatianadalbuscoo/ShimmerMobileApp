@@ -1,0 +1,30 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<DefineConstants>$(DefineConstants);TEST_STUBS</DefineConstants>
+		<IsPackable>false</IsPackable>
+		<NoWarn>$(NoWarn);CS0067</NoWarn>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+		<PackageReference Include="xunit" Version="2.8.1" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.1" />
+		<PackageReference Include="coverlet.collector" Version="6.0.2" />
+	</ItemGroup>
+
+	<!-- Collega SOLO il file reale sotto test (path corretto) -->
+	<ItemGroup>
+		<Compile Include="..\ShimmerSDK\EXG\ShimmerSDK_EXG.cs" Link="UnderTest\ShimmerSDK_EXG.cs" />
+		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU.cs" Link="UnderTest\ShimmerSDK_IMU.cs" />
+	</ItemGroup>
+
+	<!-- NON includere gli stub: lo SDK li prende da solo perché sono nel progetto -->
+	<ItemGroup>
+		<None Update="xunit.runner.json">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
+</Project>
