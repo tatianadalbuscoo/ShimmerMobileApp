@@ -125,6 +125,25 @@ namespace ShimmerAPI
         public double LastSamplingRateWritten { get; private set; }
         public int EnabledSensors { get; set; }
 
+        // --- Stato/contatori per i test del lifecycle ---
+        public bool Connected { get; private set; }
+        public bool IsConnected() => Connected;
+
+        // Contatori "interni"
+        public int ConnectCalls { get; private set; }
+        public int StartStreamingCalls { get; private set; }
+        public int StopStreamingCalls { get; private set; }
+        public int InquiryCalls { get; private set; }
+        public int WriteSensorsCalls { get; private set; }
+        public int? LastSensorsBitmap { get; private set; }
+
+        // Alias con i nomi attesi dai test
+        public int ConnectCount => ConnectCalls;
+        public int StartCount => StartStreamingCalls;
+        public int StopCount => StopStreamingCalls;
+        public int InquiryCount => InquiryCalls;
+        public int WriteSensorsCount => WriteSensorsCalls;
+
         public ShimmerLogAndStreamSystemSerialPortV2(string device, string port)
         {
             Device = device; Port = port;
@@ -132,11 +151,27 @@ namespace ShimmerAPI
 
         public event EventHandler? UICallback;
 
+        public void Connect()
+        {
+            ConnectCalls++;
+            Connected = true;
+        }
+
         public void WriteSamplingRate(double hz) => LastSamplingRateWritten = hz;
 
-        public void StartStreaming() { }
-        public void StopStreaming() { }
-        public void Disconnect() { }
+        public void WriteSensors(int bitmap)
+        {
+            LastSensorsBitmap = bitmap;
+            WriteSensorsCalls++;
+        }
+
+        public void Inquiry() => InquiryCalls++;
+
+        public void StartStreaming() { StartStreamingCalls++; }
+
+        public void StopStreaming() { StopStreamingCalls++; }
+
+        public void Disconnect() { Connected = false; }
 
         public void RaiseDataPacket(ObjectCluster oc)
             => UICallback?.Invoke(this, new CustomEventArgs(
@@ -217,22 +252,29 @@ namespace ShimmerSDK.EXG
                 EnabledSensors = enabled
             };
 
-            // collega l'handler eventi reale se esiste, altrimenti niente (il test lo gestisce)
-            var evtHandler = sut.GetType().GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (evtHandler != null)
+            // collega gli handler eventi reali se esistono (Windows e/o Android)
+            var h1 = sut.GetType().GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic);
+            var h2 = sut.GetType().GetMethod("HandleEventAndroid", BindingFlags.Instance | BindingFlags.NonPublic);
+
+            if (h1 != null)
             {
-                var d = Delegate.CreateDelegate(typeof(EventHandler), sut, evtHandler);
-                fake.UICallback += (EventHandler)d;
+                var d1 = Delegate.CreateDelegate(typeof(EventHandler), sut, h1);
+                fake.UICallback += (EventHandler)d1;
+            }
+            if (h2 != null)
+            {
+                var d2 = Delegate.CreateDelegate(typeof(EventHandler), sut, h2);
+                fake.UICallback += (EventHandler)d2;
             }
 
             // registra il driver nel registro cross-OS
             ShimmerSDK_EXG_TestRegistry.Register(sut, fake);
 
-            // prova a forzare il "primo pacchetto" (se il campo esiste in questa build)
+            // forza "primo pacchetto" se i campi esistono
             TrySetField(sut, "firstDataPacket", true);
             TrySetField(sut, "firstDataPacketAndroid", true);
 
-            // prova anche a iniettare nel campo privato se presente (no-op se mancante)
+            // inietta anche nel campo privato shimmer se presente (no-op se mancante)
             TrySetField(sut, "shimmer", fake);
         }
 
@@ -285,20 +327,20 @@ namespace ShimmerSDK.IMU
             bool enableWideRangeAcc,
             bool enableGyro,
             bool enableMag,
-            bool enablePressureTemp,
+            bool enablePressureTemperature, // <- nome coerente con la firma
             bool enableBattery,
             bool enableExtA6,
             bool enableExtA7,
             bool enableExtA15
         )
         {
-            // set dei flag privati come fa l’EXG
+            // set dei flag privati
             SetBool(sut, "_enableLowNoiseAccelerometer", enableLowNoiseAcc);
             SetBool(sut, "_enableWideRangeAccelerometer", enableWideRangeAcc);
             SetBool(sut, "_enableGyroscope", enableGyro);
             SetBool(sut, "_enableMagnetometer", enableMag);
-            SetBool(sut, "_enablePressureTemperature", enablePressureTemp);
-            SetBool(sut, "_enableBattery", enableBattery); // NB: IMU usa _enableBattery
+            SetBool(sut, "_enablePressureTemperature", enablePressureTemperature); // <- fix
+            SetBool(sut, "_enableBattery", enableBattery);
             SetBool(sut, "_enableExtA6", enableExtA6);
             SetBool(sut, "_enableExtA7", enableExtA7);
             SetBool(sut, "_enableExtA15", enableExtA15);
@@ -309,7 +351,7 @@ namespace ShimmerSDK.IMU
             if (enableWideRangeAcc) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
             if (enableGyro) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_MPU9150_GYRO;
             if (enableMag) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_LSM303DLHC_MAG;
-            if (enablePressureTemp) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE;
+            if (enablePressureTemperature) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_BMP180_PRESSURE; // <- fix
             if (enableBattery) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_VBATT;
             if (enableExtA6) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A6;
             if (enableExtA7) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXT_A7;
@@ -320,12 +362,51 @@ namespace ShimmerSDK.IMU
                 EnabledSensors = enabled
             };
 
-            // collega l’handler eventi reale se esiste (come per EXG)
-            var evtHandler = sut.GetType().GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic);
-            if (evtHandler != null)
+            // collega gli handler eventi reali se esistono (Windows/Android/Mac…)
+            var candidateHandlers = new[]
             {
-                var d = Delegate.CreateDelegate(typeof(EventHandler), sut, evtHandler);
-                fake.UICallback += (EventHandler)d;
+                "HandleEvent",
+                "HandleEventWindows",
+                "HandleEventAndroid",
+                "HandleEventMac",
+                "HandleEventMacCatalyst",
+                "HandleEventiOS"
+            };
+
+            EventHandler? bound = null;
+            foreach (var name in candidateHandlers)
+            {
+                var mi = sut.GetType().GetMethod(name, BindingFlags.Instance | BindingFlags.NonPublic);
+                if (mi == null) continue;
+
+                var del = Delegate.CreateDelegate(typeof(EventHandler), sut, mi, throwOnBindFailure: false);
+                if (del is EventHandler eh)
+                {
+                    bound = eh;
+                    break;
+                }
+            }
+            if (bound != null)
+            {
+                fake.UICallback += bound;
+            }
+            else
+            {
+                // Fallback: se non c'è un handler privato, rilancia l'evento pubblico SampleReceived con uno snapshot minimale
+                fake.UICallback += (sender, e) =>
+                {
+                    if (e is ShimmerAPI.CustomEventArgs cea &&
+                        cea.getIndicator() == (int)ShimmerAPI.ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET)
+                    {
+                        var evField = sut.GetType().GetField("SampleReceived", BindingFlags.Instance | BindingFlags.NonPublic);
+                        var dlg = evField?.GetValue(sut) as Delegate;
+                        if (dlg != null)
+                        {
+                            var payload = new ShimmerSDK_IMUData(cea.getObject());
+                            dlg.DynamicInvoke(sut, payload);
+                        }
+                    }
+                };
             }
 
             // registra il fake driver
@@ -355,4 +436,3 @@ namespace ShimmerSDK.IMU
         }
     }
 }
-

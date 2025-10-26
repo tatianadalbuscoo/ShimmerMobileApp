@@ -73,6 +73,7 @@ namespace ShimmerSDK.EXG
         public async void StartStreaming()
         {
 
+            await Task.Yield();
 
 #if ANDROID
             
@@ -135,6 +136,8 @@ namespace ShimmerSDK.EXG
         /// </summary>
         public async void StopStreaming()
         {
+
+            await Task.Yield();
 
 #if ANDROID
 

@@ -72,6 +72,8 @@ namespace ShimmerSDK.IMU
         public async void StartStreaming()
         {
 
+            await Task.Yield();
+
 #if ANDROID
 
             // Not configured
@@ -103,6 +105,8 @@ namespace ShimmerSDK.IMU
         public async void StopStreaming()
         {
 
+            await Task.Yield();
+
 #if ANDROID
 
             shimmerAndroid?.StopStreaming();
@@ -110,7 +114,7 @@ namespace ShimmerSDK.IMU
             return;
 
 #elif WINDOWS
-            
+
             shimmer.StopStreaming();
             await DelayWork(1000);
 
