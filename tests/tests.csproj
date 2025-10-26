@@ -18,7 +18,9 @@
 	<!-- Collega SOLO il file reale sotto test (path corretto) -->
 	<ItemGroup>
 		<Compile Include="..\ShimmerSDK\EXG\ShimmerSDK_EXG.cs" Link="UnderTest\ShimmerSDK_EXG.cs" />
+		<Compile Include="..\ShimmerSDK\EXG\ShimmerSDK_EXG_Settings.cs" Link="UnderTest\ShimmerSDK_EXG_Settings.cs" />
 		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU.cs" Link="UnderTest\ShimmerSDK_IMU.cs" />
+		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU_Settings.cs" Link="UnderTest\ShimmerSDK_IMU_Settings.cs" />
 	</ItemGroup>
 
 	<!-- NON includere gli stub: lo SDK li prende da solo perché sono nel progetto -->
