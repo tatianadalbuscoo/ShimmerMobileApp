@@ -5,7 +5,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<DefineConstants>$(DefineConstants);TEST_STUBS</DefineConstants>
 		<IsPackable>false</IsPackable>
-		<NoWarn>$(NoWarn);CS0067</NoWarn>
+		<NoWarn>$(NoWarn);CS0067;CS1998;CS8321;xUnit1026;MVVMTK0034</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -13,6 +13,9 @@
 		<PackageReference Include="xunit" Version="2.8.1" />
 		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.1" />
 		<PackageReference Include="coverlet.collector" Version="6.0.2" />
+		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+		<Using Include="Microsoft.Maui.Controls" />
+
 	</ItemGroup>
 
 	<!-- Collega SOLO il file reale sotto test (path corretto) -->
@@ -25,6 +28,8 @@
 		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU_Settings.cs" Link="UnderTest\ShimmerSDK_IMU_Settings.cs" />
 		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU_Streaming.cs" Link="UnderTest\ShimmerSDK_IMU_Streaming.cs" />
 		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU_Data.cs" Link="UnderTest\ShimmerSDK_IMU_Data.cs" />
+		<Compile Include="..\ShimmerInterface\ViewModels\MainPageViewModel.cs" Link="UnderTest\MainPageViewModel.cs" />
+		<Compile Include="..\ShimmerInterface\Models\ShimmerDevice.cs" Link="UnderTest\ShimmerDevice.cs" />
 	</ItemGroup>
 
 	<!-- NON includere gli stub: lo SDK li prende da solo perché sono nel progetto -->

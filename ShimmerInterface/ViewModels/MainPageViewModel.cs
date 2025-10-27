@@ -575,6 +575,8 @@ public partial class MainPageViewModel : ObservableObject
     private static bool IsHexString(string str)
     {
 
+        if (string.IsNullOrEmpty(str)) return false;
+
         // Loop through each character in the input string
         foreach (char c in str)
         {
