@@ -26,7 +26,7 @@ namespace ShimmerSDK.IMU
     /// <summary>
     /// iOS/Mac Catalyst client for reading IMU data from a Shimmer device via an Android WebSocket bridge.
     /// Manages the WS connection/handshake, subscribes to a target MAC, pushes config, starts/stops streaming,
-    /// and parses incoming samples into <see cref="ShimmerSDK_IMUData"/> (raising <c>SampleReceived</c> on the UI thread).
+    /// and parses incoming samples into <see cref="ShimmerSDK_IMU_Data"/> (raising <c>SampleReceived</c> on the UI thread).
     /// </summary>
     public partial class ShimmerSDK_IMU
     {
@@ -97,13 +97,13 @@ namespace ShimmerSDK.IMU
         /// <summary>
         /// Checks whether the provided IMU sample contains at least one populated numeric field.
         /// </summary>
-        /// <param name="d">The latest <see cref="ShimmerSDK_IMUData"/> sample to inspect; may be <c>null</c>.</param>
+        /// <param name="d">The latest <see cref="ShimmerSDK_IMU_Data"/> sample to inspect; may be <c>null</c>.</param>
         /// <returns>
         /// <c>true</c> if any accelerometer (LNA/WRA), gyroscope, magnetometer, temperature,
         /// pressure, battery voltage, or external ADC (A6/A7/A15) value is present and numeric;
         /// otherwise <c>false</c>.
         /// </returns>    
-        private static bool HasAnyValue(ShimmerSDK_IMUData d) =>
+        private static bool HasAnyValue(ShimmerSDK_IMU_Data d) =>
             d != null &&
             (IsNumLike(d.LowNoiseAccelerometerX) || IsNumLike(d.LowNoiseAccelerometerY) || IsNumLike(d.LowNoiseAccelerometerZ) ||
              IsNumLike(d.WideRangeAccelerometerX) || IsNumLike(d.WideRangeAccelerometerY) || IsNumLike(d.WideRangeAccelerometerZ) ||
@@ -604,7 +604,7 @@ namespace ShimmerSDK.IMU
                         double? a15 = N(ext, "a15");
 
 
-                        LatestData = new ShimmerSDK_IMUData(
+                        LatestData = new ShimmerSDK_IMU_Data(
                             timeStamp: (uint)Math.Max(0, (int)(ts ?? 0)),
                             accelerometerX: lnaX.HasValue ? new NumericPayload(lnaX.Value) : null,
                             accelerometerY: lnaY.HasValue ? new NumericPayload(lnaY.Value) : null,

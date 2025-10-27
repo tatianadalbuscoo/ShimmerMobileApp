@@ -1,9 +1,11 @@
 ﻿using System;
+using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using ShimmerAPI;
 using ShimmerSDK.EXG;
 using Xunit;
+using static ShimmerSDKTests.ExgValuesShim;
 
 namespace ShimmerSDKTests.EXGTests
 {
@@ -126,7 +128,6 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(expected, result);
         }
 
-
         // ExgMode — behavior
         // Switch completo su tutti i valori: nessun default colpito
         [Fact]
@@ -168,7 +169,6 @@ namespace ShimmerSDKTests.EXGTests
             var mode = GetPrivateField<ExgMode>(sut, "_exgMode");
             Assert.Equal(ExgMode.ECG, mode);
         }
-
 
         // SetFirmwareSamplingRateNearest() — behavior
         // Quantizza a clock/divider e aggiorna SamplingRate
@@ -265,133 +265,121 @@ namespace ShimmerSDKTests.EXGTests
             Assert.InRange(a2, 255.9, 256.1);
         }
 
+        // Utility locale: stessa quantizzazione del metodo sotto test
+        private static double Quantize(double requested)
+        {
+            const double clock = 32768.0;
+            int divider = Math.Max(1, (int)Math.Round(clock / requested, MidpointRounding.AwayFromZero));
+            return clock / divider;
+        }
 
-        // SetFirmwareSamplingRateNearest behavior
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Caso "divisore esatto": 51.2 Hz = 32768 / 640 → deve restare 51.2
+        [Fact]
+        public void SetFirmwareSamplingRateNearest_ExactDivisor_IsIdentity()
+        {
+            var sut = new ShimmerSDK_EXG();
+            double applied = sut.SetFirmwareSamplingRateNearest(51.2);
+            Assert.InRange(applied, 51.1999, 51.2001);
+            Assert.InRange(sut.SamplingRate, 51.1999, 51.2001);
+        }
 
-            // Utility locale: stessa quantizzazione del metodo sotto test
-            // divider = round(32768 / requested, MidpointRounding.AwayFromZero)
-            // applied = 32768 / divider
-            private static double Quantize(double requested)
-            {
-                const double clock = 32768.0;
-                int divider = Math.Max(1, (int)Math.Round(clock / requested, MidpointRounding.AwayFromZero));
-                return clock / divider;
-            }
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Quantizza a clock/divider e aggiorna SamplingRate
+        [Theory]
+        [InlineData(50.0)]
+        [InlineData(75.0)]
+        [InlineData(100.0)]
+        [InlineData(123.456)]
+        public void SetFirmwareSamplingRateNearest_MatchesExpectedQuantization(double requested)
+        {
+            var sut = new ShimmerSDK_EXG();
+            double expected = Quantize(requested);
+            double applied = sut.SetFirmwareSamplingRateNearest(requested);
 
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Caso "divisore esatto": 51.2 Hz = 32768 / 640 → deve restare 51.2
-            [Fact]
-            public void SetFirmwareSamplingRateNearest_ExactDivisor_IsIdentity()
-            {
-                var sut = new ShimmerSDK_EXG();
-                double applied = sut.SetFirmwareSamplingRateNearest(51.2);
-                Assert.InRange(applied, 51.1999, 51.2001);
-                Assert.InRange(sut.SamplingRate, 51.1999, 51.2001);
-            }
+            Assert.InRange(applied, expected - 1e-12, expected + 1e-12);
+            Assert.InRange(sut.SamplingRate, expected - 1e-12, expected + 1e-12);
+        }
 
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Quantizza a clock/divider e aggiorna SamplingRate
-            [Theory]
-            [InlineData(50.0)]
-            [InlineData(75.0)]
-            [InlineData(100.0)]
-            [InlineData(123.456)]
-            public void SetFirmwareSamplingRateNearest_MatchesExpectedQuantization(double requested)
-            {
-                var sut = new ShimmerSDK_EXG();
-                double expected = Quantize(requested);
-                double applied = sut.SetFirmwareSamplingRateNearest(requested);
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Monotonia locale: aumentare leggermente la richiesta non deve ridurre l'applicato
+        [Fact]
+        public void SetFirmwareSamplingRateNearest_IsLocallyMonotonic()
+        {
+            var sut = new ShimmerSDK_EXG();
+            var a1 = sut.SetFirmwareSamplingRateNearest(100.0);
+            var a2 = sut.SetFirmwareSamplingRateNearest(101.0);
+            Assert.True(a2 >= a1 - 1e-12);
+        }
 
-                Assert.InRange(applied, expected - 1e-12, expected + 1e-12);
-                Assert.InRange(sut.SamplingRate, expected - 1e-12, expected + 1e-12);
-            }
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Idempotenza: chiamare due volte con la stessa richiesta produce lo stesso applicato
+        [Fact]
+        public void SetFirmwareSamplingRateNearest_IsIdempotent_ForSameInput()
+        {
+            var sut = new ShimmerSDK_EXG();
+            var a1 = sut.SetFirmwareSamplingRateNearest(200.0);
+            var a2 = sut.SetFirmwareSamplingRateNearest(200.0);
+            Assert.InRange(a2, a1 - 1e-12, a1 + 1e-12);
+        }
 
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Monotonia locale: aumentare leggermente la richiesta non deve ridurre l'applicato
-            [Fact]
-            public void SetFirmwareSamplingRateNearest_IsLocallyMonotonic()
-            {
-                var sut = new ShimmerSDK_EXG();
-                var a1 = sut.SetFirmwareSamplingRateNearest(100.0);
-                var a2 = sut.SetFirmwareSamplingRateNearest(101.0);
-                Assert.True(a2 >= a1 - 1e-12);
-            }
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Gestione input non-positivi: deve lanciare ArgumentOutOfRangeException
+        [Theory]
+        [InlineData(0)]
+        [InlineData(-1)]
+        [InlineData(-100)]
+        public void SetFirmwareSamplingRateNearest_Throws_OnNonPositive(double requested)
+        {
+            var sut = new ShimmerSDK_EXG();
+            Assert.Throws<ArgumentOutOfRangeException>(() => sut.SetFirmwareSamplingRateNearest(requested));
+        }
 
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Idempotenza: chiamare due volte con la stessa richiesta produce lo stesso applicato
-            [Fact]
-            public void SetFirmwareSamplingRateNearest_IsIdempotent_ForSameInput()
-            {
-                var sut = new ShimmerSDK_EXG();
-                var a1 = sut.SetFirmwareSamplingRateNearest(200.0);
-                var a2 = sut.SetFirmwareSamplingRateNearest(200.0);
-                Assert.InRange(a2, a1 - 1e-12, a1 + 1e-12);
-            }
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Tie-breaking (.5): con MidpointRounding.AwayFromZero deve fare "ceiling" del divisore.
+        [Theory]
+        [InlineData(100)]
+        [InlineData(200)]
+        [InlineData(655)]
+        public void SetFirmwareSamplingRateNearest_RoundsHalfAwayFromZero_OnDivider(int N)
+        {
+            const double clock = 32768.0;
+            double requested = clock / (N + 0.5);
+            double expected = clock / (N + 1);
 
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Gestione input non-positivi: deve lanciare ArgumentOutOfRangeException
-            [Theory]
-            [InlineData(0)]
-            [InlineData(-1)]
-            [InlineData(-100)]
-            public void SetFirmwareSamplingRateNearest_Throws_OnNonPositive(double requested)
-            {
-                var sut = new ShimmerSDK_EXG();
-                Assert.Throws<ArgumentOutOfRangeException>(() => sut.SetFirmwareSamplingRateNearest(requested));
-            }
+            var sut = new ShimmerSDK_EXG();
+            double applied = sut.SetFirmwareSamplingRateNearest(requested);
 
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Tie-breaking (.5): con MidpointRounding.AwayFromZero deve fare "ceiling" del divisore.
-            // Scegliamo requested = clock / (N + 0.5) → divider atteso = N + 1 → applied = clock / (N+1).
-            [Theory]
-            [InlineData(100)]
-            [InlineData(200)]
-            [InlineData(655)]
-            public void SetFirmwareSamplingRateNearest_RoundsHalfAwayFromZero_OnDivider(int N)
-            {
-                const double clock = 32768.0;
-                double requested = clock / (N + 0.5);       // forza il .5 sul divisore
-                double expected = clock / (N + 1);         // AwayFromZero → N+1
+            Assert.InRange(applied, expected - 1e-12, expected + 1e-12);
+        }
 
-                var sut = new ShimmerSDK_EXG();
-                double applied = sut.SetFirmwareSamplingRateNearest(requested);
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Estremi: richiesta molto alta → divider=1 → applied = clock
+        [Fact]
+        public void SetFirmwareSamplingRateNearest_ClampsToClock_ForVeryHighRequest()
+        {
+            const double clock = 32768.0;
+            var sut = new ShimmerSDK_EXG();
+            double applied = sut.SetFirmwareSamplingRateNearest(1e9);
+            Assert.InRange(applied, clock - 1e-12, clock + 1e-12);
+        }
 
-                Assert.InRange(applied, expected - 1e-12, expected + 1e-12);
-            }
+        // SetFirmwareSamplingRateNearest() — behavior
+        // Estremi: richiesta molto bassa → divider grande → applied piccolo (>0)
+        [Theory]
+        [InlineData(0.1)]
+        [InlineData(0.01)]
+        public void SetFirmwareSamplingRateNearest_ProducesSmallPositive_ForVeryLowRequest(double requested)
+        {
+            var sut = new ShimmerSDK_EXG();
+            double applied = sut.SetFirmwareSamplingRateNearest(requested);
+            Assert.True(applied > 0);
+            Assert.True(applied <= requested * 1.01);
+        }
 
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Estremi: richiesta molto alta → divider=1 → applied = clock
-            [Fact]
-            public void SetFirmwareSamplingRateNearest_ClampsToClock_ForVeryHighRequest()
-            {
-                const double clock = 32768.0;
-                var sut = new ShimmerSDK_EXG();
-                double applied = sut.SetFirmwareSamplingRateNearest(1e9); // enorme
-                Assert.InRange(applied, clock - 1e-12, clock + 1e-12);
-            }
-
-            // SetFirmwareSamplingRateNearest() — behavior
-            // Estremi: richiesta molto bassa → divider grande → applied piccolo (>0)
-            [Theory]
-            [InlineData(0.1)]
-            [InlineData(0.01)]
-            public void SetFirmwareSamplingRateNearest_ProducesSmallPositive_ForVeryLowRequest(double requested)
-            {
-                var sut = new ShimmerSDK_EXG();
-                double applied = sut.SetFirmwareSamplingRateNearest(requested);
-                Assert.True(applied > 0);
-                // deve essere inferiore alla richiesta (perché il divider quantizzato può crescere)
-                Assert.True(applied <= requested * 1.01); // tolleriamo 1%
-            }
-
-
-
-
-
-
-            // TestConfigure()/Configure* — behavior
-            // Costruisce bitmap sensori e sottoscrive
-            [Fact]
+        // TestConfigure()/Configure* — behavior
+        // Costruisce bitmap sensori e sottoscrive
+        [Fact]
         public void Configure_Builds_SensorBitmap_And_Subscribes()
         {
             var sut = new ShimmerSDK_EXG();
@@ -463,13 +451,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(0, shimmer!.EnabledSensors & exgMask);
         }
 
-
-        // Esegue davvero ConfigureWindows se disponibile; altrimenti esce (conta come pass).
+        // ConfigureWindows — behavior
         // Esegue davvero ConfigureWindows se disponibile; altrimenti esce (passa su build non-Windows).
         [Fact]
         public void ConfigureWindows_IfPresent_BuildsDriverAndSubscribes()
         {
-            // ✅ classe dal namespace, non annidata
             var sut = new ShimmerSDK_EXG();
 
             var m = sut.GetType().GetMethod(
@@ -478,20 +464,18 @@ namespace ShimmerSDKTests.EXGTests
 
             if (m == null)
             {
-                // ramo WINDOWS non compilato -> nessuna asserzione qui
                 return;
             }
 
-            // ✅ enum dal namespace, non annidato nella classe
             m.Invoke(sut, new object[] {
-        "D1","COM1",
-        true,true,   // LowNoiseAcc, WideRangeAcc
-        true,true,   // Gyro, Mag
-        true,true,   // PressureTemp, Battery
-        true,false,true, // ExtA6, ExtA7, ExtA15
-        true,        // EXG on
-        ExgMode.EMG
-    });
+                "D1","COM1",
+                true,true,   // LowNoiseAcc, WideRangeAcc
+                true,true,   // Gyro, Mag
+                true,true,   // PressureTemp, Battery
+                true,false,true, // ExtA6, ExtA7, ExtA15
+                true,        // EXG on
+                ExgMode.EMG
+            });
 
             var shimmerFi = sut.GetType().GetField("shimmer", BindingFlags.Instance | BindingFlags.NonPublic);
             var shimmer = shimmerFi?.GetValue(sut);
@@ -509,7 +493,7 @@ namespace ShimmerSDKTests.EXGTests
             var sut = new ShimmerSDK_EXG();
             var mi = typeof(ShimmerSDK_EXG).GetMethod("GetSafe",
                 BindingFlags.NonPublic | BindingFlags.Static);
-            if (mi == null) return; // ramo WINDOWS non presente → test no-op cross-OS
+            if (mi == null) return;
 
             var oc = new ObjectCluster();
             oc.Add("ANY", ShimmerConfiguration.SignalFormats.CAL, 42);
@@ -565,7 +549,6 @@ namespace ShimmerSDKTests.EXGTests
             if (mi == null) return;
 
             var oc = new ObjectCluster();
-            // Stesso nome in due formati
             oc.Add("FOO", "RAW", 1);
             oc.Add("FOO", ShimmerConfiguration.SignalFormats.CAL, 2);
 
@@ -583,14 +566,12 @@ namespace ShimmerSDKTests.EXGTests
                 BindingFlags.NonPublic | BindingFlags.Static);
             if (mi == null) return;
 
-            // Caso RAW
             var ocRaw = new ObjectCluster();
             ocRaw.Add("BAR", "RAW", 10);
             var resRaw = ((int idx, string name, string fmt))mi.Invoke(null, new object[] { ocRaw, new[] { "BAR" } })!;
             Assert.Equal("RAW", resRaw.fmt);
             Assert.Equal(ocRaw.GetIndex("BAR", "RAW"), resRaw.idx);
 
-            // Caso UNCAL
             var ocUncal = new ObjectCluster();
             ocUncal.Add("BAZ", "UNCAL", 20);
             var resUncal = ((int idx, string name, string fmt))mi.Invoke(null, new object[] { ocUncal, new[] { "BAZ" } })!;
@@ -608,7 +589,7 @@ namespace ShimmerSDKTests.EXGTests
             if (mi == null) return;
 
             var oc = new ObjectCluster();
-            oc.Add("QUX", null, 33); // formato assente
+            oc.Add("QUX", null, 33);
 
             var res = ((int idx, string name, string fmt))mi.Invoke(null, new object[] { oc, new[] { "QUX" } })!;
             Assert.Null(res.fmt);
@@ -633,8 +614,6 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Null(res.fmt);
         }
 
-
-
         // HandleEvent() — behavior
         // Mappa indici, emette evento e valorizza EXG* quando EXG è abilitato
         [Fact]
@@ -650,7 +629,6 @@ namespace ShimmerSDKTests.EXGTests
                 enableExtA6: true, enableExtA7: true, enableExtA15: true,
                 enableExg: true, exgMode: ExgMode.ECG);
 
-            // Se il metodo privato HandleEvent non è compilato in questa build, bypassa il test.
             var handleEvent = sut.GetType().GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic);
             if (handleEvent == null) return;
 
@@ -686,9 +664,9 @@ namespace ShimmerSDKTests.EXGTests
             shimmer!.RaiseDataPacket(oc);
 
             Assert.NotNull(received);
-            Assert.True(received!.Values.Length >= 21);
-            Assert.NotNull(received!.Values[^2]); // EXG CH1
-            Assert.NotNull(received!.Values[^1]); // EXG CH2
+            Assert.True(Vals(received!).Length >= 21);
+            Assert.NotNull(Vals(received!)[^2]); // EXG CH1
+            Assert.NotNull(Vals(received!)[^1]); // EXG CH2
         }
 
         // HandleEvent() — behavior
@@ -723,8 +701,8 @@ namespace ShimmerSDKTests.EXGTests
             shimmer!.RaiseDataPacket(oc);
 
             Assert.NotNull(received);
-            Assert.Null(received!.Values[^2]); // EXG CH1 nullo
-            Assert.Null(received!.Values[^1]); // EXG CH2 nullo
+            Assert.Null(Vals(received!)[^2]); // EXG CH1 nullo
+            Assert.Null(Vals(received!)[^1]); // EXG CH2 nullo
         }
 
         // HandleEvent() — behavior
@@ -752,15 +730,14 @@ namespace ShimmerSDKTests.EXGTests
             sut.SampleReceived += (s, d) => received = (ShimmerSDK_EXGData)d;
 
             var oc = new ObjectCluster();
-            // Niente EXG*; solo timestamp
             oc.Add(ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerConfiguration.SignalFormats.CAL, 777);
 
             shimmer!.RaiseDataPacket(oc);
 
             Assert.NotNull(received);
-            Assert.True(received!.Values.Length >= 2); // almeno ts + 2 slot EXG
-            Assert.Null(received!.Values[^2]); // EXG CH1 mancante -> null
-            Assert.Null(received!.Values[^1]); // EXG CH2 mancante -> null
+            Assert.True(Vals(received!).Length >= 2); // almeno ts + 2 slot EXG
+            Assert.Null(Vals(received!)[^2]); // EXG CH1 mancante -> null
+            Assert.Null(Vals(received!)[^1]); // EXG CH2 mancante -> null
         }
 
         // ConfigureAndroid() — behavior
@@ -774,16 +751,16 @@ namespace ShimmerSDKTests.EXGTests
             var sut = new ShimmerSDK_EXG();
             var mi = typeof(ShimmerSDK_EXG).GetMethod("ConfigureAndroid",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (mi == null) return; // ramo ANDROID non presente → test no-op
+            if (mi == null) return;
 
             var args = new object[]
             {
-        "Dev1", mac,
-        true, true,  // LN-Acc, WR-Acc
-        true, true,  // Gyro, Mag
-        true, true,  // Press/Temp, VBatt
-        true, false, true, // ExtA6, ExtA7, ExtA15
-        true, ExgMode.ECG
+                "Dev1", mac,
+                true, true,  // LN-Acc, WR-Acc
+                true, true,  // Gyro, Mag
+                true, true,  // Press/Temp, VBatt
+                true, false, true, // ExtA6, ExtA7, ExtA15
+                true, ExgMode.ECG
             };
 
             var ex = Assert.Throws<TargetInvocationException>(() => mi.Invoke(sut, args));
@@ -799,28 +776,25 @@ namespace ShimmerSDKTests.EXGTests
             var sut = new ShimmerSDK_EXG();
             var mi = typeof(ShimmerSDK_EXG).GetMethod("ConfigureAndroid",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (mi == null) return; // ramo ANDROID non presente
+            if (mi == null) return;
 
-            // MAC valido in formato standard
             var args = new object[]
             {
-        "Dev1", "00:11:22:33:44:55",
-        true,  true,   // LN-Acc, WR-Acc
-        true,  true,   // Gyro, Mag
-        true,  true,   // Press/Temp, VBatt
-        true,  false,  true,   // ExtA6, ExtA7, ExtA15
-        true,  ExgMode.EMG
+                "Dev1", "00:11:22:33:44:55",
+                true,  true,
+                true,  true,
+                true,  true,
+                true,  false,  true,
+                true,  ExgMode.EMG
             };
 
             mi.Invoke(sut, args);
 
-            // shimmerAndroid non nullo
             var fShimmerAndroid = sut.GetType().GetField("shimmerAndroid", BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(fShimmerAndroid);                      // il campo deve esistere su ANDROID
+            Assert.NotNull(fShimmerAndroid);
             var shimmerAndroid = fShimmerAndroid!.GetValue(sut);
             Assert.NotNull(shimmerAndroid);
 
-            // bitmap attesa
             int expected =
                 (int)ShimmerAPI.ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL |
                 (int)ShimmerAPI.ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL |
@@ -846,16 +820,16 @@ namespace ShimmerSDKTests.EXGTests
             var sut = new ShimmerSDK_EXG();
             var mi = typeof(ShimmerSDK_EXG).GetMethod("ConfigureAndroid",
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (mi == null) return; // ramo ANDROID non presente
+            if (mi == null) return;
 
             mi.Invoke(sut, new object[]
             {
-        "DevX", "01:23:45:67:89:AB",
-        false, true,   // LN-Acc off, WR-Acc on
-        false, true,   // Gyro off, Mag on
-        false, true,   // Press/Temp off, VBatt on
-        false, false, false, // ExtA6/7/15 off
-        false, ExgMode.ECG
+                "DevX", "01:23:45:67:89:AB",
+                false, true,
+                false, true,
+                false, true,
+                false, false, false,
+                false, ExgMode.ECG
             });
 
             bool firstPacket = (bool)(sut.GetType().GetField("firstDataPacketAndroid", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(sut)!);
@@ -863,16 +837,15 @@ namespace ShimmerSDKTests.EXGTests
 
             string[] indexFields = new[]
             {
-        "indexTimeStamp",
-        "indexLowNoiseAccX","indexLowNoiseAccY","indexLowNoiseAccZ",
-        "indexWideAccX","indexWideAccY","indexWideAccZ",
-        "indexGyroX","indexGyroY","indexGyroZ",
-        "indexMagX","indexMagY","indexMagZ",
-        "indexBMP180Temperature","indexBMP180Pressure",
-        "indexBatteryVoltage",
-        "indexExtA6","indexExtA7","indexExtA15"
-        // NB: gli indici EXG vengono risolti al primo DATA_PACKET, quindi qui non li verifichiamo.
-    };
+                "indexTimeStamp",
+                "indexLowNoiseAccX","indexLowNoiseAccY","indexLowNoiseAccZ",
+                "indexWideAccX","indexWideAccY","indexWideAccZ",
+                "indexGyroX","indexGyroY","indexGyroZ",
+                "indexMagX","indexMagY","indexMagZ",
+                "indexBMP180Temperature","indexBMP180Pressure",
+                "indexBatteryVoltage",
+                "indexExtA6","indexExtA7","indexExtA15"
+            };
 
             foreach (var fld in indexFields)
             {
@@ -881,65 +854,6 @@ namespace ShimmerSDKTests.EXGTests
                 Assert.Equal(-1, (int)fi!.GetValue(sut)!);
             }
         }
-
-
-
-
-        // // ConnectInternalAndroid() — behavior
-        // Se non configurato (shimmerAndroid == null) deve lanciare InvalidOperationException.
-        // Se il metodo non esiste (ramo ANDROID non compilato), il test viene bypassato.
-        [Fact]
-        public void ConnectInternalAndroid_Throws_When_Not_Configured()
-        {
-            var sut = new ShimmerSDK_EXG();
-            var mi = typeof(ShimmerSDK_EXG).GetMethod("ConnectInternalAndroid",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (mi == null) return; // ramo ANDROID non presente → test no-op cross-OS
-
-            var ex = Assert.Throws<TargetInvocationException>(() => mi.Invoke(sut, Array.Empty<object>()));
-            Assert.IsType<InvalidOperationException>(ex.InnerException);
-            Assert.Contains("ConfigureAndroid", ex.InnerException!.Message, StringComparison.OrdinalIgnoreCase);
-        }
-
-        // ApplySamplingRateWithSafeRestartAsync() — behavior
-        // Con requestedHz <= 0 deve lanciare ArgumentOutOfRangeException anche se non configurato.
-        // Se il metodo non esiste (ramo ANDROID non compilato), bypass.
-        [Theory]
-        [InlineData(0)]
-        [InlineData(-1)]
-        [InlineData(-100)]
-        public void ApplySamplingRateWithSafeRestartAsync_Throws_On_NonPositive(double requested)
-        {
-            var sut = new ShimmerSDK_EXG();
-            var mi = typeof(ShimmerSDK_EXG).GetMethod("ApplySamplingRateWithSafeRestartAsync",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (mi == null) return; // ramo ANDROID non presente
-
-            // Invoke async method via reflection, catturando l'eccezione inner
-            var task = (Task<double>)mi.Invoke(sut, new object[] { requested })!;
-            var agg = Assert.Throws<AggregateException>(() => task.GetAwaiter().GetResult());
-            var inner = agg.InnerException!;
-            Assert.IsType<ArgumentOutOfRangeException>(inner);
-        }
-
-        // ApplySamplingRateWithSafeRestartAsync() — behavior
-        // Con requestedHz > 0 ma senza configurazione Android → InvalidOperationException.
-        // Se il metodo non esiste (ramo ANDROID non compilato), bypass.
-        [Fact]
-        public void ApplySamplingRateWithSafeRestartAsync_Throws_When_Not_Configured()
-        {
-            var sut = new ShimmerSDK_EXG();
-            var mi = typeof(ShimmerSDK_EXG).GetMethod("ApplySamplingRateWithSafeRestartAsync",
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (mi == null) return; // ramo ANDROID non presente
-
-            var task = (Task<double>)mi.Invoke(sut, new object[] { 100.0 })!;
-            var agg = Assert.Throws<AggregateException>(() => task.GetAwaiter().GetResult());
-            var inner = agg.InnerException!;
-            Assert.IsType<InvalidOperationException>(inner);
-            Assert.Contains("ConfigureAndroid", inner.Message, StringComparison.OrdinalIgnoreCase);
-        }
-
 
         // ===== Helpers riflessione brevi =====
         private static object? GetField(object o, string name)
@@ -965,19 +879,16 @@ namespace ShimmerSDKTests.EXGTests
         {
             var sut = new ShimmerSDK_EXG();
             var mi = GetPrivMethod(typeof(ShimmerSDK_EXG), "GetSafeA", isStatic: true);
-            if (mi == null) return; // ramo ANDROID non presente
+            if (mi == null) return;
 
             var oc = new ShimmerAPI.ObjectCluster();
             oc.Add("A", ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, 1.23);
             oc.Add("B", ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, 4.56);
 
-            // idx valido
             var d1 = mi.Invoke(null, new object[] { oc, 0 });
             Assert.NotNull(d1);
-            // idx -1 -> null
             var d2 = mi.Invoke(null, new object[] { oc, -1 });
             Assert.Null(d2);
-            // idx out-of-range -> null
             var d3 = mi.Invoke(null, new object[] { oc, 99 });
             Assert.Null(d3);
         }
@@ -986,43 +897,33 @@ namespace ShimmerSDKTests.EXGTests
         [Fact]
         public void Android_FindSignalA_Prefers_CAL_Then_RAW_Then_UNCAL_Then_Default()
         {
-            var sut = new ShimmerSDK_EXG();
             var mi = GetPrivMethod(typeof(ShimmerSDK_EXG), "FindSignalA", isStatic: true);
-            if (mi == null) return; // ramo ANDROID non presente
+            if (mi == null) return;
 
             var oc = new ShimmerAPI.ObjectCluster();
-            // Solo RAW per X
             oc.Add("X", "RAW", 10);
-            // Solo UNCAL per Y
             oc.Add("Y", "UNCAL", 20);
-            // Solo default (format null) per Z
             oc.Add("Z", null, 30);
-            // CAL per W (prioritario)
             oc.Add("W", ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, 40);
 
-            // Cerca in ordine W → X → Y → Z; deve trovare W con CAL
             var (idx1, name1, fmt1) = ((int, string?, string?))mi.Invoke(null, new object[] { oc, new[] { "W", "X", "Y", "Z" } })!;
             Assert.True(idx1 >= 0);
             Assert.Equal("W", name1, ignoreCase: true);
             Assert.Equal(ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, fmt1);
 
-            // Se CAL non esiste, cade su RAW
             var (idx2, name2, fmt2) = ((int, string?, string?))mi.Invoke(null, new object[] { oc, new[] { "X" } })!;
             Assert.True(idx2 >= 0);
             Assert.Equal("X", name2, ignoreCase: true);
             Assert.Equal("RAW", fmt2);
 
-            // Se non c'è CAL/RAW, cade su UNCAL
-            var (idx3, name3, fmt3) = ((int, string?, string?))mi.Invoke(null, new object[] { oc, new[] { "Y" } })!;
+            var (idx3, _, fmt3) = ((int, string?, string?))mi.Invoke(null, new object[] { oc, new[] { "Y" } })!;
             Assert.True(idx3 >= 0);
             Assert.Equal("UNCAL", fmt3);
 
-            // Se non c'è CAL/RAW/UNCAL, usa default (fmt null)
-            var (idx4, name4, fmt4) = ((int, string?, string?))mi.Invoke(null, new object[] { oc, new[] { "Z" } })!;
+            var (idx4, _, fmt4) = ((int, string?, string?))mi.Invoke(null, new object[] { oc, new[] { "Z" } })!;
             Assert.True(idx4 >= 0);
             Assert.Null(fmt4);
 
-            // Non trovato
             var (idx5, name5, fmt5) = ((int, string?, string?))mi.Invoke(null, new object[] { oc, new[] { "NOPE" } })!;
             Assert.Equal(-1, idx5);
             Assert.Null(name5);
@@ -1035,17 +936,14 @@ namespace ShimmerSDKTests.EXGTests
         {
             var sut = new ShimmerSDK_EXG();
             var mi = GetPrivMethod(typeof(ShimmerSDK_EXG), "HandleEventAndroid");
-            if (mi == null) return; // ramo ANDROID non presente
+            if (mi == null) return;
 
-            // Abilita EXG e stato "primo pacchetto"
             SetField(sut, "_enableExg", true);
             SetField(sut, "firstDataPacketAndroid", true);
 
-            // Ascolta l'evento pubblico
             ShimmerSDK.EXG.ShimmerSDK_EXGData? received = null;
             sut.SampleReceived += (s, d) => received = (ShimmerSDK.EXG.ShimmerSDK_EXGData)d;
 
-            // Costruisci ObjectCluster con CAL + EXG
             var oc = new ShimmerAPI.ObjectCluster();
             oc.Add(ShimmerAPI.ShimmerConfiguration.SignalNames.SYSTEM_TIMESTAMP, ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, 123);
             oc.Add(ShimmerAPI.Shimmer3Configuration.SignalNames.LOW_NOISE_ACCELEROMETER_X, ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, 1);
@@ -1069,17 +967,15 @@ namespace ShimmerSDKTests.EXGTests
             oc.Add("EXG1_CH1", ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, 1001);
             oc.Add("EXG2_CH1", ShimmerAPI.ShimmerConfiguration.SignalFormats.CAL, 1002);
 
-            // Invoca come se fosse un pacchetto dati
             var ev = new ShimmerAPI.CustomEventArgs(
                 (int)ShimmerAPI.ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET, oc);
             mi.Invoke(sut, new object?[] { null, ev });
 
             Assert.NotNull(received);
-            Assert.True(received!.Values.Length >= 21);
-            Assert.NotNull(received.Values[^2]); // EXG1_CH1
-            Assert.NotNull(received.Values[^1]); // EXG2_CH1
+            Assert.True(Vals(received!).Length >= 21);
+            Assert.NotNull(Vals(received!)[^2]);
+            Assert.NotNull(Vals(received!)[^1]);
 
-            // secondo pacchetto: usa indici già mappati (no eccezioni, evento arriva)
             received = null;
             mi.Invoke(sut, new object?[] { null, ev });
             Assert.NotNull(received);
@@ -1091,33 +987,27 @@ namespace ShimmerSDKTests.EXGTests
         {
             var sut = new ShimmerSDK_EXG();
             var mi = GetPrivMethod(typeof(ShimmerSDK_EXG), "HandleEventAndroid");
-            if (mi == null) return; // ramo ANDROID non presente
+            if (mi == null) return;
 
-            // Prepara TCS tramite riflessione
             var tcsConnected = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             var tcsStreaming = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             SetField(sut, "_androidConnectedTcs", tcsConnected);
             SetField(sut, "_androidStreamingAckTcs", tcsStreaming);
 
-            // Evento: CONNECTED
             var evConn = new ShimmerAPI.CustomEventArgs(
                 (int)ShimmerAPI.ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE,
                 ShimmerAPI.ShimmerBluetooth.SHIMMER_STATE_CONNECTED);
             mi.Invoke(sut, new object?[] { null, evConn });
             Assert.True(await Task.WhenAny(tcsConnected.Task, Task.Delay(200)) == tcsConnected.Task);
 
-            // Evento: STREAMING
             var evStr = new ShimmerAPI.CustomEventArgs(
                 (int)ShimmerAPI.ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_STATE_CHANGE,
                 ShimmerAPI.ShimmerBluetooth.SHIMMER_STATE_STREAMING);
             mi.Invoke(sut, new object?[] { null, evStr });
             Assert.True(await Task.WhenAny(tcsStreaming.Task, Task.Delay(200)) == tcsStreaming.Task);
 
-            // Flag privati aggiornati
             Assert.True((bool)GetField(sut, "_androidIsStreaming")!);
             Assert.True((bool)GetField(sut, "firstDataPacketAndroid")!);
         }
-
-
     }
 }

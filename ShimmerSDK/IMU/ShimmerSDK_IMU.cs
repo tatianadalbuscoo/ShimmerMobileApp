@@ -116,7 +116,7 @@ namespace ShimmerSDK.IMU
 
 
         // Last parsed IMU sample (CAL values for enabled sensors)
-        public ShimmerSDK_IMUData? LatestData { get; private set; }
+        public ShimmerSDK_IMU_Data? LatestData { get; private set; }
 
 
         /// <summary>

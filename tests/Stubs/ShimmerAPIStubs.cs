@@ -392,7 +392,7 @@ namespace ShimmerSDK.IMU
             }
             else
             {
-                // Fallback: se non c'è un handler privato, rilancia l'evento pubblico SampleReceived con uno snapshot minimale
+                // Fallback: se non c'è un handler privato, rilancia l'evento pubblico così com'è (senza istanziare IMUData)
                 fake.UICallback += (sender, e) =>
                 {
                     if (e is ShimmerAPI.CustomEventArgs cea &&
@@ -402,11 +402,11 @@ namespace ShimmerSDK.IMU
                         var dlg = evField?.GetValue(sut) as Delegate;
                         if (dlg != null)
                         {
-                            var payload = new ShimmerSDK_IMUData(cea.getObject());
-                            dlg.DynamicInvoke(sut, payload);
+                            dlg.DynamicInvoke(sut, cea.getObject());
                         }
                     }
                 };
+
             }
 
             // registra il fake driver

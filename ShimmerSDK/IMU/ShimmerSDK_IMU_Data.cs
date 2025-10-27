@@ -20,7 +20,7 @@ namespace ShimmerSDK.IMU
     /// BMP180 temperature and pressure sensors,
     /// battery voltage, and external ADCs.
     /// </summary>
-    public class ShimmerSDK_IMUData
+    public class ShimmerSDK_IMU_Data
     {
 
 #if WINDOWS || ANDROID
@@ -64,7 +64,7 @@ namespace ShimmerSDK.IMU
         /// <summary>
         /// Constructs a full Shimmer IMU data frame with all sensor channels.
         /// </summary>
-        public ShimmerSDK_IMUData(
+        public ShimmerSDK_IMU_Data(
             SensorData? timeStamp,
             SensorData? accelerometerX, SensorData? accelerometerY, SensorData? accelerometerZ,
             SensorData? wideAccelerometerX, SensorData? wideAccelerometerY, SensorData? wideAccelerometerZ,
@@ -145,7 +145,7 @@ namespace ShimmerSDK.IMU
         /// <summary>
         /// Constructs a full Shimmer IMU data frame with all sensor channels.
         /// </summary>
-        public ShimmerSDK_IMUData(
+        public ShimmerSDK_IMU_Data(
             object? timeStamp = null,
             object? accelerometerX = null, object? accelerometerY = null, object? accelerometerZ = null,
             object? wideAccelerometerX = null, object? wideAccelerometerY = null, object? wideAccelerometerZ = null,
