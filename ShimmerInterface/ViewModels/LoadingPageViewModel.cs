@@ -43,7 +43,7 @@ public partial class LoadingPageViewModel : ObservableObject
 
     // Message displayed on the UI during the connection process
     [ObservableProperty]
-    private string connectingMessage;
+    private string connectingMessage = string.Empty;
 
     // Indicates whether a connection attempt is currently in progress
     [ObservableProperty]

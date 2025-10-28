@@ -29,6 +29,7 @@
 		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU_Streaming.cs" Link="UnderTest\ShimmerSDK_IMU_Streaming.cs" />
 		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU_Data.cs" Link="UnderTest\ShimmerSDK_IMU_Data.cs" />
 		<Compile Include="..\ShimmerInterface\ViewModels\MainPageViewModel.cs" Link="UnderTest\MainPageViewModel.cs" />
+		<Compile Include="..\ShimmerInterface\ViewModels\LoadingPageViewModel.cs" Link="UnderTest\LoadingPageViewModel.cs" />
 		<Compile Include="..\ShimmerInterface\Models\ShimmerDevice.cs" Link="UnderTest\ShimmerDevice.cs" />
 	</ItemGroup>
 
