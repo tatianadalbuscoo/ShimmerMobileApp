@@ -5,7 +5,7 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<DefineConstants>$(DefineConstants);TEST_STUBS</DefineConstants>
 		<IsPackable>false</IsPackable>
-		<NoWarn>$(NoWarn);CS0067;CS1998;CS8321;xUnit1026;MVVMTK0034</NoWarn>
+		<NoWarn>$(NoWarn);CS0067;CS1998;CS8321;xUnit1026;MVVMTK0034;SYSLIB0050</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -15,6 +15,8 @@
 		<PackageReference Include="coverlet.collector" Version="6.0.2" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
 		<Using Include="Microsoft.Maui.Controls" />
+		<PackageReference Include="Microsoft.Maui.Graphics" Version="8.0.60" />
+		<Using Include="Microsoft.Maui.Graphics" />
 
 	</ItemGroup>
 
@@ -30,6 +32,7 @@
 		<Compile Include="..\ShimmerSDK\IMU\ShimmerSDK_IMU_Data.cs" Link="UnderTest\ShimmerSDK_IMU_Data.cs" />
 		<Compile Include="..\ShimmerInterface\ViewModels\MainPageViewModel.cs" Link="UnderTest\MainPageViewModel.cs" />
 		<Compile Include="..\ShimmerInterface\ViewModels\LoadingPageViewModel.cs" Link="UnderTest\LoadingPageViewModel.cs" />
+		<Compile Include="..\ShimmerInterface\ViewModels\DataPageViewModel.cs" Link="UnderTest\DataPageViewModel.cs" />
 		<Compile Include="..\ShimmerInterface\Models\ShimmerDevice.cs" Link="UnderTest\ShimmerDevice.cs" />
 	</ItemGroup>
 
