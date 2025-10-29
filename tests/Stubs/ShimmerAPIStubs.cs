@@ -1,18 +1,29 @@
-﻿// tests/Stubs/ShimmerAPIStubs.cs
-// Stub minimi per eseguire i test cross-OS senza I/O reale.
+﻿/* 
+ * ShimmerAPIStubs.cs
+ * Purpose: Cross-OS, no-I/O test stubs to drive unit tests without real hardware/SDK.
+ */
 
-using System;
-using System.Collections.Generic;
+
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
+
 namespace ShimmerAPI
 {
+
+    /// <summary>
+    /// Minimal subset of Shimmer Bluetooth constants and enumerations used by tests.
+    /// </summary>
     public static class ShimmerBluetooth
     {
-        public const int SHIMMER_STATE_CONNECTED = 1;
-        public const int SHIMMER_STATE_STREAMING = 2;
 
+        public const int SHIMMER_STATE_CONNECTED = 1;       // Logical state: device is connected.
+        public const int SHIMMER_STATE_STREAMING = 2;       // Logical state: device is streaming.
+
+
+        /// <summary>
+        /// Identifiers that tag SDK/UI callback messages.
+        /// </summary>
         public enum ShimmerIdentifier
         {
             MSG_IDENTIFIER_DATA_PACKET = 0x00,
@@ -21,6 +32,10 @@ namespace ShimmerAPI
             MSG_IDENTIFIER_PACKET_RECEPTION_RATE = 0x03
         }
 
+
+        /// <summary>
+        /// Bitfield of Shimmer3 sensor flags; combine with bitwise OR.
+        /// </summary>
         [Flags]
         public enum SensorBitmapShimmer3
         {
@@ -38,19 +53,49 @@ namespace ShimmerAPI
         }
     }
 
+
+    /// <summary>
+    /// Minimal data wrapper representing a single numeric sample.
+    /// </summary>
     public class SensorData
     {
+
+        /// <summary>
+        /// The stored numeric value.
+        /// </summary>
         public double Data { get; }
+
+
+        /// <summary>
+        /// Create a new instance.
+        /// </summary>
+        /// <param name="d">Value to store.</param>
         public SensorData(double d) => Data = d;
     }
 
+
+    /// <summary>
+    /// Lightweight container that mimics SDK ObjectCluster (name/format -> value rows).
+    /// </summary>
     public class ObjectCluster
     {
         private readonly List<(string name, string? fmt, SensorData data)> _rows = new();
 
+
+        /// <summary>
+        /// Adds a row to the cluster.
+        /// </summary>
+        /// <param name="name">Signal name.</param>
+        /// <param name="format">Signal format (e.g., CAL/RAW); optional.</param>
+        /// <param name="value">Numeric value.</param>
         public void Add(string name, string? format, double value)
             => _rows.Add((name, format, new SensorData(value)));
 
+
+        /// <summary>
+        /// Finds the index of the first row that matches <paramref name="name"/> and (if provided) <paramref name="format"/>.
+        /// </summary>
+        /// <returns>Zero-based index or -1 if not found.</returns>
         public int GetIndex(string name, string? format)
         {
             for (int i = 0; i < _rows.Count; i++)
@@ -61,25 +106,43 @@ namespace ShimmerAPI
             }
             return -1;
         }
-
-        public SensorData? GetData(int idx)
-            => (idx >= 0 && idx < _rows.Count) ? _rows[idx].data : null;
     }
 
+
+    /// <summary>
+    /// Common signal names and formats referenced by the code under test.
+    /// </summary>
     public static class ShimmerConfiguration
     {
+
+        /// <summary>
+        /// Generic signal names.
+        /// </summary>
         public static class SignalNames
         {
             public const string SYSTEM_TIMESTAMP = "System Timestamp";
         }
+
+
+        /// <summary>
+        /// Signal format labels.
+        /// </summary>
         public static class SignalFormats
         {
             public const string CAL = "CAL";
         }
     }
 
+
+    /// <summary>
+    /// Shimmer3-specific signal names used by tests.
+    /// </summary>
     public static class Shimmer3Configuration
     {
+
+        /// <summary>
+        /// Shimmer3 signal name strings.
+        /// </summary>
         public static class SignalNames
         {
             public const string LOW_NOISE_ACCELEROMETER_X = "Low Noise Accelerometer X";
@@ -106,102 +169,225 @@ namespace ShimmerAPI
         }
     }
 
+
+    /// <summary>
+    /// Event args carrying an indicator and optional payload, mirroring SDK callbacks.
+    /// </summary>
     public class CustomEventArgs : EventArgs
     {
+
         private readonly int _indicator;
         private readonly object? _payload;
+
+
+        /// <summary>
+        /// Create a new instance.
+        /// </summary>
+        /// <param name="indicator">Numeric identifier of the message.</param>
+        /// <param name="payload">Optional payload object.</param>
         public CustomEventArgs(int indicator, object? payload)
         {
             _indicator = indicator; _payload = payload;
         }
+
+
+        /// <summary>
+        /// Gets the numeric indicator.
+        /// </summary>
         public int getIndicator() => _indicator;
+
+
+        /// <summary>
+        /// Gets the optional payload object.
+        /// </summary>
         public object? getObject() => _payload;
     }
 
+
+    /// <summary>
+    /// Fake driver that records lifecycle calls and raises UI-like callbacks for tests.
+    /// </summary>
     public class ShimmerLogAndStreamSystemSerialPortV2
     {
+
+        /// <summary>
+        /// Logical device label.
+        /// </summary>
         public string Device { get; }
+
+
+        /// <summary>
+        /// Port or unique identifier.
+        /// </summary>
         public string Port { get; }
+
+
+        /// <summary>
+        /// Last sampling rate set via <see cref="WriteSamplingRate"/>.
+        /// </summary>
         public double LastSamplingRateWritten { get; private set; }
+
+
+        /// <summary>
+        /// Enabled sensors bitmask.
+        /// </summary>
         public int EnabledSensors { get; set; }
 
-        // --- Stato/contatori per i test del lifecycle ---
+
+        // ----- Lifecycle state/counters for tests -----
+
+
+        /// <summary>
+        /// Current connection state.
+        /// </summary>
         public bool Connected { get; private set; }
+
+
+        /// <summary>
+        /// Convenience wrapper for <see cref="Connected"/>.
+        /// </summary>
         public bool IsConnected() => Connected;
 
-        // Contatori "interni"
+
+        /// <summary>
+        /// Total number of Connect() calls.
+        /// </summary>
         public int ConnectCalls { get; private set; }
+
+
+        /// <summary>
+        /// Total number of StartStreaming() calls.
+        /// </summary>
         public int StartStreamingCalls { get; private set; }
+
+
+        /// <summary>
+        /// Total number of StopStreaming() calls.
+        /// </summary>
         public int StopStreamingCalls { get; private set; }
+
+
+        /// <summary>
+        /// Total number of Inquiry() calls.
+        /// </summary>
         public int InquiryCalls { get; private set; }
+
+
+        /// <summary>
+        /// Total number of WriteSensors() calls.
+        /// </summary>
         public int WriteSensorsCalls { get; private set; }
+
+
+        /// <summary>
+        /// Most recent bitmap passed to WriteSensors().
+        /// </summary>
         public int? LastSensorsBitmap { get; private set; }
 
-        // Alias con i nomi attesi dai test
+
+        // Aliases expected by tests
         public int ConnectCount => ConnectCalls;
         public int StartCount => StartStreamingCalls;
         public int StopCount => StopStreamingCalls;
         public int InquiryCount => InquiryCalls;
         public int WriteSensorsCount => WriteSensorsCalls;
 
+
+        /// <summary>
+        /// Create a new fake driver instance.
+        /// </summary>
+        /// <param name="device">Device label.</param>
+        /// <param name="port">Port or ID.</param>
         public ShimmerLogAndStreamSystemSerialPortV2(string device, string port)
         {
             Device = device; Port = port;
         }
 
+
+        /// <summary>
+        /// Event raised to simulate SDK UI callbacks.
+        /// </summary>
         public event EventHandler? UICallback;
 
-        public void Connect()
-        {
-            ConnectCalls++;
-            Connected = true;
-        }
 
+        /// <summary>
+        /// Records sampling rate configuration.
+        /// </summary>
+        /// <param name="hz">Sampling rate in Hz.</param>
         public void WriteSamplingRate(double hz) => LastSamplingRateWritten = hz;
 
-        public void WriteSensors(int bitmap)
-        {
-            LastSensorsBitmap = bitmap;
-            WriteSensorsCalls++;
-        }
 
-        public void Inquiry() => InquiryCalls++;
-
-        public void StartStreaming() { StartStreamingCalls++; }
-
-        public void StopStreaming() { StopStreamingCalls++; }
-
-        public void Disconnect() { Connected = false; }
-
+        /// <summary>
+        /// Raises a data-packet callback with the provided cluster.
+        /// </summary>
+        /// <param name="oc">Object cluster payload.</param>
         public void RaiseDataPacket(ObjectCluster oc)
             => UICallback?.Invoke(this, new CustomEventArgs(
                 (int)ShimmerBluetooth.ShimmerIdentifier.MSG_IDENTIFIER_DATA_PACKET, oc));
     }
 }
 
+
+
 namespace ShimmerSDK.EXG
 {
     using ShimmerAPI;
 
-    // Registro cross-OS: collega un "fake driver" al SUT senza accedere a campi privati.
+
+    /// <summary>
+    /// Cross-OS registry: associates an EXG SUT with its fake driver without touching private fields.
+    /// </summary>
     public static class ShimmerSDK_EXG_TestRegistry
     {
+
         private static readonly ConditionalWeakTable<ShimmerSDK_EXG, ShimmerLogAndStreamSystemSerialPortV2> _map
             = new();
 
+
+        /// <summary>
+        /// Registers (replace if present) a fake driver for the SUT.
+        /// </summary>
+        /// <param name="sut">System under test.</param>
+        /// <param name="drv">Fake driver instance.</param>
         public static void Register(ShimmerSDK_EXG sut, ShimmerLogAndStreamSystemSerialPortV2 drv)
         {
-            // se esiste già, rimuovi e riaggiungi
             try { _map.Remove(sut); } catch { }
             _map.Add(sut, drv);
         }
 
+
+        /// <summary>
+        /// Gets the fake driver for the specified SUT, if any.
+        /// </summary>
         public static ShimmerLogAndStreamSystemSerialPortV2? Get(ShimmerSDK_EXG sut)
             => _map.TryGetValue(sut, out var drv) ? drv : null;
     }
 
+
+    /// <summary>
+    /// Test-time helpers to configure EXG SUT flags and wire event handlers.
+    /// </summary>
     public static class ShimmerSDK_EXG_TestExtensions
     {
+
+        /// <summary>
+        /// Configures private fields on the SUT, computes the sensors bitmap,
+        /// injects a fake driver, and binds available private handlers.
+        /// </summary>
+        /// <param name="sut">System under test.</param>
+        /// <param name="deviceName">Logical device name for the fake driver.</param>
+        /// <param name="portOrId">Port or unique identifier for the fake driver.</param>
+        /// <param name="enableLowNoiseAcc">Enable low-noise accelerometer.</param>
+        /// <param name="enableWideRangeAcc">Enable wide-range accelerometer.</param>
+        /// <param name="enableGyro">Enable gyroscope.</param>
+        /// <param name="enableMag">Enable magnetometer.</param>
+        /// <param name="enablePressureTemp">Enable pressure/temperature.</param>
+        /// <param name="enableBatteryVoltage">Enable battery voltage telemetry.</param>
+        /// <param name="enableExtA6">Enable external ADC A6.</param>
+        /// <param name="enableExtA7">Enable external ADC A7.</param>
+        /// <param name="enableExtA15">Enable external ADC A15.</param>
+        /// <param name="enableExg">Enable EXG channels.</param>
+        /// <param name="exgMode">EXG operation mode to set.</param>
         public static void TestConfigure(
             this ShimmerSDK_EXG sut,
             string deviceName,
@@ -219,6 +405,8 @@ namespace ShimmerSDK.EXG
             ExgMode exgMode
         )
         {
+
+            // Set private feature flags
             SetBool(sut, "_enableLowNoiseAccelerometer", enableLowNoiseAcc);
             SetBool(sut, "_enableWideRangeAccelerometer", enableWideRangeAcc);
             SetBool(sut, "_enableGyroscope", enableGyro);
@@ -231,6 +419,7 @@ namespace ShimmerSDK.EXG
             SetBool(sut, "_enableExg", enableExg);
             SetField(sut, "_exgMode", exgMode);
 
+            // Build sensor bitmap
             int enabled = 0;
             if (enableLowNoiseAcc) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
             if (enableWideRangeAcc) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
@@ -247,12 +436,12 @@ namespace ShimmerSDK.EXG
                 enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_EXG2_24BIT;
             }
 
+            // Create and configure the fake driver
             var fake = new ShimmerLogAndStreamSystemSerialPortV2(deviceName, portOrId)
             {
                 EnabledSensors = enabled
             };
 
-            // collega gli handler eventi reali se esistono (Windows e/o Android)
             var h1 = sut.GetType().GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic);
             var h2 = sut.GetType().GetMethod("HandleEventAndroid", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -267,24 +456,53 @@ namespace ShimmerSDK.EXG
                 fake.UICallback += (EventHandler)d2;
             }
 
-            // registra il driver nel registro cross-OS
+            // Register the driver
             ShimmerSDK_EXG_TestRegistry.Register(sut, fake);
 
-            // forza "primo pacchetto" se i campi esistono
+            // Force "first packet" paths if present
             TrySetField(sut, "firstDataPacket", true);
             TrySetField(sut, "firstDataPacketAndroid", true);
 
-            // inietta anche nel campo privato shimmer se presente (no-op se mancante)
+            // Best-effort injection into private 'shimmer' field (no-op if missing)
             TrySetField(sut, "shimmer", fake);
         }
 
+
+        /// <summary>
+        /// Convenience wrapper to set a private <see cref="bool"/> field via reflection.
+        /// </summary>
+        /// <param name="o">Target instance.</param>
+        /// <param name="field">Private instance field name.</param>
+        /// <param name="v">Boolean value to assign.</param>
         private static void SetBool(object o, string field, bool v) => SetField(o, field, v);
+
+
+        /// <summary>
+        /// Sets a private instance field via reflection, throwing if the field is not found.
+        /// </summary>
+        /// <param name="o">The target instance containing the field.</param>
+        /// <param name="field">The exact name of the private instance field to set.</param>
+        /// <param name="v">The value to assign to the field.</param>
+        /// <exception cref="MissingFieldException">
+        /// Thrown when the specified <paramref name="field"/> does not exist on the target type.
+        /// </exception>
         private static void SetField(object o, string field, object? v)
         {
             var fi = o.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic);
             if (fi == null) throw new MissingFieldException(o.GetType().FullName, field);
             fi.SetValue(o, v);
         }
+
+
+        /// <summary>
+        /// Attempts to set a private instance field via reflection.
+        /// </summary>
+        /// <param name="o">The target instance containing the field.</param>
+        /// <param name="field">The exact name of the private instance field to set.</param>
+        /// <param name="v">The value to assign to the field.</param>
+        /// <returns>
+        /// <c>true</c> if the field was found and set; otherwise <c>false</c>.
+        /// </returns>
         private static bool TrySetField(object o, string field, object? v)
         {
             var fi = o.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -295,30 +513,72 @@ namespace ShimmerSDK.EXG
     }
 }
 
+
 namespace ShimmerSDK.IMU
 {
     using ShimmerAPI;
     using System.Runtime.CompilerServices;
     using System.Reflection;
 
-    // Registro cross-OS per IMU (stesso pattern dell’EXG)
+
+    /// <summary>
+    /// Cross-OS registry that associates an IMU SUT instance with its fake driver
+    /// without accessing private fields directly.
+    /// </summary>
     public static class ShimmerSDK_IMU_TestRegistry
     {
         private static readonly ConditionalWeakTable<ShimmerSDK_IMU, ShimmerLogAndStreamSystemSerialPortV2> _map
             = new();
 
+
+        /// <summary>
+        /// Registers (replaces if already present) the fake driver for the specified SUT.
+        /// </summary>
+        /// <param name="sut">System under test.</param>
+        /// <param name="drv">Fake driver to associate with <paramref name="sut"/>.</param>
         public static void Register(ShimmerSDK_IMU sut, ShimmerLogAndStreamSystemSerialPortV2 drv)
         {
             try { _map.Remove(sut); } catch { }
             _map.Add(sut, drv);
         }
 
+
+        /// <summary>
+        /// Retrieves the fake driver associated with the given SUT, if any.
+        /// </summary>
+        /// <param name="sut">System under test.</param>
+        /// <returns>
+        /// The mapped <see cref="ShimmerLogAndStreamSystemSerialPortV2"/> instance,
+        /// or <c>null</c> when no mapping exists.
+        /// </returns>
         public static ShimmerLogAndStreamSystemSerialPortV2? Get(ShimmerSDK_IMU sut)
             => _map.TryGetValue(sut, out var drv) ? drv : null;
     }
 
+
+    /// <summary>
+    /// Test-only extension helpers to configure the IMU SUT, compute sensor bitmaps,
+    /// and wire event handlers.
+    /// </summary>
     public static class ShimmerSDK_IMU_TestExtensions
     {
+
+        /// <summary>
+        /// Configures private flags on the SUT, builds the enabled-sensors bitmap,
+        /// injects a fake driver, and binds the first available private handler.
+        /// </summary>
+        /// <param name="sut">System under test.</param>
+        /// <param name="deviceName">Logical device name for the fake driver.</param>
+        /// <param name="portOrId">Port or unique identifier for the fake driver.</param>
+        /// <param name="enableLowNoiseAcc">Enable low-noise accelerometer.</param>
+        /// <param name="enableWideRangeAcc">Enable wide-range accelerometer.</param>
+        /// <param name="enableGyro">Enable gyroscope.</param>
+        /// <param name="enableMag">Enable magnetometer.</param>
+        /// <param name="enablePressureTemperature">Enable pressure/temperature.</param>
+        /// <param name="enableBattery">Enable battery telemetry.</param>
+        /// <param name="enableExtA6">Enable external ADC A6.</param>
+        /// <param name="enableExtA7">Enable external ADC A7.</param>
+        /// <param name="enableExtA15">Enable external ADC A15.</param>
         public static void TestConfigure(
             this ShimmerSDK_IMU sut,
             string deviceName,
@@ -327,14 +587,15 @@ namespace ShimmerSDK.IMU
             bool enableWideRangeAcc,
             bool enableGyro,
             bool enableMag,
-            bool enablePressureTemperature, // <- nome coerente con la firma
+            bool enablePressureTemperature,
             bool enableBattery,
             bool enableExtA6,
             bool enableExtA7,
             bool enableExtA15
         )
         {
-            // set dei flag privati
+
+            // Set private feature flags
             SetBool(sut, "_enableLowNoiseAccelerometer", enableLowNoiseAcc);
             SetBool(sut, "_enableWideRangeAccelerometer", enableWideRangeAcc);
             SetBool(sut, "_enableGyroscope", enableGyro);
@@ -345,7 +606,7 @@ namespace ShimmerSDK.IMU
             SetBool(sut, "_enableExtA7", enableExtA7);
             SetBool(sut, "_enableExtA15", enableExtA15);
 
-            // bitmap sensori (niente EXG qui)
+            // Build sensor bitmap
             int enabled = 0;
             if (enableLowNoiseAcc) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_A_ACCEL;
             if (enableWideRangeAcc) enabled |= (int)ShimmerBluetooth.SensorBitmapShimmer3.SENSOR_D_ACCEL;
@@ -362,7 +623,6 @@ namespace ShimmerSDK.IMU
                 EnabledSensors = enabled
             };
 
-            // collega gli handler eventi reali se esistono (Windows/Android/Mac…)
             var candidateHandlers = new[]
             {
                 "HandleEvent",
@@ -392,7 +652,6 @@ namespace ShimmerSDK.IMU
             }
             else
             {
-                // Fallback: se non c'è un handler privato, rilancia l'evento pubblico così com'è (senza istanziare IMUData)
                 fake.UICallback += (sender, e) =>
                 {
                     if (e is ShimmerAPI.CustomEventArgs cea &&
@@ -409,24 +668,53 @@ namespace ShimmerSDK.IMU
 
             }
 
-            // registra il fake driver
+            // register the fake driver
             ShimmerSDK_IMU_TestRegistry.Register(sut, fake);
 
-            // forza mappatura al prossimo pacchetto se il campo esiste
+            // force mapping to next packet if field exists
             TrySetField(sut, "firstDataPacket", true);
             TrySetField(sut, "firstDataPacketAndroid", true);
 
-            // inietta anche nel campo privato shimmer se presente (no-op se assente)
+            // also inject shimmer into the private field if present (no-op if absent)
             TrySetField(sut, "shimmer", fake);
         }
 
+
+        /// <summary>
+        /// Convenience wrapper to set a private <see cref="bool"/> field via reflection.
+        /// </summary>
+        /// <param name="o">Target instance.</param>
+        /// <param name="field">Name of the private instance field.</param>
+        /// <param name="v">Boolean value to assign.</param>
         private static void SetBool(object o, string field, bool v) => SetField(o, field, v);
+
+
+        /// <summary>
+        /// Sets a private instance field via reflection, throwing if the field is not found.
+        /// </summary>
+        /// <param name="o">The target instance containing the field.</param>
+        /// <param name="field">The exact name of the private instance field to set.</param>
+        /// <param name="v">The value to assign to the field.</param>
+        /// <exception cref="MissingFieldException">
+        /// Thrown when the specified <paramref name="field"/> does not exist on the target type.
+        /// </exception>
         private static void SetField(object o, string field, object? v)
         {
             var fi = o.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic);
             if (fi == null) throw new MissingFieldException(o.GetType().FullName, field);
             fi.SetValue(o, v);
         }
+
+
+        /// <summary>
+        /// Attempts to set a private instance field via reflection.
+        /// </summary>
+        /// <param name="o">The target instance containing the field.</param>
+        /// <param name="field">The exact name of the private instance field to set.</param>
+        /// <param name="v">The value to assign to the field.</param>
+        /// <returns>
+        /// <c>true</c> if the field was found and set; otherwise <c>false</c>.
+        /// </returns>
         private static bool TrySetField(object o, string field, object? v)
         {
             var fi = o.GetType().GetField(field, BindingFlags.Instance | BindingFlags.NonPublic);
