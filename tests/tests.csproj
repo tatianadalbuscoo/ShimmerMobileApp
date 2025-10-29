@@ -20,7 +20,7 @@
 
 	</ItemGroup>
 
-	<!-- Collega SOLO il file reale sotto test (path corretto) -->
+	<!-- Sources under test -->
 	<ItemGroup>
 		<Compile Include="..\ShimmerSDK\EXG\ShimmerSDK_EXG.cs" Link="UnderTest\ShimmerSDK_EXG.cs" />
 		<Compile Include="..\ShimmerSDK\EXG\ShimmerSDK_EXG_Settings.cs" Link="UnderTest\ShimmerSDK_EXG_Settings.cs" />
@@ -36,8 +36,9 @@
 		<Compile Include="..\ShimmerInterface\Models\ShimmerDevice.cs" Link="UnderTest\ShimmerDevice.cs" />
 	</ItemGroup>
 
-	<!-- NON includere gli stub: lo SDK li prende da solo perché sono nel progetto -->
 	<ItemGroup>
+
+		<!-- Ship runner config -->
 		<None Update="xunit.runner.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
