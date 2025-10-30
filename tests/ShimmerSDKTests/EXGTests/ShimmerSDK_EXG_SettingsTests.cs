@@ -1,23 +1,42 @@
-﻿using System;
-using System.Collections.Generic;
+﻿/*
+ * ShimmerSDK_EXGSettingsTests.cs
+ * Purpose: Unit tests for ShimmerSDK_EXGSettings file.
+ */
+
+
 using ShimmerSDK.EXG;
 using Xunit;
 
+
 namespace ShimmerSDKTests.EXGTests
 {
+
+    /// <summary>
+    /// Unit tests for <see cref="ShimmerSDK_EXG"/> (configuration partial):
+    /// validates ctor defaults, property round-trips, EXG mode, and independence between flags and sampling rate.
+    /// </summary>
     public class ShimmerSDK_EXG_SettingsTests
     {
-        // Ctor() — behavior
-        // Defaults from ctor (dall’altro partial della classe)
+
+        // ----- Constructor behavior -----
+
+
+        /// <summary>
+        /// Ensures the parameterless constructor sets sensible defaults.
+        /// Expected:
+        /// - SamplingRate ≈ 51.2 Hz (within [51.199, 51.201])
+        /// - All sensor flags default to true: LNA, WRA, Gyro, Mag, Pressure/Temperature,
+        ///   BatteryVoltage, ExtA6, ExtA7, ExtA15
+        /// - EnableExg defaults to false
+        /// - ExgMode defaults to ECG
+        /// </summary>
         [Fact]
         public void Ctor_Defaults_Are_Sensible()
         {
             var sut = new ShimmerSDK_EXG();
 
-            // SamplingRate default ~51.2 Hz
             Assert.InRange(sut.SamplingRate, 51.199, 51.201);
 
-            // Flag sensori default (come impostati nel costruttore dell’altra partial)
             Assert.True(sut.EnableLowNoiseAccelerometer);
             Assert.True(sut.EnableWideRangeAccelerometer);
             Assert.True(sut.EnableGyroscope);
@@ -28,13 +47,20 @@ namespace ShimmerSDKTests.EXGTests
             Assert.True(sut.EnableExtA7);
             Assert.True(sut.EnableExtA15);
 
-            // EXG di default OFF, mode ECG
             Assert.False(sut.EnableExg);
             Assert.Equal(ExgMode.ECG, sut.ExgMode);
         }
 
-        // SamplingRate — behavior
-        // set/get round-trip
+
+        // ----- SamplingRate behavior -----
+
+
+        /// <summary>
+        /// Verifies round-trip for SamplingRate across representative values.
+        /// Expected:
+        /// - After setting, getter returns exactly the assigned value (high precision)
+        /// - No side effects on other properties asserted here
+        /// </summary>
         [Theory]
         [InlineData(12.5)]
         [InlineData(51.2)]
@@ -47,11 +73,20 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(value, sut.SamplingRate, precision: 10);
         }
 
-        // Bool flags — behavior
-        // Tutti i bool getter/setter: round-trip e verifica default
+
+        // ----- Bool flags behavior -----
+
+
+        /// <summary>
+        /// Helper: Provides (name, getter, setter, defaultValue) tuples for each boolean sensor flag
+        /// to drive the parameterized test.
+        /// </summary>
+        /// <returns>
+        /// An <see cref="IEnumerable{T}"/> of <see cref="object"/> arrays where each entry is:
+        /// <c>{ string name, Func&lt;ShimmerSDK_EXG,bool&gt; getter, Action&lt;ShimmerSDK_EXG,bool&gt; setter, bool defaultValue }</c>.
+        /// </returns>
         public static IEnumerable<object[]> BoolProps()
         {
-            // name, getter, setter, defaultValue
             yield return new object[] { "EnableLowNoiseAccelerometer", (Func<ShimmerSDK_EXG, bool>)(s => s.EnableLowNoiseAccelerometer), (Action<ShimmerSDK_EXG, bool>)((s, v) => s.EnableLowNoiseAccelerometer = v), true };
             yield return new object[] { "EnableWideRangeAccelerometer", (Func<ShimmerSDK_EXG, bool>)(s => s.EnableWideRangeAccelerometer), (Action<ShimmerSDK_EXG, bool>)((s, v) => s.EnableWideRangeAccelerometer = v), true };
             yield return new object[] { "EnableGyroscope", (Func<ShimmerSDK_EXG, bool>)(s => s.EnableGyroscope), (Action<ShimmerSDK_EXG, bool>)((s, v) => s.EnableGyroscope = v), true };
@@ -64,8 +99,14 @@ namespace ShimmerSDKTests.EXGTests
             yield return new object[] { "EnableExg", (Func<ShimmerSDK_EXG, bool>)(s => s.EnableExg), (Action<ShimmerSDK_EXG, bool>)((s, v) => s.EnableExg = v), false };
         }
 
-        // Bool flags — behavior
-        // Ogni proprietà booleana: default poi toggle e round-trip (property: {name})
+
+        /// <summary>
+        /// Validates default, toggle, and round-trip behavior for each boolean flag.
+        /// Expected:
+        /// - Getter returns the documented default
+        /// - After setting to the opposite value, getter reflects the change
+        /// - After setting back to the default, getter returns the original default
+        /// </summary>
         [Theory]
         [MemberData(nameof(BoolProps))]
         public void Bool_Property_Default_Then_Toggle_RoundTrip(
@@ -76,15 +117,22 @@ namespace ShimmerSDKTests.EXGTests
         {
             var sut = new ShimmerSDK_EXG();
 
-            Assert.Equal(defaultValue, getter(sut)); // usa getter
+            Assert.Equal(defaultValue, getter(sut));
             setter(sut, !defaultValue);
             Assert.True(getter(sut) == !defaultValue, $"Property '{name}' did not toggle as expected.");
             setter(sut, defaultValue);
             Assert.True(getter(sut) == defaultValue, $"Property '{name}' did not round-trip as expected.");
         }
 
-        // ExgMode — behavior
-        // round-trip su tutti i valori dell'enum
+
+        // ----- ExgMode behavior -----
+
+
+        /// <summary>
+        /// Verifies round-trip on all enum values for <c>ExgMode</c>.
+        /// Expected:
+        /// - After setting, <c>sut.ExgMode</c> equals the assigned value for each case
+        /// </summary>
         [Theory]
         [InlineData(ExgMode.ECG)]
         [InlineData(ExgMode.EMG)]
@@ -97,27 +145,36 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(mode, sut.ExgMode);
         }
 
-        // Flags independence — behavior
-        // Settare un flag non modifica gli altri
+
+        // ----- Independence checks -----
+
+
+        /// <summary>
+        /// Changing one flag must not affect the others; SamplingRate must remain unchanged.
+        /// Expected:
+        /// - Only EnableWideRangeAccelerometer and EnableExg change (the ones toggled)
+        /// - All other flags remain identical to the initial snapshot
+        /// - SamplingRate stays ≈ 51.2 Hz (within [51.199, 51.201])
+        /// </summary>
         [Fact]
         public void Changing_One_Flag_Does_Not_Affect_Others()
         {
             var sut = new ShimmerSDK_EXG();
 
-            // snapshot iniziale
+            // initial snapshot
             var before = SnapshotFlags(sut);
 
-            // cambia SOLO WideRangeAccelerometer e EXG
+            // change ONLY WideRangeAccelerometer and EXG
             sut.EnableWideRangeAccelerometer = !before.EnableWideRangeAccelerometer;
             sut.EnableExg = !before.EnableExg;
 
             var after = SnapshotFlags(sut);
 
-            // Quelli modificati devono essere cambiati
+            // the modified ones should differ
             Assert.Equal(!before.EnableWideRangeAccelerometer, after.EnableWideRangeAccelerometer);
             Assert.Equal(!before.EnableExg, after.EnableExg);
 
-            // Tutti gli altri invariati
+            // all the others should be identical
             Assert.Equal(before.EnableLowNoiseAccelerometer, after.EnableLowNoiseAccelerometer);
             Assert.Equal(before.EnableGyroscope, after.EnableGyroscope);
             Assert.Equal(before.EnableMagnetometer, after.EnableMagnetometer);
@@ -127,12 +184,16 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(before.EnableExtA7, after.EnableExtA7);
             Assert.Equal(before.EnableExtA15, after.EnableExtA15);
 
-            // SamplingRate non deve cambiare per effetto dei flag
+            // SamplingRate should not change as a side effect of flag changes
             Assert.InRange(sut.SamplingRate, 51.199, 51.201);
         }
 
-        // SamplingRate independence — behavior
-        // Cambiare SamplingRate non altera i flag
+
+        /// <summary>
+        /// Changing <c>SamplingRate</c> must not alter any sensor flags.
+        /// Expected:
+        /// - After setting SamplingRate to a different value, the complete flag snapshot is unchanged
+        /// </summary>
         [Fact]
         public void Changing_SamplingRate_Does_Not_Affect_Flags()
         {
@@ -145,7 +206,17 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(before, after);
         }
 
-        // ==== helpers ====
+
+        // ----- helpers -----
+
+
+        /// <summary>
+        /// Helper: Captures a snapshot of all boolean flags for equality comparison.
+        /// </summary>
+        /// <param name="s">The <see cref="ShimmerSDK_EXG"/> instance to snapshot.</param>
+        /// <returns>
+        /// An immutable <see cref="Flags"/> record containing the current values of all boolean flags.
+        /// </returns>
         private static Flags SnapshotFlags(ShimmerSDK_EXG s) => new Flags(
             s.EnableLowNoiseAccelerometer,
             s.EnableWideRangeAccelerometer,
@@ -159,6 +230,20 @@ namespace ShimmerSDKTests.EXGTests
             s.EnableExg
         );
 
+
+        /// <summary>
+        /// Helper: Immutable struct used to compare complete flag states.
+        /// </summary>
+        /// <param name="EnableLowNoiseAccelerometer">Current value of the LowNoiseAccelerometer flag.</param>
+        /// <param name="EnableWideRangeAccelerometer">Current value of the WideRangeAccelerometer flag.</param>
+        /// <param name="EnableGyroscope">Current value of the Gyroscope flag.</param>
+        /// <param name="EnableMagnetometer">Current value of the Magnetometer flag.</param>
+        /// <param name="EnablePressureTemperature">Current value of the Pressure/Temperature flag.</param>
+        /// <param name="EnableBatteryVoltage">Current value of the BatteryVoltage flag.</param>
+        /// <param name="EnableExtA6">Current value of the ExtA6 flag.</param>
+        /// <param name="EnableExtA7">Current value of the ExtA7 flag.</param>
+        /// <param name="EnableExtA15">Current value of the ExtA15 flag.</param>
+        /// <param name="EnableExg">Current value of the Exg flag.</param>
         private readonly record struct Flags(
             bool EnableLowNoiseAccelerometer,
             bool EnableWideRangeAccelerometer,
