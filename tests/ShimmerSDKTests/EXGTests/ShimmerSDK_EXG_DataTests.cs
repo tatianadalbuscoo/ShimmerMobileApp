@@ -166,7 +166,7 @@ namespace ShimmerSDKTests.EXGTests
             else
             {
 
-                // MacCatalyst
+                // iOS/MacCatalyst
                 var sutEmpty = Activator.CreateInstance(typeof(ShimmerSDK_EXGData))!;
                 var p1 = sutEmpty.GetType().GetProperty("Exg1", BindingFlags.Instance | BindingFlags.Public);
                 var p2 = sutEmpty.GetType().GetProperty("Exg2", BindingFlags.Instance | BindingFlags.Public);

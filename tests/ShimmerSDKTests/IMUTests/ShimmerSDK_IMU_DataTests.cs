@@ -1,39 +1,71 @@
-﻿// tests/ShimmerSDKTests/IMUTests/ShimmerSDK_IMU_DataTests.cs
-#nullable enable
-using System;
-using System.Linq;
+﻿/*
+ * ShimmerSDK_IMUDataTests.cs
+ * Purpose: Unit tests for ShimmerSDK_IMUData file.
+ */
+
+
 using System.Reflection;
-using ShimmerAPI;      // SensorData
-using ShimmerSDK.IMU; // ShimmerSDK_IMU_Data
+using ShimmerAPI;
+using ShimmerSDK.IMU;
 using Xunit;
+
 
 namespace ShimmerSDKTests.IMUTests
 {
+
     /// <summary>
-    /// Test robusti per ShimmerSDK_IMU_Data:
-    /// - I canali principali sono obbligatori e readonly
-    /// - Il Timestamp è opzionale (accetta alias) per evitare falsi negativi
-    /// - Soft-skip se la classe non è presente nel TFM corrente
+    /// Unit tests for <see cref="ShimmerSDK_IMU_Data"/> across platform-specific API shapes.
+    /// Validates presence and mutability of public members, constructor wiring,
+    /// and null-handling semantics in both SensorData (Windows/Android) and Apple branches.
     /// </summary>
     public class ShimmerSDK_IMU_Data_Tests
     {
-        // === Helpers =========================================================
+
+        /// <summary>
+        /// Helper: Determines whether a public instance <c>field</c> or <c>property</c> with the given
+        /// <paramref name="name"/> exists on type <paramref name="t"/>.
+        /// </summary>
+        /// <param name="t">Type to inspect.</param>
+        /// <param name="name">Member name to look up.</param>
+        /// <returns><c>true</c> if a matching public instance field or property exists; otherwise <c>false</c>.</returns>
         private static bool MemberExists(Type t, string name) =>
             t.GetField(name, BindingFlags.Public | BindingFlags.Instance) != null ||
             t.GetProperty(name, BindingFlags.Public | BindingFlags.Instance) != null;
 
+
+        /// <summary>
+        /// Helper: Retrieves the value of a public instance field named <paramref name="name"/> from
+        /// <paramref name="instance"/>. Returns <c>null</c> if the field is not found.
+        /// </summary>
+        /// <param name="instance">Object instance that owns the field.</param>
+        /// <param name="name">Field name to fetch.</param>
+        /// <returns>The field value if found; otherwise <c>null</c>.</returns>
         private static object? GetFieldValue(object instance, string name) =>
             instance.GetType().GetField(name, BindingFlags.Public | BindingFlags.Instance)?.GetValue(instance);
 
+
+        /// <summary>
+        /// Helper: Detects whether the current build uses the SensorData-typed API surface (Windows/Android branch)
+        /// versus the Apple branch (double/nullable fields or properties).
+        /// </summary>
+        /// <param name="t">Type to inspect (typically <see cref="ShimmerSDK_IMU_Data"/>).</param>
+        /// <returns>
+        /// <c>true</c> if the type exposes a public field named <c>TimeStamp</c> whose type is
+        /// assignable to <see cref="SensorData"/>; otherwise <c>false</c>.
+        /// </returns>
         private static bool IsSensorDataBranch(Type t)
         {
             var ts = t.GetField("TimeStamp", BindingFlags.Public | BindingFlags.Instance)?.FieldType;
             return ts != null && typeof(SensorData).IsAssignableFrom(ts);
         }
 
+
+        /// <summary>
+        /// Canonical channel names expected to be present for IMU data (excluding timestamp),
+        /// used to assert API surface shape consistently across branches.
+        /// </summary>
         private static readonly string[] RequiredNames =
         {
-            // Tutti i canali tranne il timestamp
             "LowNoiseAccelerometerX","LowNoiseAccelerometerY","LowNoiseAccelerometerZ",
             "WideRangeAccelerometerX","WideRangeAccelerometerY","WideRangeAccelerometerZ",
             "GyroscopeX","GyroscopeY","GyroscopeZ",
@@ -43,58 +75,86 @@ namespace ShimmerSDKTests.IMUTests
             "ExtADC_A6","ExtADC_A7","ExtADC_A15"
         };
 
-        // Alias accettati per il timestamp (se presente)
+        
+        /// <summary>
+        /// Accepted aliases for the timestamp field in different branches/platforms.
+        /// The timestamp is an optional presence in these tests (validated when present).
+        /// </summary>
         private static readonly string[] TimestampAliases =
         {
             "TimeStamp","Timestamp","SystemTimeStamp","SystemTimestamp"
         };
 
-        // === Tests ============================================================
 
+        // ----- API surface -----
+
+
+        /// <summary>
+        /// Ensures the constructor correctly wires channels according to the active platform branch.
+        /// Windows/Android branch: invokes the long <c>SensorData</c>-based constructor via reflection.
+        /// Apple branch: validates param-less + full-parameter overload behavior with settable properties.
+        /// Expected:
+        /// - Every channel lands in the expected field/property with the provided sentinel value
+        /// - Test short-circuits (return) if branch-specific members are not present in the build
+        /// </summary>
         [Fact]
         public void Has_All_Expected_Public_Members()
         {
             var t = typeof(ShimmerSDK_IMU_Data);
 
-            // Soft-skip se non c'è nessun membro atteso (classe non inclusa in questo TFM)
             if (!RequiredNames.Any(n => MemberExists(t, n)) && !TimestampAliases.Any(a => MemberExists(t, a)))
                 return;
 
-            // I canali principali DEVONO esserci
             foreach (var n in RequiredNames)
-                Assert.True(MemberExists(t, n), $"Membro pubblico mancante: {n}");
-
-            // Il timestamp è opzionale → non assertiamo la sua presenza
+                Assert.True(MemberExists(t, n), $"Missing public member: {n}");
         }
 
+
+        /// <summary>
+        /// Ensures the constructor correctly wires channels according to the active platform branch.
+        /// Windows/Android branch: invokes the long <c>SensorData</c>-based constructor via reflection.
+        /// Apple branch: validates param-less + full-parameter overload behavior with settable properties.
+        /// Expected:
+        /// - Every channel lands in the expected field/property with the provided sentinel value
+        /// - Test short-circuits (return) if branch-specific members are not present in the build
+        /// </summary>
         [Fact]
         public void Fields_Are_Public_Readonly_And_No_Properties()
         {
             var t = typeof(ShimmerSDK_IMU_Data);
 
-            // Soft-skip se non c'è nessun membro atteso
             if (!RequiredNames.Any(n => MemberExists(t, n)) && !TimestampAliases.Any(a => MemberExists(t, a)))
                 return;
 
-            // Tutti i canali principali sono campi readonly e non esistono proprietà omonime
             foreach (var n in RequiredNames)
             {
                 var f = t.GetField(n, BindingFlags.Public | BindingFlags.Instance);
-                if (f != null) Assert.True(f.IsInitOnly, $"{n} non è readonly");
+                if (f != null) Assert.True(f.IsInitOnly, $"{n} is not readonly");
                 Assert.Null(t.GetProperty(n, BindingFlags.Public | BindingFlags.Instance));
             }
 
-            // Timestamp: se presente con uno degli alias, deve essere un campo readonly
             var tsName = TimestampAliases.FirstOrDefault(a => t.GetField(a, BindingFlags.Public | BindingFlags.Instance) != null);
             if (tsName != null)
             {
                 var f = t.GetField(tsName, BindingFlags.Public | BindingFlags.Instance);
                 Assert.NotNull(f);
-                Assert.True(f!.IsInitOnly, $"{tsName} non è readonly");
+                Assert.True(f!.IsInitOnly, $"{tsName} is not readonly");
                 Assert.Null(t.GetProperty(tsName, BindingFlags.Public | BindingFlags.Instance));
             }
         }
 
+
+        // ----- Constructor behavior -----
+
+
+        /// <summary>
+        /// Ensures the constructor correctly wires channels according to the active platform branch.
+        /// Windows/Android branch: invokes the long <c>SensorData</c>-based constructor via reflection.
+        /// Apple branch: validates param-less + full-parameter overload behavior with settable properties.
+        /// Expected:
+        /// - Every channel lands in the expected field/property with the provided sentinel value
+        /// - Test short-circuits (return) if branch-specific members are not present in the build
+        /// </summary>
         [Fact]
         public void Ctor_Assigns_All_Fields_Correctly_For_Current_Platform()
         {
@@ -102,27 +162,26 @@ namespace ShimmerSDKTests.IMUTests
 
             if (IsSensorDataBranch(t))
             {
-                // WINDOWS/ANDROID: ctor con 19 parametri di tipo SensorData?
+                // WINDOWS/ANDROID
                 var ctor = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                             .FirstOrDefault(c => c.GetParameters().Length == 19 &&
                                                  typeof(SensorData).IsAssignableFrom(c.GetParameters()[0].ParameterType));
-                if (ctor == null) return; // soft-skip
+                if (ctor == null) return;
 
                 object sut = ctor.Invoke(new object?[]
                 {
-                    new SensorData(100),                 // TimeStamp (se esiste)
+                    new SensorData(100),                                       // TimeStamp (if exists)
                     new SensorData(1), new SensorData(2), new SensorData(3),   // LNA
                     new SensorData(4), new SensorData(5), new SensorData(6),   // WRA
                     new SensorData(7), new SensorData(8), new SensorData(9),   // Gyro
                     new SensorData(10),new SensorData(11),new SensorData(12),  // Mag
-                    new SensorData(20), new SensorData(21),                    // Temp, Pressure (params)
+                    new SensorData(20), new SensorData(21),                    // Temp, Pressure
                     new SensorData(22),                                        // Battery
                     new SensorData(30), new SensorData(31), new SensorData(32) // Ext
                 });
 
                 double D(object? o) => Assert.IsType<SensorData>(o).Data;
 
-                // Timestamp: assert solo se il campo/alias esiste
                 var tsAlias = TimestampAliases.FirstOrDefault(a => MemberExists(t, a));
                 if (tsAlias != null) Assert.Equal(100, D(GetFieldValue(sut, tsAlias)));
 
@@ -142,8 +201,6 @@ namespace ShimmerSDKTests.IMUTests
                 Assert.Equal(11, D(GetFieldValue(sut, "MagnetometerY")));
                 Assert.Equal(12, D(GetFieldValue(sut, "MagnetometerZ")));
 
-                // Param order: (temperature=20, pressure=21)
-                // Mapping (Win/Android): Pressure_BMP180 <- 21, Temperature_BMP180 <- 20
                 Assert.Equal(21, D(GetFieldValue(sut, "Pressure_BMP180")));
                 Assert.Equal(20, D(GetFieldValue(sut, "Temperature_BMP180")));
 
@@ -155,10 +212,10 @@ namespace ShimmerSDKTests.IMUTests
             }
             else
             {
-                // iOS/MacCatalyst: ctor con 19 parametri object?
+                // iOS/MacCatalyst
                 var ctor = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                             .FirstOrDefault(c => c.GetParameters().Length == 19);
-                if (ctor == null) return; // soft-skip
+                if (ctor == null) return;
 
                 object sut = ctor.Invoke(new object?[]
                 {
@@ -167,12 +224,11 @@ namespace ShimmerSDKTests.IMUTests
                     4.0, 5.0, 6.0,
                     7.0, 8.0, 9.0,
                     10.0, 11.0, 12.0,
-                    20.0, 21.0,     // Temp, Pressure
+                    20.0, 21.0,
                     22.0,
                     30.0, 31.0, 32.0
                 });
 
-                // Timestamp: assert solo se il campo/alias esiste
                 var tsAlias = TimestampAliases.FirstOrDefault(a => MemberExists(t, a));
                 if (tsAlias != null) Assert.Equal(100.0, GetFieldValue(sut, tsAlias));
 
@@ -192,7 +248,6 @@ namespace ShimmerSDKTests.IMUTests
                 Assert.Equal(11.0, GetFieldValue(sut, "MagnetometerY"));
                 Assert.Equal(12.0, GetFieldValue(sut, "MagnetometerZ"));
 
-                // Mapping (Apple): Pressure_BMP180 <- 21, Temperature_BMP180 <- 20
                 Assert.Equal(21.0, GetFieldValue(sut, "Pressure_BMP180"));
                 Assert.Equal(20.0, GetFieldValue(sut, "Temperature_BMP180"));
 
@@ -204,6 +259,15 @@ namespace ShimmerSDKTests.IMUTests
             }
         }
 
+
+        /// <summary>
+        /// Ensures the constructor correctly wires channels according to the active platform branch.
+        /// Windows/Android branch: invokes the long <c>SensorData</c>-based constructor via reflection.
+        /// Apple branch: validates param-less + full-parameter overload behavior with settable properties.
+        /// Expected:
+        /// - Every channel lands in the expected field/property with the provided sentinel value
+        /// - Test short-circuits (return) if branch-specific members are not present in the build
+        /// </summary>
         [Fact]
         public void Ctor_Allows_Nulls_For_All_Channels()
         {
@@ -211,22 +275,20 @@ namespace ShimmerSDKTests.IMUTests
 
             var ctor = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                         .FirstOrDefault(c => c.GetParameters().Length == 19);
-            if (ctor == null) return; // soft-skip
+            if (ctor == null) return;
 
             object sut = ctor.Invoke(Enumerable.Repeat<object?>(null, 19).ToArray());
 
-            // Soft-skip se non c'è nessun membro atteso
             if (!RequiredNames.Any(n => MemberExists(t, n)) && !TimestampAliases.Any(a => MemberExists(t, a)))
                 return;
 
             foreach (var n in RequiredNames)
             {
                 var f = t.GetField(n, BindingFlags.Public | BindingFlags.Instance);
-                if (f == null) return; // ramo non presente → soft-skip
+                if (f == null) return;
                 Assert.Null(f.GetValue(sut));
             }
 
-            // Timestamp: se presente con uno degli alias, deve risultare null
             foreach (var alias in TimestampAliases)
             {
                 var f = t.GetField(alias, BindingFlags.Public | BindingFlags.Instance);
