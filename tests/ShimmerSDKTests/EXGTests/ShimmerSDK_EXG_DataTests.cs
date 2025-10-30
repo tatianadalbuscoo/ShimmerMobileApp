@@ -1,20 +1,45 @@
-﻿// tests/ShimmerSDKTests/EXGTests/ShimmerSDK_EXGDataTests.cs
+﻿/*
+ * ShimmerSDK_EXGDataTests.cs
+ * Purpose: Unit tests for ShimmerSDK_EXGData file.
+ */
 
-#nullable enable
-using System;
-using System.Linq;
+
 using System.Reflection;
 using ShimmerAPI;
 using ShimmerSDK.EXG;
 using Xunit;
 
+
 namespace ShimmerSDKTests
 {
-    // === Helper “shim” usabile da tutti i test che oggi usano .Values ===
-    // Usa reflection per costruire un array ordinato dei canali della classe reale ShimmerSDK_EXGData
-    // (branch Windows/Android: campi; branch Apple: proprietà).
+
+    /// <summary>
+    /// Helper “shim” shared by tests that historically accessed a <c>.Values</c> array.
+    /// Uses reflection to build an ordered array of channel values from a real
+    /// <see cref="ShimmerSDK_EXGData"/> instance, matching the canonical order:
+    /// TimeStamp, LNA (X/Y/Z), WRA (X/Y/Z), Gyro (X/Y/Z), Mag (X/Y/Z),
+    /// Temperature_BMP180, Pressure_BMP180, BatteryVoltage, ExtADC (A6/A7/A15), Exg1, Exg2.
+    /// <para>
+    /// Works across platform branches:
+    /// - Windows/Android: reads public fields
+    /// - Apple: reads public properties
+    /// </para>
+    /// </summary>
     public static class ExgValuesShim
     {
+
+        /// <summary>
+        /// Returns the ordered values array for the specified <paramref name="d"/> instance,
+        /// resolving public fields or public properties by name.
+        /// Missing members (in a non-matching branch) will yield <c>null</c> entries.
+        /// </summary>
+        /// <param name="d">The EXG data instance from which to extract values.</param>
+        /// <returns>
+        /// Array of values in canonical order (nullable objects):
+        /// TimeStamp, LowNoiseAccelerometerX/Y/Z, WideRangeAccelerometerX/Y/Z,
+        /// GyroscopeX/Y/Z, MagnetometerX/Y/Z, Temperature_BMP180, Pressure_BMP180,
+        /// BatteryVoltage, ExtADC_A6/A7/A15, Exg1, Exg2.
+        /// </returns>
         public static object?[] Vals(ShimmerSDK_EXGData d)
         {
             var t = d.GetType();
@@ -45,11 +70,24 @@ namespace ShimmerSDKTests
     }
 }
 
+
 namespace ShimmerSDKTests.EXGTests
 {
+
+    /// <summary>
+    /// Unit tests for <see cref="ShimmerSDK_EXGData"/> across platform-specific API shapes.
+    /// Covers: constructor wiring, null handling, API surface shape for EXG channels,
+    /// and mutability semantics by platform (readonly fields vs settable properties).
+    /// </summary>
     public class ShimmerSDK_EXGData_Tests
     {
-        // ==== Helpers locali per questi test =================================
+
+        /// <summary>
+        /// Helper: Retrieves a public instance field value by name using reflection.
+        /// </summary>
+        /// <param name="instance">Object instance that owns the field.</param>
+        /// <param name="name">Field name to fetch.</param>
+        /// <returns>The field value, or <c>null</c> if not found.</returns>
         private static object? GetField(object instance, string name)
         {
             var fi = instance.GetType().GetField(name, BindingFlags.Instance | BindingFlags.Public);
@@ -57,14 +95,34 @@ namespace ShimmerSDKTests.EXGTests
             return fi!.GetValue(instance);
         }
 
+
+        /// <summary>
+        /// Helper: Detects whether the current build uses the SensorData-typed API surface
+        /// (Windows/Android branch) as opposed to double/settable properties (Apple branch).
+        /// </summary>
+        /// <param name="t">Type to inspect (typically <see cref="ShimmerSDK_EXGData"/>).</param>
+        /// <returns>
+        /// <c>true</c> if the type exposes <c>TimeStamp</c> as a <see cref="SensorData"/> field
+        /// (Windows/Android branch); otherwise <c>false</c> (Apple branch).
+        /// </returns>
         private static bool IsSensorDataBranch(Type t)
         {
             var ts = t.GetField("TimeStamp", BindingFlags.Instance | BindingFlags.Public)?.FieldType;
             return ts != null && typeof(SensorData).IsAssignableFrom(ts);
         }
 
-        // Ctor() — behavior
-        // Assegna correttamente i canali nella variante corrente (Windows/Android vs iOS/Mac)
+
+        // ----- Constructor behavior -----
+
+
+        /// <summary>
+        /// Ensures the constructor correctly wires channels according to the active platform branch.
+        /// Windows/Android branch: invokes the long <c>SensorData</c>-based constructor via reflection.
+        /// Apple branch: validates param-less + full-parameter overload behavior with settable properties.
+        /// Expected:
+        /// - Every channel lands in the expected field/property with the provided sentinel value
+        /// - Test short-circuits (return) if branch-specific members are not present in the build
+        /// </summary>
         [Fact]
         public void Ctor_Assigns_Fields_Correctly_For_Current_Platform()
         {
@@ -72,7 +130,8 @@ namespace ShimmerSDKTests.EXGTests
 
             if (IsSensorDataBranch(t))
             {
-                // WINDOWS/ANDROID: prova a usare il costruttore lungo via reflection; se non c’è, skip
+
+                // WINDOWS/ANDROID
                 var ctor = t.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                             .FirstOrDefault(c => c.GetParameters().Length == 21);
                 if (ctor == null) return;
@@ -106,11 +165,12 @@ namespace ShimmerSDKTests.EXGTests
             }
             else
             {
-                // iOS/MacCatalyst/TFM neutro: costruttore param-less + proprietà Exg1/Exg2
+
+                // MacCatalyst
                 var sutEmpty = Activator.CreateInstance(typeof(ShimmerSDK_EXGData))!;
                 var p1 = sutEmpty.GetType().GetProperty("Exg1", BindingFlags.Instance | BindingFlags.Public);
                 var p2 = sutEmpty.GetType().GetProperty("Exg2", BindingFlags.Instance | BindingFlags.Public);
-                if (p1 == null || p2 == null) return; // nessun branch attivo
+                if (p1 == null || p2 == null) return;
 
                 p1.SetValue(sutEmpty, 1001.0);
                 p2.SetValue(sutEmpty, 1002.0);
@@ -142,8 +202,14 @@ namespace ShimmerSDKTests.EXGTests
             }
         }
 
-        // Ctor() — behavior
-        // Accetta null e li preserva
+
+        /// <summary>
+        /// Constructor accepts nulls for optional channels and preserves them.
+        /// Expected:
+        /// - On SensorData branch, passing nulls yields null fields (e.g., Exg1/Exg2)
+        /// - On Apple branch, default properties remain null when not set
+        /// - Test short-circuits if branch members are not present
+        /// </summary>
         [Fact]
         public void Ctor_Allows_Nulls_For_Optional_Channels()
         {
@@ -185,10 +251,16 @@ namespace ShimmerSDKTests.EXGTests
             }
         }
 
-        // API surface — behavior
-        // Due canali EXG (Exg1, Exg2)
-        // API surface — behavior
-        // Due canali EXG (Exg1, Exg2) quando il ramo di piattaforma li espone
+
+        // ----- API surface — EXG channel presence -----
+
+
+        /// <summary>
+        /// Ensures exactly two EXG members are exposed when the branch includes them.
+        /// Expected:
+        /// - If neither fields nor properties exist (branch not compiled), soft-skip (return)
+        /// - Otherwise, exactly 2 public instance members named Exg1 and Exg2
+        /// </summary>
         [Fact]
         public void Exg_Channel_Count_Is_Two()
         {
@@ -197,16 +269,23 @@ namespace ShimmerSDKTests.EXGTests
                            .Where(m => m.Name is "Exg1" or "Exg2")
                            .ToArray();
 
-            // Se questa build non include né i campi (Win/Android) né le proprietà (iOS/Mac),
-            // non c’è nulla da verificare: skip “soft” come negli altri test.
             if (members.Length == 0) return;
 
             Assert.Equal(2, members.Length);
         }
 
 
-        // Immutability/Mutability — behavior
-        // Win/Android: field readonly; Apple: property settable
+        // ----- Mutability semantics by platform -----
+
+
+        /// <summary>
+        /// Verifies branch-specific mutability:
+        /// Windows/Android expose readonly fields; Apple exposes settable properties.
+        /// Expected:
+        /// - SensorData branch: public fields present & IsInitOnly == true, no properties
+        /// - Apple branch: public properties present & CanWrite == true, no fields
+        /// - Soft-skip when branch members are missing
+        /// </summary>
         [Fact]
         public void Immutable_On_WindowsAndroid_But_Settable_On_Apple()
         {
@@ -219,7 +298,7 @@ namespace ShimmerSDKTests.EXGTests
 
             if (IsSensorDataBranch(t))
             {
-                if (exg1Field == null || exg2Field == null) return; // ramo non compilato
+                if (exg1Field == null || exg2Field == null) return;
                 Assert.True(exg1Field!.IsInitOnly);
                 Assert.True(exg2Field!.IsInitOnly);
                 Assert.Null(exg1Prop);
@@ -227,7 +306,7 @@ namespace ShimmerSDKTests.EXGTests
             }
             else
             {
-                if (exg1Prop == null || exg2Prop == null) return; // ramo non compilato
+                if (exg1Prop == null || exg2Prop == null) return;
                 Assert.True(exg1Prop!.CanWrite);
                 Assert.True(exg2Prop!.CanWrite);
                 Assert.Null(exg1Field);
