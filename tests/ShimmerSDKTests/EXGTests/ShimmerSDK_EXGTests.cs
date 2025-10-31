@@ -1,15 +1,34 @@
-﻿
+﻿/*
+ * ShimmerSDK_EXGTests.cs
+ * Purpose: Unit tests for ShimmerSDK_EXG file.
+ */
+
+
 using System.Reflection;
 using ShimmerAPI;
 using ShimmerSDK.EXG;
 using Xunit;
 using static ShimmerSDKTests.ExgValuesShim;
 
+
 namespace ShimmerSDKTests.EXGTests
 {
+
+    /// <summary>
+    /// Unit tests for <see cref="ShimmerSDK_EXG"/> core behaviors:
+    /// enum shape, constructor defaults, sampling-rate quantization (sync/async),
+    /// Windows/Android configuration helpers, event mapping, and private utilities.
+    /// </summary>
     public class ShimmerSDK_EXGTests
     {
-        // Helper riflessione: prende un campo privato e lo restituisce tipizzato
+
+        /// <summary>
+        /// Helper: reads a private instance field via reflection and returns it as the requested type.
+        /// </summary>
+        /// <typeparam name="T">Expected field type.</typeparam>
+        /// <param name="instance">Object instance that contains the field.</param>
+        /// <param name="fieldName">Private field name.</param>
+        /// <returns>Typed value of the private field.</returns>
         private static T GetPrivateField<T>(object instance, string fieldName)
         {
             var fi = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
@@ -19,10 +38,14 @@ namespace ShimmerSDKTests.EXGTests
             return (T)value!;
         }
 
-        // public enum ExgMode
 
-        // ExgMode — behavior
-        // Contiene esattamente i 4 valori attesi
+        // ----- ExgMode enum -----
+
+
+        /// <summary>
+        /// <see cref="ExgMode"/> contains exactly the four expected values.
+        /// Expected: length is 4 and includes ECG, EMG, ExGTest, Respiration.
+        /// </summary>
         [Fact]
         public void ExgMode_Has_All_Expected_Values()
         {
@@ -34,8 +57,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Contains(ExgMode.Respiration, values);
         }
 
-        // ExgMode — behavior
-        // I valori sottostanti sono sequenziali e partono da 0: ECG=0, EMG=1, ExGTest=2, Respiration=3
+
+        /// <summary>
+        /// Underlying integers are sequential starting at 0.
+        /// Expected: ECG=0, EMG=1, ExGTest=2, Respiration=3.
+        /// </summary>
         [Fact]
         public void ExgMode_Underlying_Int_Values_Are_Expected()
         {
@@ -45,21 +71,27 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(3, (int)ExgMode.Respiration);
         }
 
-        // ExgMode — behavior
-        // ToString() fa round-trip con Enum.Parse (case-sensitive di default)
+
+        /// <summary>
+        /// <c>ToString()</c> round-trips with <c>Enum.Parse</c> using default (case-sensitive) parsing.
+        /// Expected: Enum.Parse(ToString()) equals the original value.
+        /// </summary>
         [Fact]
         public void ExgMode_ToString_RoundTrip_Parse_CaseSensitive()
         {
             foreach (var v in Enum.GetValues(typeof(ExgMode)).Cast<ExgMode>())
             {
                 var s = v.ToString();
-                var parsed = (ExgMode)Enum.Parse(typeof(ExgMode), s); // case-sensitive
+                var parsed = (ExgMode)Enum.Parse(typeof(ExgMode), s);
                 Assert.Equal(v, parsed);
             }
         }
 
-        // ExgMode — behavior
-        // TryParse(ignoreCase: true) accetta input case-insensitive
+
+        /// <summary>
+        /// <c>Enum.TryParse</c> with <c>ignoreCase: true</c> accepts case-insensitive names.
+        /// Expected: parsing succeeds and matches the expected enum.
+        /// </summary>
         [Theory]
         [InlineData("ecg", ExgMode.ECG)]
         [InlineData("EMG", ExgMode.EMG)]
@@ -72,8 +104,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(expected, result);
         }
 
-        // ExgMode — behavior
-        // TryParse(ignoreCase: false) fallisce con case sbagliato
+
+        /// <summary>
+        /// <c>Enum.TryParse</c> with <c>ignoreCase: false</c> fails on incorrect casing.
+        /// Expected: parsing returns false.
+        /// </summary>
         [Theory]
         [InlineData("ecg")]
         [InlineData("emg")]
@@ -85,8 +120,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.False(ok);
         }
 
-        // ExgMode — behavior
-        // Nomi non validi NON vengono parsati (anche in ignoreCase)
+
+        /// <summary>
+        /// Unknown names do not parse, even with <c>ignoreCase: true</c>.
+        /// Expected: parsing fails for invalid identifiers.
+        /// </summary>
         [Theory]
         [InlineData("")]
         [InlineData(" ")]
@@ -98,8 +136,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.False(ok);
         }
 
-        // ExgMode — behavior
-        // Stringhe numeriche fanno parse ma NON sono valori definiti dell'enum
+
+        /// <summary>
+        /// Numeric strings parse but may not be defined values.
+        /// Expected: TryParse succeeds; Enum.IsDefined is false when out of range.
+        /// </summary>
         [Theory]
         [InlineData("-1")]
         [InlineData("4")]
@@ -107,12 +148,15 @@ namespace ShimmerSDKTests.EXGTests
         public void ExgMode_TryParse_Numeric_Parses_But_IsNotDefined(string input)
         {
             var ok = Enum.TryParse<ExgMode>(input, ignoreCase: true, out var result);
-            Assert.True(ok); // parse riuscito perché è numerico...
-            Assert.False(Enum.IsDefined(typeof(ExgMode), result)); // ...ma non è un valore definito (ECG=0..Respiration=3)
+            Assert.True(ok);
+            Assert.False(Enum.IsDefined(typeof(ExgMode), result));
         }
 
-        // ExgMode — behavior
-        // Numerici validi (0..3) sono definiti
+
+        /// <summary>
+        /// Valid numeric strings map to defined enum values.
+        /// Expected: parse succeeds and equals the expected value.
+        /// </summary>
         [Theory]
         [InlineData("0", ExgMode.ECG)]
         [InlineData("1", ExgMode.EMG)]
@@ -126,8 +170,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(expected, result);
         }
 
-        // ExgMode — behavior
-        // Switch completo su tutti i valori: nessun default colpito
+
+        /// <summary>
+        /// Exhaustive switch covers all enum values.
+        /// Expected: every value returns a non-empty mapping; default is never hit.
+        /// </summary>
         [Fact]
         public void ExgMode_Exhaustive_Switch_Covers_All_Cases()
         {
@@ -147,8 +194,14 @@ namespace ShimmerSDKTests.EXGTests
             }
         }
 
-        // Ctor() — behavior
-        // Imposta default sensati: SR≈51.2, EXG off
+
+        // ----- Constructor behavior -----
+
+
+        /// <summary>
+        /// Constructor sets sensible defaults.
+        /// Expected: <para>SamplingRate ≈ 51.2</para><para>_enableExg == false</para>
+        /// </summary>
         [Fact]
         public void Ctor_Sets_Defaults()
         {
@@ -158,8 +211,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.False(exgEnabled);
         }
 
-        // Ctor() — behavior
-        // Modalità EXG predefinita = ECG
+
+        /// <summary>
+        /// Default EXG mode.
+        /// Expected: _exgMode == ECG.
+        /// </summary>
         [Fact]
         public void Ctor_Default_ExgMode_Is_ECG()
         {
@@ -168,8 +224,60 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(ExgMode.ECG, mode);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Quantizza a clock/divider e aggiorna SamplingRate
+
+        // ----- SetFirmwareSamplingRateNearestAsync behavior -----
+
+
+        /// <summary>
+        /// Async mirrors sync for identical inputs.
+        /// Expected: same quantized value for 51.2 Hz.
+        /// </summary>
+        [Fact]
+        public async Task SetFirmwareSamplingRateNearestAsync_Mirrors_Sync()
+        {
+            var sut = new ShimmerSDK_EXG();
+            double r1 = sut.SetFirmwareSamplingRateNearest(51.2);
+            double r2 = await sut.SetFirmwareSamplingRateNearestAsync(51.2);
+            Assert.Equal(r1, r2, precision: 8);
+        }
+
+
+        /// <summary>
+        /// Two distinct inputs quantize to expected outputs.
+        /// Expected: Applied(256) >= Applied(200) and ≈ 256 within ±0.1.
+        /// </summary>
+        [Fact]
+        public async Task SetFirmwareSamplingRateNearestAsync_Quantizes_Two_Different_Inputs()
+        {
+            var sut = new ShimmerSDK_EXG();
+            double a1 = await sut.SetFirmwareSamplingRateNearestAsync(200.0); // 32768/round(163.84)=32768/164≈199.8
+            double a2 = await sut.SetFirmwareSamplingRateNearestAsync(256.0); // 32768/128=256
+            Assert.True(a2 >= a1);
+            Assert.InRange(a2, 255.9, 256.1);
+        }
+
+
+        // ----- SetFirmwareSamplingRateNearest behavior -----
+
+
+        /// <summary>
+        /// <para>Helper: reproduces the firmware quantization strategy:</para>
+        /// <para><c>applied = clock / round(clock / requested, MidpointRounding.AwayFromZero)</c></para>
+        /// <para>Where <c>clock</c> is the device base frequency (32,768 Hz) and the divider is clamped to at least 1.</para>
+        /// </summary>
+        /// <returns>The quantized sampling rate that the firmware would apply.</returns>
+        private static double Quantize(double requested)
+        {
+            const double clock = 32768.0;
+            int divider = Math.Max(1, (int)Math.Round(clock / requested, MidpointRounding.AwayFromZero));
+            return clock / divider;
+        }
+
+
+        /// <summary>
+        /// <c>SetFirmwareSamplingRateNearest</c> quantizes to clock/divider and updates <c>SamplingRate</c>.
+        /// Expected: for 50 Hz request, applied and property are ≈ 50.03 Hz.
+        /// </summary>
         [Fact]
         public void SetFirmwareSamplingRateNearest_Quantizes_And_Updates_SR()
         {
@@ -180,8 +288,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.InRange(sut.SamplingRate, 50.02, 50.04);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Monotonia locale: una richiesta un po' maggiore non deve diminuire l'applicato
+
+        /// <summary>
+        /// Local monotonicity around a point.
+        /// Expected: Applied(101) >= Applied(100).
+        /// </summary>
         [Fact]
         public void SetFirmwareSamplingRateNearest_Is_Locally_Monotonic()
         {
@@ -191,8 +302,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.True(a2 >= a1 - 1e-9);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Input non-positivo -> ArgumentOutOfRangeException
+
+        /// <summary>
+        /// Non-positive input handling.
+        /// Expected: throws <see cref="ArgumentOutOfRangeException"/> for 0 or negative values.
+        /// </summary>
         [Theory]
         [InlineData(0)]
         [InlineData(-1)]
@@ -203,8 +317,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Throws<ArgumentOutOfRangeException>(() => sut.SetFirmwareSamplingRateNearest(requested));
         }
 
-        // SetFirmwareSamplingRateNearest() — integration
-        // Se il ramo WINDOWS è presente, scrive nel driver; altrove aggiorna comunque SamplingRate
+
+        /// <summary>
+        /// Driver write integration (Windows branch only).
+        /// Expected: Windows: driver receives the applied rate; cross-OS: property updated, driver stays 0.
+        /// </summary>
         [Fact]
         public void SetFirmwareSamplingRateNearest_Writes_To_Driver_When_Configured()
         {
@@ -223,7 +340,6 @@ namespace ShimmerSDKTests.EXGTests
             var shimmer = ShimmerSDK_EXG_TestRegistry.Get(sut);
             Assert.NotNull(shimmer);
 
-            // Se esiste il campo/metodo specifico di Windows, il SUT chiama WriteSamplingRate(applied).
             bool windowsBranchPresent =
                 sut.GetType().GetField("shimmer", BindingFlags.Instance | BindingFlags.NonPublic) != null ||
                 sut.GetType().GetMethod("HandleEvent", BindingFlags.Instance | BindingFlags.NonPublic) != null;
@@ -234,45 +350,16 @@ namespace ShimmerSDKTests.EXGTests
             }
             else
             {
-                // Build cross-OS: il fake resta a 0, ma la proprietà nel SUT è aggiornata.
                 Assert.Equal(0, shimmer!.LastSamplingRateWritten);
                 Assert.InRange(sut.SamplingRate, applied - 1e-10, applied + 1e-10);
             }
         }
 
-        // SetFirmwareSamplingRateNearestAsync() — behavior
-        // Async replica il sync (stesso input)
-        [Fact]
-        public async Task SetFirmwareSamplingRateNearestAsync_Mirrors_Sync()
-        {
-            var sut = new ShimmerSDK_EXG();
-            double r1 = sut.SetFirmwareSamplingRateNearest(51.2);
-            double r2 = await sut.SetFirmwareSamplingRateNearestAsync(51.2);
-            Assert.Equal(r1, r2, precision: 8);
-        }
 
-        // SetFirmwareSamplingRateNearestAsync() — behavior
-        // Due input diversi portano a due quantizzazioni attese (es. ~204.8Hz e ~256Hz)
-        [Fact]
-        public async Task SetFirmwareSamplingRateNearestAsync_Quantizes_Two_Different_Inputs()
-        {
-            var sut = new ShimmerSDK_EXG();
-            double a1 = await sut.SetFirmwareSamplingRateNearestAsync(200.0); // 32768/round(163.84)=32768/164≈199.8
-            double a2 = await sut.SetFirmwareSamplingRateNearestAsync(256.0); // 32768/128=256
-            Assert.True(a2 >= a1);
-            Assert.InRange(a2, 255.9, 256.1);
-        }
-
-        // Utility locale: stessa quantizzazione del metodo sotto test
-        private static double Quantize(double requested)
-        {
-            const double clock = 32768.0;
-            int divider = Math.Max(1, (int)Math.Round(clock / requested, MidpointRounding.AwayFromZero));
-            return clock / divider;
-        }
-
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Caso "divisore esatto": 51.2 Hz = 32768 / 640 → deve restare 51.2
+        /// <summary>
+        /// Exact divisor scenario.
+        /// Expected: 51.2 Hz remains 51.2 Hz (identity).
+        /// </summary>
         [Fact]
         public void SetFirmwareSamplingRateNearest_ExactDivisor_IsIdentity()
         {
@@ -282,8 +369,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.InRange(sut.SamplingRate, 51.1999, 51.2001);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Quantizza a clock/divider e aggiorna SamplingRate
+
+        /// <summary>
+        /// Quantized value matches the expected local quantizer.
+        /// Expected: Applied == Quantize(requested); SamplingRate == Applied.
+        /// </summary>
         [Theory]
         [InlineData(50.0)]
         [InlineData(75.0)]
@@ -299,19 +389,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.InRange(sut.SamplingRate, expected - 1e-12, expected + 1e-12);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Monotonia locale: aumentare leggermente la richiesta non deve ridurre l'applicato
-        [Fact]
-        public void SetFirmwareSamplingRateNearest_IsLocallyMonotonic()
-        {
-            var sut = new ShimmerSDK_EXG();
-            var a1 = sut.SetFirmwareSamplingRateNearest(100.0);
-            var a2 = sut.SetFirmwareSamplingRateNearest(101.0);
-            Assert.True(a2 >= a1 - 1e-12);
-        }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Idempotenza: chiamare due volte con la stessa richiesta produce lo stesso applicato
+        /// <summary>
+        /// Idempotence for same input.
+        /// Expected: calling twice with 200.0 yields the same applied rate.
+        /// </summary>
         [Fact]
         public void SetFirmwareSamplingRateNearest_IsIdempotent_ForSameInput()
         {
@@ -321,20 +403,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.InRange(a2, a1 - 1e-12, a1 + 1e-12);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Gestione input non-positivi: deve lanciare ArgumentOutOfRangeException
-        [Theory]
-        [InlineData(0)]
-        [InlineData(-1)]
-        [InlineData(-100)]
-        public void SetFirmwareSamplingRateNearest_Throws_OnNonPositive(double requested)
-        {
-            var sut = new ShimmerSDK_EXG();
-            Assert.Throws<ArgumentOutOfRangeException>(() => sut.SetFirmwareSamplingRateNearest(requested));
-        }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Tie-breaking (.5): con MidpointRounding.AwayFromZero deve fare "ceiling" del divisore.
+        /// <summary>
+        /// Midpoint rounding behavior.
+        /// Expected: with requested = clock/(N+0.5), applied = clock/(N+1).
+        /// </summary>
         [Theory]
         [InlineData(100)]
         [InlineData(200)]
@@ -351,8 +424,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.InRange(applied, expected - 1e-12, expected + 1e-12);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Estremi: richiesta molto alta → divider=1 → applied = clock
+
+        /// <summary>
+        /// Extreme high request clamps to device clock.
+        /// Expected: applied ≈ 32768 Hz (divider = 1).
+        /// </summary>
         [Fact]
         public void SetFirmwareSamplingRateNearest_ClampsToClock_ForVeryHighRequest()
         {
@@ -362,8 +438,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.InRange(applied, clock - 1e-12, clock + 1e-12);
         }
 
-        // SetFirmwareSamplingRateNearest() — behavior
-        // Estremi: richiesta molto bassa → divider grande → applied piccolo (>0)
+
+        /// <summary>
+        /// Extreme low request still yields a small positive rate.
+        /// Expected: applied &gt; 0 and ≤ requested × 1.01.
+        /// </summary>
         [Theory]
         [InlineData(0.1)]
         [InlineData(0.01)]
@@ -375,8 +454,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.True(applied <= requested * 1.01);
         }
 
-        // TestConfigure()/Configure* — behavior
-        // Costruisce bitmap sensori e sottoscrive
+
+        // ----- TestConfigure/Configure* behavior -----
+
+
+        /// <summary>
+        /// Verifies that <c>TestConfigure</c> builds the correct sensor bitmap and attaches subscriptions.
+        /// Expected: <c>EnabledSensors</c> equals the bitwise OR of all selected sensors (incl. EXG1/EXG2).
+        /// </summary>
         [Fact]
         public void Configure_Builds_SensorBitmap_And_Subscribes()
         {
@@ -416,8 +501,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(expected, shimmer!.EnabledSensors);
         }
 
-        // TestConfigure()/Configure* — behavior
-        // EXG disabilitato: nessun bit EXG attivo
+
+        /// <summary>
+        /// Verifies that when EXG is disabled, EXG bits are not set in the bitmap.
+        /// Expected: <c>EnabledSensors</c> & EXG mask == 0.
+        /// </summary>
         [Fact]
         public void Configure_Without_EXG_Does_Not_Set_EXG_Bits()
         {
@@ -449,8 +537,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(0, shimmer!.EnabledSensors & exgMask);
         }
 
-        // ConfigureWindows — behavior
-        // Esegue davvero ConfigureWindows se disponibile; altrimenti esce (passa su build non-Windows).
+
+        // ----- ConfigureWindows behavior -----
+
+
+        /// <summary>
+        /// Invokes <c>ConfigureWindows</c> when present and verifies driver object and event subscription exist.
+        /// Expected: private <c>shimmer</c> is initialized and exposes <c>UICallback</c> event.
+        /// </summary>
         [Fact]
         public void ConfigureWindows_IfPresent_BuildsDriverAndSubscribes()
         {
@@ -467,11 +561,11 @@ namespace ShimmerSDKTests.EXGTests
 
             m.Invoke(sut, new object[] {
                 "D1","COM1",
-                true,true,   // LowNoiseAcc, WideRangeAcc
-                true,true,   // Gyro, Mag
-                true,true,   // PressureTemp, Battery
-                true,false,true, // ExtA6, ExtA7, ExtA15
-                true,        // EXG on
+                true,true,           // LowNoiseAcc, WideRangeAcc
+                true,true,           // Gyro, Mag
+                true,true,           // PressureTemp, Battery
+                true,false,true,     // ExtA6, ExtA7, ExtA15
+                true,                // EXG on
                 ExgMode.EMG
             });
 
@@ -483,8 +577,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.NotNull(evt);
         }
 
-        // GetSafe() — behavior
-        // Ritorna null per idx < 0 (skip se il metodo non è compilato)
+
+        // ----- GetSafe() behavior -----
+
+
+        /// <summary>
+        /// Validates <c>GetSafe</c> returns <c>null</c> for negative indices.
+        /// Expected: result is <c>null</c> for index &lt; 0.
+        /// </summary>
         [Fact]
         public void GetSafe_NegativeIndex_ReturnsNull()
         {
@@ -500,8 +600,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Null(result);
         }
 
-        // GetSafe() — behavior
-        // Ritorna null per index fuori range (>= Count)
+
+        /// <summary>
+        /// Validates <c>GetSafe</c> returns <c>null</c> for out-of-range indices.
+        /// Expected: result is <c>null</c> for index >= Count.
+        /// </summary>
         [Fact]
         public void GetSafe_OutOfRangeIndex_ReturnsNull()
         {
@@ -517,8 +620,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Null(result);
         }
 
-        // GetSafe() — behavior
-        // Ritorna il SensorData giusto per index valido
+
+        /// <summary>
+        /// Validates <c>GetSafe</c> returns the expected <c>SensorData</c> for a valid index.
+        /// Expected: retrieved data matches the value inserted in the <c>ObjectCluster</c>.
+        /// </summary>
         [Fact]
         public void GetSafe_ValidIndex_ReturnsData()
         {
@@ -537,8 +643,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(12.34, sd.Data, precision: 6);
         }
 
-        // FindSignal() — behavior
-        // Preferisce CAL quando sono presenti sia CAL che RAW
+
+        // ----- FindSignal behavior -----
+
+
+        /// <summary>
+        /// Verifies that CAL is preferred over RAW when both exist.
+        /// Expected: returned tuple refers to CAL entry for the given signal name.
+        /// </summary>
         [Fact]
         public void FindSignal_Prefers_CAL_Over_RAW()
         {
@@ -555,8 +667,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(oc.GetIndex("FOO", ShimmerConfiguration.SignalFormats.CAL), res.idx);
         }
 
-        // FindSignal() — behavior
-        // Se CAL non esiste, ricade su RAW poi UNCAL
+
+        /// <summary>
+        /// Verifies fallback order when CAL is missing: RAW, then UNCAL.
+        /// Expected: RAW is used if present; otherwise UNCAL.
+        /// </summary>
         [Fact]
         public void FindSignal_FallsBack_RAW_then_UNCAL()
         {
@@ -577,8 +692,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(ocUncal.GetIndex("BAZ", "UNCAL"), resUncal.idx);
         }
 
-        // FindSignal() — behavior
-        // Se non trova CAL/RAW/UNCAL, prova senza formato (format-agnostic)
+
+        /// <summary>
+        /// Verifies format-agnostic fallback when CAL/RAW/UNCAL are not found.
+        /// Expected: returns a match without format if present; otherwise not found.
+        /// </summary>
         [Fact]
         public void FindSignal_FallsBack_FormatAgnostic()
         {
@@ -594,8 +712,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(oc.GetIndex("QUX", null), res.idx);
         }
 
-        // FindSignal() — behavior
-        // Nome inesistente → (-1, null, null)
+
+        /// <summary>
+        /// Verifies not-found behavior.
+        /// Expected: returns (-1, null, null) for missing names.
+        /// </summary>
         [Fact]
         public void FindSignal_NotFound_ReturnsMinusOneAndNulls()
         {
@@ -612,8 +733,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Null(res.fmt);
         }
 
-        // HandleEvent() — behavior
-        // Mappa indici, emette evento e valorizza EXG* quando EXG è abilitato
+
+        // ----- HandleEvent behavior -----
+
+
+        /// <summary>
+        /// Verifies Windows event handler maps indices, raises <c>SampleReceived</c>, and fills EXG channels when enabled.
+        /// Expected: after first packet mapping, a subsequent packet triggers event with non-null EXG values.
+        /// </summary>
         [Fact]
         public void HandleEvent_Maps_Indices_And_Raises_Sample()
         {
@@ -663,12 +790,15 @@ namespace ShimmerSDKTests.EXGTests
 
             Assert.NotNull(received);
             Assert.True(Vals(received!).Length >= 21);
-            Assert.NotNull(Vals(received!)[^2]); // EXG CH1
-            Assert.NotNull(Vals(received!)[^1]); // EXG CH2
+            Assert.NotNull(Vals(received!)[^2]);
+            Assert.NotNull(Vals(received!)[^1]);
         }
 
-        // HandleEvent() — behavior
-        // Con EXG disabilitato, i due canali EXG devono risultare null anche se i nomi esistono
+
+        /// <summary>
+        /// Verifies that when EXG is disabled, EXG channels remain <c>null</c> even if names exist in the payload.
+        /// Expected: EXG CH1/CH2 are <c>null</c>.
+        /// </summary>
         [Fact]
         public void HandleEvent_With_Exg_Disabled_Leaves_Exg_Nulls()
         {
@@ -699,12 +829,15 @@ namespace ShimmerSDKTests.EXGTests
             shimmer!.RaiseDataPacket(oc);
 
             Assert.NotNull(received);
-            Assert.Null(Vals(received!)[^2]); // EXG CH1 nullo
-            Assert.Null(Vals(received!)[^1]); // EXG CH2 nullo
+            Assert.Null(Vals(received!)[^2]); 
+            Assert.Null(Vals(received!)[^1]);
         }
 
-        // HandleEvent() — behavior
-        // Se i nomi EXG non sono presenti nell'ObjectCluster, i canali EXG restano null
+
+        /// <summary>
+        /// Verifies missing EXG names produce <c>null</c> EXG channels even when EXG is enabled.
+        /// Expected: EXG CH1/CH2 remain <c>null</c> if signals are absent in the cluster.
+        /// </summary>
         [Fact]
         public void HandleEvent_Missing_Exg_Signals_Stays_Null()
         {
@@ -733,13 +866,19 @@ namespace ShimmerSDKTests.EXGTests
             shimmer!.RaiseDataPacket(oc);
 
             Assert.NotNull(received);
-            Assert.True(Vals(received!).Length >= 2); // almeno ts + 2 slot EXG
-            Assert.Null(Vals(received!)[^2]); // EXG CH1 mancante -> null
-            Assert.Null(Vals(received!)[^1]); // EXG CH2 mancante -> null
+            Assert.True(Vals(received!).Length >= 2);
+            Assert.Null(Vals(received!)[^2]);
+            Assert.Null(Vals(received!)[^1]);
         }
 
-        // ConfigureAndroid() — behavior
-        // MAC non valido => ArgumentException. Se il metodo non esiste (niente ramo ANDROID), bypass.
+
+        // ----- ConfigureAndroid behavior -----
+
+
+        /// <summary>
+        /// Validates Android configuration rejects invalid MAC addresses.
+        /// Expected: <see cref="ArgumentException"/> (wrapped by <see cref="TargetInvocationException"/>) with message containing "Invalid MAC".
+        /// </summary>
         [Theory]
         [InlineData("")]
         [InlineData("123")]
@@ -754,10 +893,10 @@ namespace ShimmerSDKTests.EXGTests
             var args = new object[]
             {
                 "Dev1", mac,
-                true, true,  // LN-Acc, WR-Acc
-                true, true,  // Gyro, Mag
-                true, true,  // Press/Temp, VBatt
-                true, false, true, // ExtA6, ExtA7, ExtA15
+                true, true,         // LN-Acc, WR-Acc
+                true, true,         // Gyro, Mag
+                true, true,         // Press/Temp, VBatt
+                true, false, true,  // ExtA6, ExtA7, ExtA15
                 true, ExgMode.ECG
             };
 
@@ -766,8 +905,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Contains("Invalid MAC", ex.InnerException!.Message, StringComparison.OrdinalIgnoreCase);
         }
 
-        // ConfigureAndroid() — behavior
-        // MAC valido: costruisce bitmap sensori con EXG e inizializza shimmerAndroid; bypass se assente.
+
+        /// <summary>
+        /// Validates Android configuration builds sensor bitmap (with EXG) and initializes the Android driver state.
+        /// Expected: private <c>shimmerAndroid</c> initialized and <c>_androidEnabledSensors</c> equals expected bitmap.
+        /// </summary>
         [Fact]
         public void ConfigureAndroid_Builds_SensorBitmap_And_Initializes_Driver()
         {
@@ -810,8 +952,11 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Equal(expected, (int)fEnabled!.GetValue(sut)!);
         }
 
-        // ConfigureAndroid() — behavior
-        // Reset mappa indici: firstDataPacketAndroid = true e tutti gli index a -1; bypass se assente.
+
+        /// <summary>
+        /// Validates Android configuration resets index mapping.
+        /// Expected: <c>firstDataPacketAndroid</c> = true and all index fields set to -1.
+        /// </summary>
         [Fact]
         public void ConfigureAndroid_Resets_Index_Mapping()
         {
@@ -853,25 +998,58 @@ namespace ShimmerSDKTests.EXGTests
             }
         }
 
-        // ===== Helpers riflessione brevi =====
+
+        // ----- Reflection helpers -----
+
+
+        /// <summary>
+        /// Reflection helper: gets the value of a private instance field.
+        /// </summary>
+        /// <param name="o">Target instance.</param>
+        /// <param name="name">Private field name.</param>
+        /// <returns>The field value, or <c>null</c> if the field does not exist.</returns>
         private static object? GetField(object o, string name)
         {
             var f = o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             return f?.GetValue(o);
         }
+
+
+        /// <summary>
+        /// Reflection helper: sets a private instance field.
+        /// </summary>
+        /// <param name="o">Target instance.</param>
+        /// <param name="name">Private field name.</param>
+        /// <param name="value">Value to assign.</param>
         private static void SetField(object o, string name, object? value)
         {
             var f = o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
             Assert.NotNull(f);
             f!.SetValue(o, value);
         }
+
+
+        /// <summary>
+        /// Reflection helper: retrieves a private method by name.
+        /// </summary>
+        /// <param name="t">Type that declares the method.</param>
+        /// <param name="name">Method name.</param>
+        /// <param name="isStatic">Whether the method is static.</param>
+        /// <returns>The matching <see cref="MethodInfo"/> or <c>null</c>.</returns>
         private static MethodInfo? GetPrivMethod(Type t, string name, bool isStatic = false)
         {
             var flags = BindingFlags.NonPublic | (isStatic ? BindingFlags.Static : BindingFlags.Instance);
             return t.GetMethod(name, flags);
         }
 
-        // ========== GetSafeA() ==========
+
+        // ----- GetSafeA behavior -----
+
+
+        /// <summary>
+        /// Android helper <c>GetSafeA</c>: returns a value for valid indices, <c>null</c> otherwise.
+        /// Expected: non-null for index 0; <c>null</c> for -1 and out-of-range indices.
+        /// </summary>
         [Fact]
         public void Android_GetSafeA_Returns_Data_Else_Null()
         {
@@ -891,7 +1069,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Null(d3);
         }
 
-        // ========== FindSignalA() ==========
+
+        // ----- FindSignalA -----
+
+
+        /// <summary>
+        /// Android helper <c>FindSignalA</c>: preference order is CAL &gt; RAW &gt; UNCAL &gt; format-agnostic; not found returns (-1, null, null).
+        /// Expected: each queried case yields a tuple consistent with the priority and available signals.
+        /// </summary>
         [Fact]
         public void Android_FindSignalA_Prefers_CAL_Then_RAW_Then_UNCAL_Then_Default()
         {
@@ -928,7 +1113,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.Null(fmt5);
         }
 
-        // ========== HandleEventAndroid(): DATA_PACKET ==========
+
+        // ----- HandleEventAndroid: DATA_PACKET -----
+
+
+        /// <summary>
+        /// Android event handling (DATA_PACKET): first packet builds index mapping; subsequent packets raise <c>SampleReceived</c> with EXG filled when enabled.
+        /// Expected: after initial mapping, EXG CH1/CH2 are non-null in received samples; second invocation still raises an event.
+        /// </summary>
         [Fact]
         public void Android_HandleEventAndroid_DataPacket_Maps_And_Raises_Sample()
         {
@@ -979,7 +1171,14 @@ namespace ShimmerSDKTests.EXGTests
             Assert.NotNull(received);
         }
 
-        // ========== HandleEventAndroid(): STATE_CHANGE ==========
+
+        // ----- HandleEventAndroid: STATE_CHANGE -----
+
+
+        /// <summary>
+        /// Android state-change handling: updates flags and completes pending tasks for CONNECTED and STREAMING.
+        /// Expected: CONNECTED completes <c>_androidConnectedTcs</c>; STREAMING completes <c>_androidStreamingAckTcs</c>; flags <c>_androidIsStreaming</c> and <c>firstDataPacketAndroid</c> become <c>true</c>.
+        /// </summary>
         [Fact]
         public async Task Android_HandleEventAndroid_StateChange_SetsFlags_And_Completes_Tasks()
         {
