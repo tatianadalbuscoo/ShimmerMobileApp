@@ -1,7 +1,5 @@
-﻿using System;
-using System.Linq;
+﻿
 using System.Reflection;
-using System.Threading.Tasks;
 using ShimmerAPI;
 using ShimmerSDK.EXG;
 using Xunit;
