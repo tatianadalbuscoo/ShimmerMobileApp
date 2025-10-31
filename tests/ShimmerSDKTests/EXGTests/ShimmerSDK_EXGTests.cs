@@ -578,7 +578,7 @@ namespace ShimmerSDKTests.EXGTests
         }
 
 
-        // ----- GetSafe() behavior -----
+        // ----- GetSafe behavior -----
 
 
         /// <summary>
