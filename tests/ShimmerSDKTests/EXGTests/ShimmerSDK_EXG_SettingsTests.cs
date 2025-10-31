@@ -74,7 +74,7 @@ namespace ShimmerSDKTests.EXGTests
         }
 
 
-        // ----- Bool flags behavior -----
+        // ----- Boolean flags behavior -----
 
 
         /// <summary>

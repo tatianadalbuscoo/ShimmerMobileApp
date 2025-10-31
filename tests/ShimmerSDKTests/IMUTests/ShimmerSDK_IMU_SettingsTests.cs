@@ -1,14 +1,35 @@
-﻿using System;
-using System.Collections.Generic;
+﻿/*
+ * ShimmerSDK_IMUSettingsTests.cs
+ * Purpose: Unit tests for ShimmerSDK_IMUSettings file.
+ */
+
+
 using ShimmerSDK.IMU;
 using Xunit;
 
+
 namespace ShimmerSDKTests.IMUTests
 {
+
+    /// <summary>
+    /// Unit tests for <see cref="ShimmerSDK_IMU"/> (configuration partial):
+    /// validates constructor defaults, property round-trips, and independence
+    /// between boolean flags and sampling rate.
+    /// </summary>
     public class ShimmerSDK_IMU_SettingsTests
     {
-        // Ctor() — behavior
-        // Defaults from ctor (dall’altro partial della classe)
+
+        // ----- Constructor behavior -----
+
+
+        /// <summary>
+        /// Ensures the parameterless constructor sets sensible defaults.
+        /// Expected:
+        /// - <c>SamplingRate</c> ≈ 51.2 Hz (within [51.199, 51.201])
+        /// - All IMU-related sensor flags default to <c>true</c>:
+        ///   LowNoiseAccelerometer, WideRangeAccelerometer, Gyroscope, Magnetometer,
+        ///   Pressure/Temperature, Battery, ExtA6, ExtA7, ExtA15.
+        /// </summary>
         [Fact]
         public void Ctor_Defaults_Are_Sensible()
         {
@@ -17,7 +38,6 @@ namespace ShimmerSDKTests.IMUTests
             // SamplingRate default ~51.2 Hz
             Assert.InRange(sut.SamplingRate, 51.199, 51.201);
 
-            // Flag sensori default (come impostati nel costruttore dell’altra partial)
             Assert.True(sut.EnableLowNoiseAccelerometer);
             Assert.True(sut.EnableWideRangeAccelerometer);
             Assert.True(sut.EnableGyroscope);
@@ -29,8 +49,16 @@ namespace ShimmerSDKTests.IMUTests
             Assert.True(sut.EnableExtA15);
         }
 
-        // SamplingRate — behavior
-        // set/get round-trip
+
+        // ----- SamplingRate behavior -----
+
+
+        /// <summary>
+        /// Verifies a set/get round-trip for <c>SamplingRate</c> across representative values.
+        /// Expected:
+        /// - After assignment, the getter returns exactly the assigned value (high precision).
+        /// - No side effects on other properties asserted here.
+        /// </summary>
         [Theory]
         [InlineData(12.5)]
         [InlineData(51.2)]
@@ -43,11 +71,20 @@ namespace ShimmerSDKTests.IMUTests
             Assert.Equal(value, sut.SamplingRate, precision: 10);
         }
 
-        // Bool flags — behavior
-        // Tutti i bool getter/setter: round-trip e verifica default
+
+        // ----- Boolean flags behavior -----
+
+
+        /// <summary>
+        /// Helper: Provides (name, getter, setter, defaultValue) tuples for each boolean sensor flag
+        /// to drive the parameterized test.
+        /// </summary>
+        /// <returns>
+        /// An <see cref="IEnumerable{T}"/> of <see cref="object"/> arrays where each entry is:
+        /// <c>{ string name, Func&lt;ShimmerSDK_IMU,bool&gt; getter, Action&lt;ShimmerSDK_IMU,bool&gt; setter, bool defaultValue }</c>.
+        /// </returns>
         public static IEnumerable<object[]> BoolProps()
         {
-            // name, getter, setter, defaultValue
             yield return new object[] { "EnableLowNoiseAccelerometer", (Func<ShimmerSDK_IMU, bool>)(s => s.EnableLowNoiseAccelerometer), (Action<ShimmerSDK_IMU, bool>)((s, v) => s.EnableLowNoiseAccelerometer = v), true };
             yield return new object[] { "EnableWideRangeAccelerometer", (Func<ShimmerSDK_IMU, bool>)(s => s.EnableWideRangeAccelerometer), (Action<ShimmerSDK_IMU, bool>)((s, v) => s.EnableWideRangeAccelerometer = v), true };
             yield return new object[] { "EnableGyroscope", (Func<ShimmerSDK_IMU, bool>)(s => s.EnableGyroscope), (Action<ShimmerSDK_IMU, bool>)((s, v) => s.EnableGyroscope = v), true };
@@ -59,8 +96,14 @@ namespace ShimmerSDKTests.IMUTests
             yield return new object[] { "EnableExtA15", (Func<ShimmerSDK_IMU, bool>)(s => s.EnableExtA15), (Action<ShimmerSDK_IMU, bool>)((s, v) => s.EnableExtA15 = v), true };
         }
 
-        // Bool flags — behavior
-        // Ogni proprietà booleana: default poi toggle e round-trip (property: {name})
+
+        /// <summary>
+        /// Validates default, toggle, and round-trip behavior for each boolean flag.
+        /// Expected:
+        /// - Getter returns the documented default.
+        /// - After setting to the opposite value, getter reflects the change.
+        /// - After setting back to the default, getter returns the original default.
+        /// </summary>
         [Theory]
         [MemberData(nameof(BoolProps))]
         public void Bool_Property_Default_Then_Toggle_RoundTrip(
@@ -71,34 +114,43 @@ namespace ShimmerSDKTests.IMUTests
         {
             var sut = new ShimmerSDK_IMU();
 
-            Assert.Equal(defaultValue, getter(sut)); // usa getter
+            Assert.Equal(defaultValue, getter(sut));
             setter(sut, !defaultValue);
             Assert.True(getter(sut) == !defaultValue, $"Property '{name}' did not toggle as expected.");
             setter(sut, defaultValue);
             Assert.True(getter(sut) == defaultValue, $"Property '{name}' did not round-trip as expected.");
         }
 
-        // Flags independence — behavior
-        // Settare un flag non modifica gli altri
+
+        // ----- Independence checks -----
+
+
+        /// <summary>
+        /// Changing one flag must not affect the others; <c>SamplingRate</c> must remain unchanged.
+        /// Expected:
+        /// - Only <c>EnableWideRangeAccelerometer</c> and <c>EnableBattery</c> change (the ones toggled).
+        /// - All other flags remain identical to the initial snapshot.
+        /// - <c>SamplingRate</c> stays ≈ 51.2 Hz (within [51.199, 51.201]).
+        /// </summary>
         [Fact]
         public void Changing_One_Flag_Does_Not_Affect_Others()
         {
             var sut = new ShimmerSDK_IMU();
 
-            // snapshot iniziale
+            // initial snapshot
             var before = SnapshotFlags(sut);
 
-            // cambia SOLO WideRangeAccelerometer e Battery
+            // change ONLY WideRangeAccelerometer and Battery
             sut.EnableWideRangeAccelerometer = !before.EnableWideRangeAccelerometer;
             sut.EnableBattery = !before.EnableBattery;
 
             var after = SnapshotFlags(sut);
 
-            // Quelli modificati devono essere cambiati
+            // the modified ones should differ
             Assert.Equal(!before.EnableWideRangeAccelerometer, after.EnableWideRangeAccelerometer);
             Assert.Equal(!before.EnableBattery, after.EnableBattery);
 
-            // Tutti gli altri invariati
+            // all the others should be identical
             Assert.Equal(before.EnableLowNoiseAccelerometer, after.EnableLowNoiseAccelerometer);
             Assert.Equal(before.EnableGyroscope, after.EnableGyroscope);
             Assert.Equal(before.EnableMagnetometer, after.EnableMagnetometer);
@@ -107,12 +159,16 @@ namespace ShimmerSDKTests.IMUTests
             Assert.Equal(before.EnableExtA7, after.EnableExtA7);
             Assert.Equal(before.EnableExtA15, after.EnableExtA15);
 
-            // SamplingRate non deve cambiare per effetto dei flag
+            // SamplingRate should not change as a side effect of flag changes
             Assert.InRange(sut.SamplingRate, 51.199, 51.201);
         }
 
-        // SamplingRate independence — behavior
-        // Cambiare SamplingRate non altera i flag
+
+        /// <summary>
+        /// Changing <c>SamplingRate</c> must not alter any sensor flags.
+        /// Expected:
+        /// - After setting <c>SamplingRate</c> to a different value, the complete flag snapshot is unchanged.
+        /// </summary>
         [Fact]
         public void Changing_SamplingRate_Does_Not_Affect_Flags()
         {
@@ -125,7 +181,17 @@ namespace ShimmerSDKTests.IMUTests
             Assert.Equal(before, after);
         }
 
-        // ==== helpers ====
+
+        // ----- helpers -----
+
+
+        /// <summary>
+        /// Helper: Captures a snapshot of all boolean flags for equality comparison.
+        /// </summary>
+        /// <param name="s">The <see cref="ShimmerSDK_IMU"/> instance to snapshot.</param>
+        /// <returns>
+        /// An immutable <see cref="Flags"/> record containing the current values of all boolean flags.
+        /// </returns>
         private static Flags SnapshotFlags(ShimmerSDK_IMU s) => new Flags(
             s.EnableLowNoiseAccelerometer,
             s.EnableWideRangeAccelerometer,
@@ -138,6 +204,19 @@ namespace ShimmerSDKTests.IMUTests
             s.EnableExtA15
         );
 
+
+        /// <summary>
+        /// Helper: Immutable struct used to compare complete flag states.
+        /// </summary>
+        /// <param name="EnableLowNoiseAccelerometer">Current value of the LowNoiseAccelerometer flag.</param>
+        /// <param name="EnableWideRangeAccelerometer">Current value of the WideRangeAccelerometer flag.</param>
+        /// <param name="EnableGyroscope">Current value of the Gyroscope flag.</param>
+        /// <param name="EnableMagnetometer">Current value of the Magnetometer flag.</param>
+        /// <param name="EnablePressureTemperature">Current value of the Pressure/Temperature flag.</param>
+        /// <param name="EnableBattery">Current value of the Battery flag.</param>
+        /// <param name="EnableExtA6">Current value of the ExtA6 flag.</param>
+        /// <param name="EnableExtA7">Current value of the ExtA7 flag.</param>
+        /// <param name="EnableExtA15">Current value of the ExtA15 flag.</param>
         private readonly record struct Flags(
             bool EnableLowNoiseAccelerometer,
             bool EnableWideRangeAccelerometer,
