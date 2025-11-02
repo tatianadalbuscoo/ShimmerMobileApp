@@ -1337,7 +1337,7 @@ public partial class DataPageViewModel : ObservableObject, IDisposable
     }
 
 
-    // ----- Validation handlers (user input → numeric state) -----
+    // ----- Validation handlers (user input -> numeric state) -----
 
     /// <summary>
     /// Validates and applies a new Y-axis minimum. Enforces allowed range and consistency with Y max.
