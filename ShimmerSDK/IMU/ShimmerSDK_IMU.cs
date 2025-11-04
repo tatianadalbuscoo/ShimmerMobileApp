@@ -360,7 +360,7 @@ namespace ShimmerSDK.IMU
                 }
 
                 // Build snapshot with CAL values (null-safe via GetSafe)
-                LatestData = new ShimmerSDK_IMUData(
+                LatestData = new ShimmerSDK_IMU_Data(
                     GetSafe(oc, indexTimeStamp),
                     GetSafe(oc, indexLowNoiseAccX),
                     GetSafe(oc, indexLowNoiseAccY),
@@ -646,7 +646,7 @@ namespace ShimmerSDK.IMU
                 }
 
                 // Update the latest data snapshot (CAL values), null-safe
-                LatestData = new ShimmerSDK_IMUData(
+                LatestData = new ShimmerSDK_IMU_Data(
                     SafeGet(oc, indexTimeStamp),
                     SafeGet(oc, indexLowNoiseAccX), SafeGet(oc, indexLowNoiseAccY), SafeGet(oc, indexLowNoiseAccZ),
                     SafeGet(oc, indexWideAccX),    SafeGet(oc, indexWideAccY),    SafeGet(oc, indexWideAccZ),
