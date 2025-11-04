@@ -210,7 +210,7 @@ namespace ShimmerSDKTests.IMUTests
                 return;
 
             var imuDataType = typeof(ShimmerSDK_IMU).Assembly.GetType("ShimmerSDK.IMU.ShimmerSDK_IMU_Data")
-                              ?? typeof(ShimmerSDK_IMU).Assembly.GetType("ShimmerSDK.IMU.ShimmerSDK_IMUData");
+                              ?? typeof(ShimmerSDK_IMU).Assembly.GetType("ShimmerSDK.IMU.ShimmerSDK_IMU_Data");
             if (imuDataType == null)
                 return;
 

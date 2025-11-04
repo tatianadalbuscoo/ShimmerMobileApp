@@ -1,5 +1,5 @@
 ﻿/* 
- * ShimmerSDK_IMUData — immutable snapshot of one IMU frame.
+ * ShimmerSDK_IMU_Data — immutable snapshot of one IMU frame.
  * Includes timestamp, LNA/WRA accel, gyro, mag, BMP180 (temperature/pressure), battery, Ext A6/A7/A15.
  * Types: SensorData on Windows/Android; object-only on iOS/macOS.
  */

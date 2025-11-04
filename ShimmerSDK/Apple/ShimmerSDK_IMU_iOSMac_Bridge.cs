@@ -1,6 +1,6 @@
 ﻿// Shimmer IMU iOS/Mac client
 // Connects to the Android WebSocket bridge, subscribes to a target MAC,
-// pushes IMU config, starts/stops streaming, and parses samples into ShimmerSDK_IMUData.
+// pushes IMU config, starts/stops streaming, and parses samples into ShimmerSDK_IMU_Data.
 // Configure via BridgeHost/BridgePort/BridgePath and BridgeTargetMac.
 // Raises SampleReceived on the main thread when new data arrives.
 
