@@ -68,10 +68,7 @@ const string BridgeHost = "172.20.10.2"; // <- change to your Android bridge IP
 const int    BridgePort = 8787;          // <- change if you use a non-default port
 const string BridgePath = "/";           // <- change only if your WS server uses a path
 
-
 ## Run the app
-
----
 
 ### Android (device or emulator)
 - Pair **Shimmer3** in **Android Bluetooth**.
@@ -96,7 +93,6 @@ Or use your IDE (Visual Studio 2022 / VS Code with C# Dev Kit).
 - Pair **Shimmer3** in **Windows Bluetooth**.
 - Use your IDE (Visual Studio 2022 / VS Code with C# Dev Kit)
 
----
 
 ## Run Tests
 
