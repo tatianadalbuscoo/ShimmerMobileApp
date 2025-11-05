@@ -56,7 +56,7 @@ dotnet restore
 
 ---
 
-#### Where to set **iOS/Mac Bridge IP**
+### Where to set **iOS/Mac Bridge IP**
 
 ---
 
