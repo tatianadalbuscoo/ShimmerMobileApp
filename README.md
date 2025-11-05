@@ -54,12 +54,9 @@ git clone https://github.com/tatianadalbuscoo/ShimmerMobileApp
 dotnet restore
 ```
 
----
+
 
 ### Where to set **iOS/Mac Bridge IP**
-
----
-
 
 Only iOS/Mac need an IP. In this repo it’s defined **in code**:
 
