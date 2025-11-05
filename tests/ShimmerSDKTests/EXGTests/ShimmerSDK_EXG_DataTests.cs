@@ -1,5 +1,5 @@
 ﻿/*
- * ShimmerSDK_EXGDataTests.cs
+ * ShimmerSDK_EXG_DataTests.cs
  * Purpose: Unit tests for ShimmerSDK_EXGData file.
  */
 

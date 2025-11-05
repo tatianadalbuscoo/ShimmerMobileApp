@@ -1,5 +1,5 @@
 ﻿/*
- * ShimmerSDK_IMUStreamingTests.cs
+ * ShimmerSDK_IMU_StreamingTests.cs
  * Purpose: Unit tests for ShimmerSDK_IMUStreaming file.
  */
 

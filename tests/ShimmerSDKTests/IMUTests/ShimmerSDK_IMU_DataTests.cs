@@ -1,5 +1,5 @@
 ﻿/*
- * ShimmerSDK_IMUDataTests.cs
+ * ShimmerSDK_IMU_DataTests.cs
  * Purpose: Unit tests for ShimmerSDK_IMU_Data file.
  */
 

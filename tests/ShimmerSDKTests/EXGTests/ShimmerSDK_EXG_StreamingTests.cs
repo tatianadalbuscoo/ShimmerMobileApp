@@ -1,5 +1,5 @@
 ﻿/*
- * ShimmerSDK_EXGStreamingTests.cs
+ * ShimmerSDK_EXG_StreamingTests.cs
  * Purpose: Unit tests for ShimmerSDK_EXGStreaming file.
  */
 

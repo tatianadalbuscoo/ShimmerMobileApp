@@ -1,5 +1,5 @@
 ﻿/* 
- * ShimmerSDK_EXGData — immutable snapshot of one EXG frame.
+ * ShimmerSDK_EXG_Data — immutable snapshot of one EXG frame.
  * Includes timestamp, LNA/WRA accelerometers, gyroscope, magnetometer,
  * BMP180 (temperature/pressure), battery, Ext A6/A7/A15, and EXG channels.
  * Types: SensorData on Windows/Android; object-only on iOS/macOS.
