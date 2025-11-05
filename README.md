@@ -19,8 +19,7 @@ It runs on **Android, iOS, Mac (MacCatalyst), and Windows** and can consume data
   - **Windows**: Bluetooth-serial **COM port** (SPP/RFCOMM)
   - **iOS/Mac**: **WebSocket** via Android bridge
 - **Multi-device:** connect **multiple Shimmer devices** and switch between them (one device displayed at a time via per-device pages/tabs)
-- Real-time charts for multiple sensors (AccelerometerS, Gyroscope, Magnetometer, Battery, etc.)
-- Pluggable data sources (SPP on Android/Windows, WS client on iOS/Mac)
+- Real-time charts for multiple sensors (Accelerometers, Gyroscope, Magnetometer, Battery, etc.)
 - Runtime configuration of sensors and sample rate
 - Single codebase for Android, iOS, MacCatalyst, and Windows
 - - **Y-axis control:** automatic scaling or manual range selection per series
