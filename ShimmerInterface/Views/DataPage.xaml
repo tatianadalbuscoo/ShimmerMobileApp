@@ -371,15 +371,6 @@
                         <Label FontSize="16" Margin="0,0,0,2">
                             <Label.FormattedText>
                                 <FormattedString>
-                                    <Span Text="Display Mode:  " TextColor="{StaticResource Primary}"/>
-                                    <Span Text="{Binding ChartModeLabel}" TextColor="Black"/>
-                                </FormattedString>
-                            </Label.FormattedText>
-                        </Label>
-
-                        <Label FontSize="16" Margin="0,0,0,2">
-                            <Label.FormattedText>
-                                <FormattedString>
                                     <Span Text="Measuring:  " TextColor="{StaticResource Primary}"/>
                                     <Span Text="{Binding YAxisLabel}" TextColor="Black"/>
                                 </FormattedString>
